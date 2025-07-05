@@ -1,4 +1,62 @@
-<!DOCTYPE html>
+// Funciones globales para debugging y gestión
+        window.jirehDebug = {
+            showAccounts: () => console.log('Cuentas:', accounts),
+            clearAccounts: async () => {
+                accounts = [];
+                await saveAccounts();
+                renderAccounts();
+                updateStats();
+                console.log('❌ Todas las cuentas eliminadas');
+            },
+            addTestAccount: addTestAccount,
+            exportAccounts: async () => {
+                const data = await db.export();
+                console.log('📊 Exportar cuentas:', data);
+                return data;
+            },
+            importAccounts: async (jsonData) => {
+                const success = await db.import(jsonData);
+                if (success) {
+                    await loadAccounts();
+                    renderAccounts();
+                    updateStats();
+                    console.log('✅ Cuentas importadas exitosamente');
+                } else {
+                    console.log('❌ Error importando cuentas');
+                }
+            },
+            dbStats: () => {
+                const stats = db.getStats();
+                console.log('📊 Estadísticas de BD:', stats);
+                return stats;
+            },
+            forceBackup: async () => {
+                await saveAccounts();
+                console.log('💾 Backup forzado completado');
+            }
+        };
+        
+        // Función para descargar backup
+        window.downloadBackup = async function() {
+            try {
+                const data = await db.export();
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jireh_backup_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('💾 Backup descargado');
+            } catch (error) {
+                console.error('❌ Error descargando backup:', error);
+            }
+        };
+    </script>
+</body>
+</html><!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1056,7 +1114,8 @@
                     <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
                     <p><strong>Días Restantes:</strong> 30 días</p>
                     <p><strong>Próximo Pago:</strong> ${getNextPaymentDate()}</p>
-                    <p><strong>Yape/Plin:</strong> 981804056</p>
+                    <p><strong>Yape:</strong> 981804056</p>
+                    <p><strong>📋 IMPORTANTE:</strong> Para compartir el perfil, debe adjuntar el voucher de pago.</p>
                     <p><strong>⚠️ El servicio se suspende automáticamente si no se paga el día 5.</strong></p>
                 </div>
                 
@@ -1101,7 +1160,8 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 💳 *INFORMACIÓN DE PAGOS:*
 ⏰ Días Restantes: 30 días
 📅 Próximo Pago: ${getNextPaymentDate()}
-💰 Yape/Plin: 981804056
+💰 Yape: 981804056
+📋 IMPORTANTE: Para compartir el perfil, debe adjuntar el voucher de pago.
 ⚠️ El servicio se suspende automáticamente si no se paga el día 5.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
@@ -1152,7 +1212,8 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 💳 *INFORMACIÓN DE PAGOS:*
 ⏰ Días Restantes: 30 días
 📅 Próximo Pago: ${getNextPaymentDate()}
-💰 Yape/Plin: 981804056
+💰 Yape: 981804056
+📋 IMPORTANTE: Para compartir el perfil, debe adjuntar el voucher de pago.
 ⚠️ El servicio se suspende automáticamente si no se paga el día 5.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
@@ -1359,6 +1420,19 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             }
         }
         
+        // Guardar cuentas usando la base de datos
+        async function saveAccounts() {
+            const success = await db.save(accounts);
+            if (!success) {
+                alert('❌ Error al guardar los datos. Verifica el espacio de almacenamiento.');
+            }
+        }
+        
+        // Cargar cuentas usando la base de datos
+        async function loadAccounts() {
+            accounts = await db.load();
+        }
+        
         // Actualizar estadísticas
         function updateStats() {
             const totalAccounts = accounts.length;
@@ -1440,7 +1514,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         // Agregar cuenta de prueba (solo para desarrollo)
-        function addTestAccount() {
+        async function addTestAccount() {
             const testAccount = {
                 id: generateId(),
                 clientName: 'Cliente de Prueba',
@@ -1462,7 +1536,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             };
             
             accounts.push(testAccount);
-            saveAccounts();
+            await saveAccounts();
             renderAccounts();
             updateStats();
             
@@ -1470,7 +1544,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         // Inicializar aplicación
-        function initApp() {
+        async function initApp() {
             console.log('🚀 Iniciando JIREH Streaming Manager...');
             
             // Verificar autenticación
@@ -1488,15 +1562,19 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             }
             
             // Cargar datos
-            loadAccounts();
+            await loadAccounts();
             renderAccounts();
             updateStats();
             
             // Si no hay cuentas, agregar una de prueba para desarrollo
             if (accounts.length === 0) {
                 console.log('📝 No hay cuentas. Agregando cuenta de prueba...');
-                addTestAccount();
+                await addTestAccount();
             }
+            
+            // Mostrar estadísticas de la base de datos
+            const dbStats = db.getStats();
+            console.log('📊 Estadísticas de BD:', dbStats);
             
             console.log('✅ JIREH Streaming Manager cargado exitosamente');
         }
@@ -1506,20 +1584,21 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             initApp();
             
             // Guardar automáticamente cada 30 segundos
-            setInterval(function() {
+            setInterval(async function() {
                 if (accounts.length > 0) {
-                    saveAccounts();
+                    await saveAccounts();
                 }
             }, 30000);
             
             // Guardar antes de cerrar/recargar página
             window.addEventListener('beforeunload', function() {
-                saveAccounts();
+                // Guardado síncrono para beforeunload
+                db.save(accounts);
             });
             
             // Guardar cuando la página pierde el foco (móvil)
-            window.addEventListener('blur', function() {
-                saveAccounts();
+            window.addEventListener('blur', async function() {
+                await saveAccounts();
             });
             
             // Cerrar modales con Escape
@@ -1529,24 +1608,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 }
             });
         });
-        
-        // Funciones globales para debugging
-        window.jirehDebug = {
-            showAccounts: () => console.log('Cuentas:', accounts),
-            clearAccounts: () => {
-                accounts = [];
-                saveAccounts();
-                renderAccounts();
-                updateStats();
-                console.log('❌ Todas las cuentas eliminadas');
-            },
-            addTestAccount: addTestAccount,
-            exportAccounts: () => {
-                const data = JSON.stringify(accounts, null, 2);
-                console.log('📊 Exportar cuentas:', data);
-                return data;
-            }
-        };
     </script>
 </body>
 </html>
