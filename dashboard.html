@@ -1,62 +1,4 @@
-// Funciones globales para debugging y gestión
-        window.jirehDebug = {
-            showAccounts: () => console.log('Cuentas:', accounts),
-            clearAccounts: () => {
-                accounts = [];
-                saveAccounts();
-                renderAccounts();
-                updateStats();
-                console.log('❌ Todas las cuentas eliminadas');
-            },
-            addTestAccount: addTestAccount,
-            exportAccounts: () => {
-                const data = db.export();
-                console.log('📊 Exportar cuentas:', data);
-                return data;
-            },
-            importAccounts: (jsonData) => {
-                const success = db.import(jsonData);
-                if (success) {
-                    loadAccounts();
-                    renderAccounts();
-                    updateStats();
-                    console.log('✅ Cuentas importadas exitosamente');
-                } else {
-                    console.log('❌ Error importando cuentas');
-                }
-            },
-            dbStats: () => {
-                const stats = db.getStats();
-                console.log('📊 Estadísticas de BD:', stats);
-                return stats;
-            },
-            forceBackup: () => {
-                saveAccounts();
-                console.log('💾 Backup forzado completado');
-            }
-        };
-        
-        // Función para descargar backup
-        window.downloadBackup = function() {
-            try {
-                const data = db.export();
-                const blob = new Blob([data], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `jireh_backup_${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                console.log('💾 Backup descargado');
-            } catch (error) {
-                console.error('❌ Error descargando backup:', error);
-            }
-        };
-    </script>
-</body>
-</html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -710,7 +652,7 @@
                 <button class="close-btn" onclick="closeModal()">&times;</button>
             </div>
             
-            <form id="accountForm" onsubmit="addAccount(event)">
+            <form id="accountForm">
                 <div class="form-group">
                     <label for="clientName">Nombre del Cliente *</label>
                     <input type="text" id="clientName" required>
@@ -848,14 +790,18 @@
     </div>
 
     <script>
-        // Variables globales
+        // ===============================================
+        // VARIABLES GLOBALES
+        // ===============================================
         let accounts = [];
         let editingAccountId = null;
         let currentAccount = null;
         let currentCommunicationText = '';
         let editingPinAccountId = null;
         
-        // Configuración de perfiles por plataforma
+        // ===============================================
+        // CONFIGURACIÓN DE PERFILES POR PLATAFORMA
+        // ===============================================
         const platformProfiles = {
             // Streaming Video
             'Netflix Completa': 5,
@@ -942,6 +888,10 @@
             'ES': '🇪🇸'
         };
         
+        // ===============================================
+        // FUNCIONES BÁSICAS
+        // ===============================================
+        
         // Verificar autenticación
         function checkAuth() {
             const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
@@ -997,6 +947,65 @@
             return platformProfiles[platform] || 5;
         }
         
+        // ===============================================
+        // FUNCIONES DE ALMACENAMIENTO
+        // ===============================================
+        
+        // Guardar cuentas
+        function saveAccounts() {
+            try {
+                const dataToSave = JSON.stringify(accounts);
+                localStorage.setItem('jirehStreamingAccounts', dataToSave);
+                
+                // Backup adicional
+                try {
+                    sessionStorage.setItem('jirehStreamingBackup', dataToSave);
+                } catch (e) {
+                    console.warn('SessionStorage no disponible');
+                }
+                
+                console.log(`✅ Guardadas ${accounts.length} cuentas`);
+                return true;
+                
+            } catch (error) {
+                console.error('Error al guardar:', error);
+                alert('❌ Error al guardar los datos. Verifica el espacio de almacenamiento.');
+                return false;
+            }
+        }
+        
+        // Cargar cuentas
+        function loadAccounts() {
+            try {
+                let saved = localStorage.getItem('jirehStreamingAccounts');
+                
+                // Si no hay datos en localStorage, intentar con sessionStorage
+                if (!saved) {
+                    saved = sessionStorage.getItem('jirehStreamingBackup');
+                }
+                
+                if (saved) {
+                    const parsedData = JSON.parse(saved);
+                    if (Array.isArray(parsedData)) {
+                        accounts = parsedData;
+                        console.log(`✅ Cargadas ${accounts.length} cuentas`);
+                        return;
+                    }
+                }
+                
+                console.log('📝 No se encontraron datos, inicializando vacío');
+                accounts = [];
+                
+            } catch (error) {
+                console.error('Error al cargar datos:', error);
+                accounts = [];
+            }
+        }
+        
+        // ===============================================
+        // FUNCIONES DE MODAL
+        // ===============================================
+        
         // Abrir modal
         function openAddModal() {
             editingAccountId = null;
@@ -1013,6 +1022,10 @@
             document.getElementById('messageModal').style.display = 'none';
             document.getElementById('pinModal').style.display = 'none';
         }
+        
+        // ===============================================
+        // FUNCIONES DE CUENTAS
+        // ===============================================
         
         // Editar cuenta
         function editAccount(accountId) {
@@ -1044,6 +1057,80 @@
                 alert('✅ Cuenta eliminada exitosamente');
             }
         }
+        
+        // Agregar cuenta
+        function addAccount(event) {
+            event.preventDefault();
+            
+            const clientName = document.getElementById('clientName').value.trim();
+            const clientPhone = document.getElementById('clientPhone').value.trim();
+            const email = document.getElementById('accountEmail').value.trim();
+            const password = document.getElementById('accountPassword').value.trim();
+            const type = document.getElementById('accountType').value;
+            const country = document.getElementById('accountCountry').value;
+            const customDays = document.getElementById('customDays').value;
+            
+            if (!clientName || !email || !password) {
+                alert('Por favor completa todos los campos obligatorios');
+                return;
+            }
+            
+            // Generar perfiles
+            const profileCount = getProfileCount(type);
+            const profiles = [];
+            for (let i = 0; i < profileCount; i++) {
+                profiles.push({
+                    name: `Perfil ${i + 1}`,
+                    pin: generatePin()
+                });
+            }
+            
+            // Calcular días restantes
+            let daysRemaining;
+            if (customDays && customDays > 0) {
+                daysRemaining = parseInt(customDays);
+            } else {
+                daysRemaining = calculateDaysRemaining();
+            }
+            
+            const status = getAccountStatus(daysRemaining);
+            
+            const newAccount = {
+                id: editingAccountId || generateId(),
+                clientName,
+                clientPhone,
+                email,
+                password,
+                type,
+                country,
+                profiles,
+                daysRemaining,
+                status,
+                createdAt: new Date().toISOString()
+            };
+            
+            if (editingAccountId) {
+                // Editar cuenta existente
+                const index = accounts.findIndex(acc => acc.id === editingAccountId);
+                if (index !== -1) {
+                    accounts[index] = newAccount;
+                }
+            } else {
+                // Agregar nueva cuenta
+                accounts.push(newAccount);
+            }
+            
+            saveAccounts();
+            renderAccounts();
+            updateStats();
+            closeModal();
+            
+            alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nPINs generados automáticamente`);
+        }
+        
+        // ===============================================
+        // FUNCIONES DE COMUNICADOS
+        // ===============================================
         
         // Generar comunicados
         function generateCommunications(accountId) {
@@ -1249,6 +1336,10 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             window.open(whatsappURL, '_blank');
         }
         
+        // ===============================================
+        // FUNCIONES DE PINS
+        // ===============================================
+        
         // Editar PINs
         function editPins(accountId) {
             const account = accounts.find(acc => acc.id === accountId);
@@ -1320,118 +1411,9 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             alert('✅ PINs actualizados exitosamente');
         }
         
-        // Logout
-        function logout() {
-            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-                localStorage.removeItem('streamingAdminLoggedIn');
-                window.location.href = 'login.html';
-            }
-        }
-        
-        // Agregar cuenta
-        function addAccount(event) {
-            event.preventDefault();
-            
-            const clientName = document.getElementById('clientName').value.trim();
-            const clientPhone = document.getElementById('clientPhone').value.trim();
-            const email = document.getElementById('accountEmail').value.trim();
-            const password = document.getElementById('accountPassword').value.trim();
-            const type = document.getElementById('accountType').value;
-            const country = document.getElementById('accountCountry').value;
-            const customDays = document.getElementById('customDays').value;
-            
-            if (!clientName || !email || !password) {
-                alert('Por favor completa todos los campos obligatorios');
-                return;
-            }
-            
-            // Generar perfiles
-            const profileCount = getProfileCount(type);
-            const profiles = [];
-            for (let i = 0; i < profileCount; i++) {
-                profiles.push({
-                    name: `Perfil ${i + 1}`,
-                    pin: generatePin()
-                });
-            }
-            
-            // Calcular días restantes
-            let daysRemaining;
-            if (customDays && customDays > 0) {
-                daysRemaining = parseInt(customDays);
-            } else {
-                daysRemaining = calculateDaysRemaining();
-            }
-            
-            const status = getAccountStatus(daysRemaining);
-            
-            const newAccount = {
-                id: editingAccountId || generateId(),
-                clientName,
-                clientPhone,
-                email,
-                password,
-                type,
-                country,
-                profiles,
-                daysRemaining,
-                status,
-                createdAt: new Date().toISOString()
-            };
-            
-            if (editingAccountId) {
-                // Editar cuenta existente
-                const index = accounts.findIndex(acc => acc.id === editingAccountId);
-                if (index !== -1) {
-                    accounts[index] = newAccount;
-                }
-            } else {
-                // Agregar nueva cuenta
-                accounts.push(newAccount);
-            }
-            
-            saveAccounts();
-            renderAccounts();
-            updateStats();
-            closeModal();
-            
-            alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nPINs generados automáticamente`);
-        }
-        
-        // Guardar cuentas con mejor compatibilidad
-        function saveAccounts() {
-            try {
-                const dataToSave = JSON.stringify(accounts);
-                localStorage.setItem('jirehStreamingAccounts', dataToSave);
-                
-                // Backup adicional
-                try {
-                    sessionStorage.setItem('jirehStreamingBackup', dataToSave);
-                } catch (e) {
-                    console.warn('SessionStorage no disponible');
-                }
-                
-                // Mostrar confirmación
-                console.log(`✅ Guardadas ${accounts.length} cuentas`);
-                
-            } catch (error) {
-                console.error('Error al guardar:', error);
-                alert('❌ Error al guardar los datos. Verifica el espacio de almacenamiento.');
-            }
-        }
-        
-        // Guardar cuentas usando la base de datos
-        function saveAccounts() {
-            const success = db.save(accounts);
-            if (!success) {
-                alert('❌ Error al guardar los datos. Verifica el espacio de almacenamiento.');
-            }
-        }
-        
-        // Cargar cuentas usando la base de datos
-        function loadAccounts() {
-            accounts = db.load();
-        }
+        // ===============================================
+        // FUNCIONES DE RENDERIZADO
+        // ===============================================
         
         // Actualizar estadísticas
         function updateStats() {
@@ -1513,34 +1495,16 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             `).join('');
         }
         
-        // Agregar cuenta de prueba (solo para desarrollo)
-        function addTestAccount() {
-            const testAccount = {
-                id: generateId(),
-                clientName: 'Cliente de Prueba',
-                clientPhone: '987654321',
-                email: 'cliente@ejemplo.com',
-                password: 'password123',
-                type: 'Netflix Completa',
-                country: 'PE',
-                profiles: [
-                    { name: 'Perfil 1', pin: '1234' },
-                    { name: 'Perfil 2', pin: '5678' },
-                    { name: 'Perfil 3', pin: '9012' },
-                    { name: 'Perfil 4', pin: '3456' },
-                    { name: 'Perfil 5', pin: '7890' }
-                ],
-                daysRemaining: 22,
-                status: 'active',
-                createdAt: new Date().toISOString()
-            };
-            
-            accounts.push(testAccount);
-            saveAccounts();
-            renderAccounts();
-            updateStats();
-            
-            console.log('✅ Cuenta de prueba agregada');
+        // ===============================================
+        // FUNCIONES DE SISTEMA
+        // ===============================================
+        
+        // Logout
+        function logout() {
+            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                localStorage.removeItem('streamingAdminLoggedIn');
+                window.location.href = 'login.html';
+            }
         }
         
         // Inicializar aplicación
@@ -1566,22 +1530,20 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             renderAccounts();
             updateStats();
             
-            // Si no hay cuentas, agregar una de prueba para desarrollo
-            if (accounts.length === 0) {
-                console.log('📝 No hay cuentas. Agregando cuenta de prueba...');
-                addTestAccount();
-            }
-            
-            // Mostrar estadísticas de la base de datos
-            const dbStats = db.getStats();
-            console.log('📊 Estadísticas de BD:', dbStats);
-            
             console.log('✅ JIREH Streaming Manager cargado exitosamente');
         }
+        
+        // ===============================================
+        // EVENT LISTENERS
+        // ===============================================
         
         // Event listeners cuando se carga la página
         document.addEventListener('DOMContentLoaded', function() {
             initApp();
+            
+            // Configurar formulario
+            const form = document.getElementById('accountForm');
+            form.addEventListener('submit', addAccount);
             
             // Guardar automáticamente cada 30 segundos
             setInterval(function() {
@@ -1606,7 +1568,143 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                     closeModal();
                 }
             });
+            
+            // Cerrar modales al hacer clic fuera
+            document.getElementById('accountModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+            
+            document.getElementById('communicationModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+            
+            document.getElementById('messageModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+            
+            document.getElementById('pinModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
         });
+        
+        // ===============================================
+        // FUNCIONES DE DEBUGGING
+        // ===============================================
+        
+        // Funciones globales para debugging
+        window.jirehDebug = {
+            showAccounts: () => {
+                console.log('📊 Cuentas actuales:', accounts);
+                return accounts;
+            },
+            clearAccounts: () => {
+                if (confirm('¿Estás seguro de eliminar TODAS las cuentas?')) {
+                    accounts = [];
+                    saveAccounts();
+                    renderAccounts();
+                    updateStats();
+                    console.log('❌ Todas las cuentas eliminadas');
+                }
+            },
+            exportAccounts: () => {
+                const data = JSON.stringify(accounts, null, 2);
+                console.log('📤 Exportar cuentas:', data);
+                return data;
+            },
+            importAccounts: (jsonData) => {
+                try {
+                    const importedAccounts = JSON.parse(jsonData);
+                    if (Array.isArray(importedAccounts)) {
+                        accounts = importedAccounts;
+                        saveAccounts();
+                        renderAccounts();
+                        updateStats();
+                        console.log('✅ Cuentas importadas exitosamente');
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.error('❌ Error importando cuentas:', error);
+                    return false;
+                }
+            },
+            storageInfo: () => {
+                const info = {
+                    totalAccounts: accounts.length,
+                    localStorage: !!localStorage.getItem('jirehStreamingAccounts'),
+                    sessionStorage: !!sessionStorage.getItem('jirehStreamingBackup'),
+                    storageSize: JSON.stringify(accounts).length + ' bytes'
+                };
+                console.log('💾 Información de almacenamiento:', info);
+                return info;
+            }
+        };
+        
+        // Función para descargar backup
+        window.downloadBackup = function() {
+            try {
+                const data = JSON.stringify({
+                    version: 1,
+                    timestamp: new Date().toISOString(),
+                    accounts: accounts,
+                    count: accounts.length
+                }, null, 2);
+                
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jireh_backup_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('💾 Backup descargado exitosamente');
+            } catch (error) {
+                console.error('❌ Error descargando backup:', error);
+                alert('Error al descargar el backup');
+            }
+        };
+        
+        // Función para cargar backup desde archivo
+        window.loadBackup = function() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            if (data.accounts && Array.isArray(data.accounts)) {
+                                accounts = data.accounts;
+                                saveAccounts();
+                                renderAccounts();
+                                updateStats();
+                                alert(`✅ Backup cargado exitosamente!\nCuentas: ${data.accounts.length}`);
+                            } else {
+                                alert('❌ Formato de archivo inválido');
+                            }
+                        } catch (error) {
+                            alert('❌ Error al leer el archivo');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        };
+        
+        console.log('🎉 JIREH Streaming Manager cargado completamente');
+        console.log('🔧 Funciones disponibles:');
+        console.log('   - jirehDebug.showAccounts()');
+        console.log('   - jirehDebug.clearAccounts()');
+        console.log('   - jirehDebug.exportAccounts()');
+        console.log('   - jirehDebug.storageInfo()');
+        console.log('   - downloadBackup()');
+        console.log('   - loadBackup()');
     </script>
 </body>
 </html>
