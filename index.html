@@ -1671,7 +1671,7 @@ ${profilesInfo}`);
         // Event listeners - Reemplazar la sección anterior
         // Inicializar aplicación
         window.onload = function() {
-            checkAuth();
+            initAuth(); // Cambiado para inicializar variables primero
             
             // Configurar fecha por defecto
             const today = new Date().toISOString().split('T')[0];
