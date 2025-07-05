@@ -749,6 +749,14 @@
                     </select>
                 </div>
                 
+                <div class="form-group">
+                    <label for="customDays">Días restantes (opcional)</label>
+                    <input type="number" id="customDays" min="0" max="365" placeholder="Deja vacío para calcular automáticamente">
+                    <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
+                        Si no especificas, se calculará automáticamente hasta el próximo mes
+                    </small>
+                </div>
+                
                 <div class="btn-group">
                     <button type="button" class="btn btn-secondary" id="cancelBtn">Cancelar</button>
                     <button type="submit" class="btn btn-primary">💾 Guardar Cuenta</button>
@@ -897,6 +905,8 @@
             document.querySelector('.modal-title').textContent = 'Agregar Nueva Cuenta';
             document.getElementById('accountModal').style.display = 'block';
             document.getElementById('accountForm').reset();
+            // Limpiar el campo de días personalizados
+            document.getElementById('customDays').value = '';
         }
         
         // Cerrar modal
@@ -921,6 +931,7 @@
             document.getElementById('accountPassword').value = account.password;
             document.getElementById('accountType').value = account.type;
             document.getElementById('accountCountry').value = account.country;
+            document.getElementById('customDays').value = account.daysRemaining;
             
             document.getElementById('accountModal').style.display = 'block';
         }
@@ -1144,6 +1155,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             const password = document.getElementById('accountPassword').value.trim();
             const type = document.getElementById('accountType').value;
             const country = document.getElementById('accountCountry').value;
+            const customDays = document.getElementById('customDays').value;
             
             if (!clientName || !email || !password) {
                 alert('Por favor completa todos los campos obligatorios');
@@ -1160,7 +1172,14 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 });
             }
             
-            const daysRemaining = calculateDaysRemaining();
+            // Calcular días restantes
+            let daysRemaining;
+            if (customDays && customDays > 0) {
+                daysRemaining = parseInt(customDays);
+            } else {
+                daysRemaining = calculateDaysRemaining();
+            }
+            
             const status = getAccountStatus(daysRemaining);
             
             const newAccount = {
@@ -1193,19 +1212,55 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             updateStats();
             closeModal();
             
-            alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nPINs generados automáticamente`);
+            alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nPINs generados automáticamente`);
         }
         
-        // Guardar cuentas
+        // Guardar cuentas con mejor compatibilidad móvil
         function saveAccounts() {
-            localStorage.setItem('streamingAccountsPro', JSON.stringify(accounts));
+            try {
+                const dataToSave = JSON.stringify(accounts);
+                localStorage.setItem('streamingAccountsPro', dataToSave);
+                
+                // Verificar que se guardó correctamente
+                const saved = localStorage.getItem('streamingAccountsPro');
+                if (!saved) {
+                    console.error('Error guardando en localStorage');
+                    alert('⚠️ Advertencia: Los datos podrían no guardarse correctamente en este dispositivo');
+                }
+                
+                // Backup adicional para móviles
+                try {
+                    sessionStorage.setItem('streamingBackup', dataToSave);
+                } catch (e) {
+                    console.warn('SessionStorage no disponible');
+                }
+                
+            } catch (error) {
+                console.error('Error al guardar:', error);
+                alert('❌ Error al guardar los datos. Verifica el espacio de almacenamiento.');
+            }
         }
         
-        // Cargar cuentas
+        // Cargar cuentas con mejor compatibilidad móvil
         function loadAccounts() {
-            const saved = localStorage.getItem('streamingAccountsPro');
-            if (saved) {
-                accounts = JSON.parse(saved);
+            try {
+                let saved = localStorage.getItem('streamingAccountsPro');
+                
+                // Si no hay datos en localStorage, intentar con sessionStorage
+                if (!saved) {
+                    saved = sessionStorage.getItem('streamingBackup');
+                }
+                
+                if (saved) {
+                    const parsedData = JSON.parse(saved);
+                    if (Array.isArray(parsedData)) {
+                        accounts = parsedData;
+                        console.log(`Cargadas ${accounts.length} cuentas`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error al cargar datos:', error);
+                accounts = [];
             }
         }
         
@@ -1292,6 +1347,17 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         document.addEventListener('DOMContentLoaded', function() {
             if (!checkAuth()) return;
             
+            // Verificar soporte de localStorage
+            try {
+                const testKey = 'test_storage';
+                localStorage.setItem(testKey, 'test');
+                localStorage.removeItem(testKey);
+                console.log('✅ localStorage disponible');
+            } catch (e) {
+                console.warn('⚠️ localStorage limitado en este dispositivo');
+                alert('⚠️ Advertencia: El almacenamiento puede estar limitado en este dispositivo. Los datos podrían no guardarse correctamente.');
+            }
+            
             loadAccounts();
             renderAccounts();
             updateStats();
@@ -1316,6 +1382,23 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             
             document.getElementById('messageModal').addEventListener('click', function(e) {
                 if (e.target === this) closeModal();
+            });
+            
+            // Guardar automáticamente cada 30 segundos (para móviles)
+            setInterval(function() {
+                if (accounts.length > 0) {
+                    saveAccounts();
+                }
+            }, 30000);
+            
+            // Guardar antes de cerrar/recargar página
+            window.addEventListener('beforeunload', function() {
+                saveAccounts();
+            });
+            
+            // Guardar cuando la página pierde el foco (móvil)
+            window.addEventListener('blur', function() {
+                saveAccounts();
             });
             
             console.log('JIREH Streaming Manager cargado exitosamente');
