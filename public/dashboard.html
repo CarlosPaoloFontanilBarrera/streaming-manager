@@ -97,11 +97,6 @@
             background: #fff;
         }
         
-        .search-box::placeholder {
-            color: #6c757d;
-            font-weight: 400;
-        }
-        
         .add-btn {
             background: linear-gradient(45deg, #28a745, #20c997);
             color: white;
@@ -118,7 +113,6 @@
         .add-btn:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
-            background: linear-gradient(45deg, #218838, #1dc58a);
         }
         
         .stats {
@@ -239,7 +233,6 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            border: 2px solid transparent;
         }
         
         .status-active {
@@ -300,13 +293,6 @@
             border-top: 2px solid #f8f9fa;
         }
         
-        .profiles-header {
-            font-weight: 700;
-            color: #495057;
-            margin-bottom: 15px;
-            font-size: 1.1em;
-        }
-        
         .profiles-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -324,11 +310,6 @@
             text-align: center;
             box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);
             transition: all 0.3s ease;
-        }
-        
-        .profile-badge:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(111, 66, 193, 0.4);
         }
         
         .action-buttons {
@@ -358,20 +339,10 @@
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
         
-        .btn-edit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4);
-        }
-        
         .btn-communication {
             background: linear-gradient(45deg, #28a745, #20c997);
             color: white;
             box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
-        }
-        
-        .btn-communication:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
         }
         
         .btn-delete {
@@ -380,9 +351,8 @@
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
         }
         
-        .btn-delete:hover {
+        .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
         }
         
         .modal {
@@ -474,11 +444,6 @@
             color: white;
         }
         
-        .btn:hover {
-            transform: translateY(-1px);
-            opacity: 0.9;
-        }
-        
         .no-accounts {
             text-align: center;
             padding: 60px 20px;
@@ -563,7 +528,7 @@
         <div class="header">
             <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
             <h1>🎬 JIREH Streaming Manager</h1>
-            <p>Sistema profesional con PostgreSQL en Railway</p>
+            <p>Sistema con PostgreSQL en Railway</p>
         </div>
         
         <!-- Modal para comunicados -->
@@ -849,7 +814,6 @@
         // CONFIGURACIÓN DE PERFILES POR PLATAFORMA
         // ===============================================
         const platformProfiles = {
-            // Streaming Video
             'Netflix Completa': 5,
             'Netflix 1 Perfil no renovable': 1,
             'Netflix 1 Perfil renovable': 1,
@@ -866,8 +830,6 @@
             'Vix+ completo': 4,
             'Vix perfilada': 1,
             'StellaTV': 3,
-            
-            // IPTV y TV
             'Telelatino completo': 5,
             'Panel Telelatino 10 créditos': 1,
             'Panel Telelatino 30 créditos': 1,
@@ -892,12 +854,8 @@
             'Iptv premiun 6 meses': 3,
             'Panel Iptv premium': 1,
             'Mientreten Futbol': 2,
-            
-            // Streaming Audio
             'AppleMusic 1 mes': 1,
             'Deezer 1 mes': 1,
-            
-            // Media Servers
             'Jelly1pXXX': 1,
             'Jellyfin completo': 5,
             'Jellyfin adultos completo': 3,
@@ -905,22 +863,14 @@
             'Plex 3 pantallas': 3,
             'Plex 3 meses': 3,
             'Plex 7 meses': 3,
-            
-            // Educación
             'Platzi 1 mes': 1,
             'Platzi 2 meses': 1,
             'Platzi 3 meses': 1,
-            
-            // Gaming
             'PS Plus Deluxe 12 meses': 1,
-            
-            // Productividad
             'Office 365 x 1 año': 1,
             'Canva premium': 1,
             'Canva premium 3 meses': 1,
             'Canva premium 12 meses': 1,
-            
-            // Entretenimiento
             'YouTube 1 mes': 1,
             'Activacion app duplex 1 año': 1,
             'Boleta procinal 2D': 1,
@@ -1256,7 +1206,7 @@
                 
                 <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
                     <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
-                    <p><strong>Días Restantes:</strong> 30 días</p>
+                    <p><strong>Días Restantes:</strong> ${currentAccount.daysRemaining} días</p>
                     <p><strong>Próximo Pago:</strong> ${getNextPaymentDate()}</p>
                     <p><strong>Yape:</strong> 981804056</p>
                     <p><strong>📋 IMPORTANTE:</strong> Para compartir el perfil, debe adjuntar el voucher de pago.</p>
@@ -1302,7 +1252,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 • Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
 
 💳 *INFORMACIÓN DE PAGOS:*
-⏰ Días Restantes: 30 días
+⏰ Días Restantes: ${currentAccount.daysRemaining} días
 📅 Próximo Pago: ${getNextPaymentDate()}
 💰 Yape: 981804056
 📋 IMPORTANTE: Para compartir el perfil, debe adjuntar el voucher de pago.
@@ -1354,7 +1304,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 • Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
 
 💳 *INFORMACIÓN DE PAGOS:*
-⏰ Días Restantes: 30 días
+⏰ Días Restantes: ${currentAccount.daysRemaining} días
 📅 Próximo Pago: ${getNextPaymentDate()}
 💰 Yape: 981804056
 📋 IMPORTANTE: Para compartir el perfil, debe adjuntar el voucher de pago.
