@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Streaming Manager - Admin Multi-Plataforma</title>
+    <meta name="description" content="Sistema de gestión profesional para todas las plataformas de streaming">
+    <meta name="keywords" content="streaming, netflix, disney, amazon, max, gestión, cuentas, perfiles">
+    <meta name="author" content="Netflix Manager Admin">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        // Cerrar modales al hacer clic fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('accountModal');
+            const commModal = document.getElementById('communicationModal');
+            const profileModal = document.getElementById('profileSelectModal');
+            
+            if (event.target === modal) {
+                closeModal();
+            }
+            if (event.target === commModal) {
+                closeCommunicationModal();
+            }
+            if (event.target === profileModal) {
+                closeProfileSelectModal();
+            }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        /* Login Screen Styles */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #141414, #e50914);
+        }
+        
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .login-logo {
+            font-size: 3em;
+            color: #e50914;
+            margin-bottom: 20px;
+        }
+        
+        .login-title {
+            font-size: 2em;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .login-input {
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .login-input:focus {
+            outline: none;
+            border-color: #e50914;
+            box-shadow: 0 0 10px rgba(229, 9, 20, 0.2);
+        }
+        
+        .password-container {
+            position: relative;
+            width: 100%;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #666;
+            padding: 5px;
+            z-index: 10;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+        
+        .password-toggle:hover {
+            color: #e50914;
+            background: rgba(229, 9, 20, 0.1);
+        }
+        
+        .password-toggle:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+        
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 10px;
+        }
+        
+        .remember-me input[type="checkbox"] {
+            margin: 0;
+            transform: scale(1.2);
+            accent-color: #e50914;
+        }
+        
+        .login-btn {
+            background: linear-gradient(45deg, #e50914, #dc143c);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(229, 9, 20, 0.3);
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(229, 9, 20, 0.4);
+        }
+        
+        .login-error {
+            color: #dc3545;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        
+        .login-info {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        /* Main App Styles */
+        .app-container {
+            display: none;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #e50914, #dc143c);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .search-section {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .search-container {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            padding: 12px 20px;
+            border: 2px solid #dee2e6;
+            border-radius: 25px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: #e50914;
+            box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.1);
+        }
+        
+        .filter-select {
+            padding: 10px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+            font-size: 1em;
+        }
+        
+        .add-btn {
+            background: linear-gradient(45deg, #e50914, #dc143c);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
+        }
+        
+        .add-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(229, 9, 20, 0.4);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #e50914;
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #e50914;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            padding: 0 30px 30px;
+        }
+        
+        .accounts-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .accounts-table th {
+            background: linear-gradient(135deg, #343a40, #495057);
+            color: white;
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .accounts-table td {
+            padding: 15px 10px;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: middle;
+        }
+        
+        .accounts-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-expired {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .country-flag {
+            width: 20px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 2px;
+        }
+        
+        .profile-pills {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .profile-pill {
+            background: #e50914;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-sm {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-view {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .btn-edit {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-sm:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .modal-title {
+            font-size: 1.5em;
+            color: #e50914;
+            font-weight: bold;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select {
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #e50914;
+            box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.1);
+        }
+        
+        .profiles-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .profiles-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .profile-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #dee2e6;
+        }
+        
+        .profile-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .profile-pin {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #e50914;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        
+        .days-remaining {
+            font-weight: bold;
+        }
+        
+        .days-high {
+            color: #28a745;
+        }
+        
+        .days-medium {
+            color: #ffc107;
+        }
+        
+        .days-low {
+            color: #dc3545;
+        }
+        
+        .copy-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.7em;
+            margin-left: 5px;
+        }
+        
+        .no-accounts {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .search-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                min-width: auto;
+            }
+            
+            .profiles-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container" id="loginScreen">
+        <div class="login-box">
+            <div class="login-logo">🎬</div>
+            <h2 class="login-title">Streaming Manager</h2>
+            <p style="color: #666; margin-bottom: 20px;">Panel de Administración Multi-Plataforma</p>
+            
+            <form class="login-form" id="loginForm">
+                <input type="text" class="login-input" id="username" placeholder="👤 Usuario" required autocomplete="username">
+                <div class="password-container">
+                    <input type="password" class="login-input" id="password" placeholder="🔒 Contraseña" required autocomplete="current-password">
+                    <button type="button" class="password-toggle" id="togglePassword" title="Mostrar contraseña">👁️</button>
+                </div>
+                <div class="remember-me">
+                    <input type="checkbox" id="rememberMe">
+                    <label for="rememberMe">Recordar mis credenciales</label>
+                </div>
+                <button type="submit" class="login-btn">🚀 Iniciar Sesión</button>
+                <div class="login-error" id="loginError"></div>
+            </form>
+            
+            <div class="login-info">
+                <p>🔐 Acceso restringido solo para administradores</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container" id="appContainer">
+        <div class="container">
+            <div class="header">
+                <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
+                <h1>🎬 Sistema de Gestión de Streaming Profesional</h1>
+                <p>Administración completa de todas las plataformas de streaming y servicios</p>
+            </div>
+        
+        <div class="search-section">
+            <div class="search-container">
+                <input type="text" class="search-box" id="searchInput" placeholder="🔍 Buscar por ID, cuenta, cliente, teléfono...">
+                <select class="filter-select" id="statusFilter">
+                    <option value="">Todos los estados</option>
+                    <option value="active">Activo</option>
+                    <option value="inactive">Inactivo</option>
+                    <option value="expired">Vencido</option>
+                </select>
+                <select class="filter-select" id="countryFilter">
+                    <option value="">Todos los países</option>
+                    <option value="PE">Perú</option>
+                    <option value="US">Estados Unidos</option>
+                    <option value="GB">Reino Unido</option>
+                    <option value="ES">España</option>
+                </select>
+                <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalAccounts">0</div>
+                <div class="stat-label">Cuentas Totales</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="activeAccounts">0</div>
+                <div class="stat-label">Cuentas Activas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalProfiles">0</div>
+                <div class="stat-label">Perfiles Totales</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="expiringAccounts">0</div>
+                <div class="stat-label">Por Vencer</div>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table class="accounts-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Estado</th>
+                        <th>Cuenta</th>
+                        <th>Contraseña</th>
+                        <th>Perfiles</th>
+                        <th>País</th>
+                        <th>Tipo</th>
+                        <th>Fecha Compra</th>
+                        <th>Días Rest.</th>
+                        <th>Cliente</th>
+                        <th>Teléfono</th>
+                        <th>Funciones</th>
+                    </tr>
+                </thead>
+                <tbody id="accountsTableBody">
+                    <tr>
+                        <td colspan="12" class="no-accounts">
+                            <h3>📱 No hay cuentas registradas</h3>
+                            <p>Haz clic en "Agregar Cuenta" para comenzar</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+    <!-- Modal para seleccionar perfil -->
+    <div id="profileSelectModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="modal-title">👥 Seleccionar Perfil para Comunicado</h2>
+                <button class="close-btn" onclick="closeProfileSelectModal()">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <p style="margin-bottom: 20px; text-align: center; font-size: 1.1em; color: #666;">
+                    Selecciona el perfil para generar su comunicado individual:
+                </p>
+                <div id="profileSelectGrid" class="profiles-grid" style="margin-bottom: 20px;">
+                    <!-- Los perfiles se cargarán aquí -->
+                </div>
+                <div style="text-align: center;">
+                    <button class="btn-sm" style="background: #28a745; color: white; padding: 10px 20px; margin: 5px;" onclick="generateAllProfileCommunications()">📧 Generar Todos los Comunicados</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para mostrar comunicado individual -->
+    <div id="communicationModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 class="modal-title">📧 Comunicado Individual - Perfil Netflix</h2>
+                <button class="close-btn" onclick="closeCommunicationModal()">&times;</button>
+            </div>
+            <div id="communicationContent" style="background: #f8f9fa; padding: 30px; border-radius: 10px; font-family: Arial, sans-serif; line-height: 1.6;">
+                <!-- El contenido se generará aquí -->
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn-sm" style="background: #28a745; color: white; padding: 10px 20px; margin-right: 10px;" onclick="copyCommunication()">📋 Copiar Comunicado</button>
+                <button class="btn-sm" style="background: #17a2b8; color: white; padding: 10px 20px; margin-right: 10px;" onclick="printCommunication()">🖨️ Imprimir</button>
+                <button class="btn-sm" style="background: #ffc107; color: #212529; padding: 10px 20px;" onclick="sendViaWhatsApp()">📱 Enviar por WhatsApp</button>
+            </div>
+        </div>
+    </div>
+    <div id="accountModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Agregar Nueva Cuenta</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            
+            <form id="accountForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="accountEmail">Email/Usuario *</label>
+                        <input type="email" id="accountEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountPassword">Contraseña *</label>
+                        <input type="password" id="accountPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountCountry">País</label>
+                        <select id="accountCountry">
+                            <option value="PE">🇵🇪 Perú</option>
+                            <option value="US">🇺🇸 Estados Unidos</option>
+                            <option value="GB">🇬🇧 Reino Unido</option>
+                            <option value="ES">🇪🇸 España</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountType">Tipo de Cuenta</label>
+                        <select id="accountType">
+                            <option value="Netflix">Netflix - S/17.00</option>
+                            <option value="StellaTV">StellaTV - S/17.00</option>
+                            <option value="Jelly1pXXX">Jelly1pXXX - S/11.30</option>
+                            <option value="Jellyfin completo">Jellyfin completo - S/14.90</option>
+                            <option value="Jellyfin adultos completo">Jellyfin adultos completo - S/24.00</option>
+                            <option value="Jellyfin perfil">Jellyfin perfil - S/7.20</option>
+                            <option value="Plex 3 pantallas">Plex 3 pantallas - S/14.00</option>
+                            <option value="Plex 7 meses">Plex 7 meses - S/92.00</option>
+                            <option value="Plex 3 meses">Plex 3 meses - S/41.50</option>
+                            <option value="Amazon Prime Completa">Amazon Prime Completa - S/11.00</option>
+                            <option value="Amazon Prime 1 perfil">Amazon Prime 1 perfil - S/5.00</option>
+                            <option value="Disney+ Estandar Completa">Disney+ Estandar Completa - S/16.30</option>
+                            <option value="Max básico con anuncios">Max básico con anuncios - S/10.10</option>
+                            <option value="Max Completa Estandar">Max Completa Estandar - S/11.10</option>
+                            <option value="Max 1 perfil">Max 1 perfil - S/5.00</option>
+                            <option value="YouTube 1 mes">YouTube 1 mes - S/6.20</option>
+                            <option value="Deezer 1 mes">Deezer 1 mes - S/5.00</option>
+                            <option value="Platzi 1 mes">Platzi 1 mes - S/106.00</option>
+                            <option value="Platzi 2 meses">Platzi 2 meses - S/211.00</option>
+                            <option value="Platzi 3 meses">Platzi 3 meses - S/317.00</option>
+                            <option value="Paramount+ Estandar Completo">Paramount+ Estandar Completo - S/8.50</option>
+                            <option value="Paramount+ Estándar 1 perfil">Paramount+ Estándar 1 perfil - S/3.50</option>
+                            <option value="Crunchyroll Mega Fan">Crunchyroll Mega Fan - S/7.50</option>
+                            <option value="Crunchyroll Mega Fan 1 perfil">Crunchyroll Mega Fan 1 perfil - S/3.00</option>
+                            <option value="AppleMusic 1 mes">AppleMusic 1 mes - S/17.40</option>
+                            <option value="Vix+ completo">Vix+ completo - S/8.20</option>
+                            <option value="Vix perfilada">Vix perfilada - S/3.50</option>
+                            <option value="Activacion app duplex 1 año">Activacion app duplex 1 año - S/11.00</option>
+                            <option value="Panel Telelatino 10 créditos">Panel Telelatino 10 créditos - S/128.00</option>
+                            <option value="Panel Telelatino 30 créditos">Panel Telelatino 30 créditos - S/373.00</option>
+                            <option value="Panel Telelatino 50 creditos">Panel Telelatino 50 creditos - S/618.00</option>
+                            <option value="Telelatino completo">Telelatino completo - S/14.50</option>
+                            <option value="Flujo Tv 1 mes">Flujo Tv 1 mes - S/16.70</option>
+                            <option value="Flujo Tv 3meses">Flujo Tv 3meses - S/48.20</option>
+                            <option value="Flujo Tv 12 meses">Flujo Tv 12 meses - S/210.00</option>
+                            <option value="Flujo Tv 6 mas 1">Flujo Tv 6 mas 1 - S/105.00</option>
+                            <option value="IPTVP3 completo">IPTVP3 completo - S/13.50</option>
+                            <option value="IPTV3 completo 6 meses">IPTV3 completo 6 meses - S/62.00</option>
+                            <option value="Panel Iptv">Panel Iptv - S/105.00</option>
+                            <option value="IPTV PREMIUM">IPTV PREMIUM - S/17.20</option>
+                            <option value="Iptv premiun 6 meses">Iptv premiun 6 meses - S/83.00</option>
+                            <option value="Panel Iptv premium">Panel Iptv premium - S/158.00</option>
+                            <option value="Mientreten Futbol">Mientreten Futbol - S/8.50</option>
+                            <option value="Canva premium">Canva premium - S/7.00</option>
+                            <option value="Office 365 x 1 año">Office 365 x 1 año - S/40.00</option>
+                            <option value="Canva premium 12 meses">Canva premium 12 meses - S/42.80</option>
+                            <option value="Canva premium 3 meses">Canva premium 3 meses - S/15.70</option>
+                            <option value="Boleta procinal 2D">Boleta procinal 2D - S/16.00</option>
+                            <option value="Combo Procinal 2">Combo Procinal 2 - S/28.00</option>
+                            <option value="Flujo Tv 30 créditos">Flujo Tv 30 créditos - S/405.00</option>
+                            <option value="Flujo Tv 100 créditos">Flujo Tv 100 créditos - S/1,240.00</option>
+                            <option value="Flujo Tv 200 créditos">Flujo Tv 200 créditos - S/2,500.00</option>
+                            <option value="Flujo Tv 300 créditos">Flujo Tv 300 créditos - S/3,600.00</option>
+                            <option value="Flujo Tv 50 créditos">Flujo Tv 50 créditos - S/680.00</option>
+                            <option value="Flujo Tv 500">Flujo Tv 500 - S/6,010.00</option>
+                            <option value="Flujo Tv1000+100 cre">Flujo Tv1000+100 cre - S/11,200.00</option>
+                            <option value="Flujo Tv 3000">Flujo Tv 3000 - S/38,000.00</option>
+                            <option value="Flujo Tv 5000 créditos">Flujo Tv 5000 créditos - S/66,000.00</option>
+                            <option value="PS Plus Deluxe 12 meses">PS Plus Deluxe 12 meses - S/311.00</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientName">Nombre del Cliente *</label>
+                        <input type="text" id="clientName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientPhone">Teléfono del Cliente</label>
+                        <input type="tel" id="clientPhone">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseDate">Fecha de Compra</label>
+                        <input type="date" id="purchaseDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="expirationDays">Tipo de Suscripción</label>
+                        <select id="expirationDays">
+                            <option value="monthly">Mensual (hasta el día 1)</option>
+                            <option value="annual">Anual (12 meses)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="profiles-section">
+                    <h3>👥 Perfiles (Se generarán automáticamente según la plataforma)</h3>
+                    <p style="margin-bottom: 15px; color: #666; font-size: 0.9em;">
+                        • Netflix: 5 perfiles | Disney+: 7 perfiles | Amazon Prime: 6 perfiles<br>
+                        • Plex 3 pantallas: 3 perfiles | Servicios individuales: 1 perfil
+                    </p>
+                    <div class="profiles-grid" id="profilesPreview">
+                        <!-- Los perfiles se generarán aquí -->
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="button" class="btn-sm" style="background: #6c757d; color: white; padding: 10px 20px; margin-right: 10px;" onclick="closeModal()">Cancelar</button>
+                    <button type="submit" class="add-btn" style="padding: 10px 30px;">💾 Guardar Cuenta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let accounts = JSON.parse(localStorage.getItem('netflixAccountsPro')) || [];
+        let editingAccountId = null;
+        
+        const profileNames = ['Perfil 1', 'Perfil 2', 'Perfil 3', 'Perfil 4', 'Perfil 5', 'Perfil 6', 'Perfil 7'];
+        
+        // Configuración de perfiles por plataforma
+        const platformProfiles = {
+            'Netflix': 5,
+            'Disney+ Estandar Completa': 7,
+            'Amazon Prime Completa': 6,
+            'Amazon Prime 1 perfil': 1,
+            'Max Completa Estandar': 5,
+            'Max 1 perfil': 1,
+            'Paramount+ Estandar Completo': 6,
+            'Paramount+ Estándar 1 perfil': 1,
+            'Crunchyroll Mega Fan': 5,
+            'Crunchyroll Mega Fan 1 perfil': 1,
+            'Jellyfin completo': 5,
+            'Jellyfin adultos completo': 5,
+            'Jellyfin perfil': 1,
+            'Plex 3 pantallas': 3,
+            'Vix+ completo': 4,
+            'Vix perfilada': 1,
+            'AppleMusic 1 mes': 1,
+            'YouTube 1 mes': 1,
+            'Deezer 1 mes': 1,
+            'Canva premium': 1,
+            'Office 365 x 1 año': 1,
+            'PS Plus Deluxe 12 meses': 1,
+            // Para el resto que no están especificados, usar 5 perfiles por defecto
+        };
+        
+        // Función para obtener número de perfiles según la plataforma
+        function getProfileCount(platform) {
+            return platformProfiles[platform] || 5; // 5 perfiles por defecto
+        }
+        const countryFlags = {
+            'PE': '🇵🇪',
+            'US': '🇺🇸',
+            'GB': '🇬🇧',
+            'ES': '🇪🇸'
+        };
+        
+        function generateId() {
+            return Date.now().toString().slice(-6);
+        }
+        
+        function generatePin() {
+            return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        }
+        
+        function generatePassword() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+            let password = '';
+            for (let i = 0; i < 12; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return password;
+        }
+        
+        function calculateDaysUntilFirstOfMonth() {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            
+            // Próximo día 1 del mes siguiente
+            const nextFirstOfMonth = new Date(currentYear, currentMonth + 1, 1);
+            
+            // Si hoy es día 1, calcular hasta el próximo mes
+            if (today.getDate() === 1) {
+                nextFirstOfMonth.setMonth(nextFirstOfMonth.getMonth() + 1);
+            }
+            
+            const diffTime = nextFirstOfMonth - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays;
+        }
+        
+        function calculateDaysRemaining(purchaseDate, duration) {
+            const purchase = new Date(purchaseDate);
+            const today = new Date();
+            
+            // Calcular cuántos meses han pasado desde la compra
+            const monthsFromPurchase = (today.getFullYear() - purchase.getFullYear()) * 12 + (today.getMonth() - purchase.getMonth());
+            
+            // Encontrar el próximo día 1 de pago
+            const nextPaymentDate = new Date(purchase.getFullYear(), purchase.getMonth() + monthsFromPurchase + 1, 1);
+            
+            // Si ya pasó el día 1 de este mes, usar el próximo mes
+            if (today.getDate() > 1) {
+                nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+            }
+            
+            const diffTime = nextPaymentDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return Math.max(0, diffDays);
+        }
+        
+        function getAccountStatus(daysRemaining) {
+            if (daysRemaining > 5) return 'active';
+            if (daysRemaining > 0) return 'inactive';
+            return 'expired';
+        }
+        
+        function openAddModal() {
+            editingAccountId = null;
+            document.getElementById('modalTitle').textContent = 'Agregar Nueva Cuenta';
+            document.getElementById('accountForm').reset();
+            document.getElementById('purchaseDate').value = new Date().toISOString().split('T')[0];
+            generateProfilesPreview();
+            document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('accountModal').style.display = 'none';
+        }
+        
+        function generateProfilesPreview() {
+            const selectedType = document.getElementById('accountType').value;
+            const profileCount = getProfileCount(selectedType);
+            const profilesContainer = document.getElementById('profilesPreview');
+            
+            let profilesHTML = '';
+            for (let i = 0; i < profileCount; i++) {
+                profilesHTML += `
+                    <div class="profile-card">
+                        <div class="profile-name">${profileNames[i]}</div>
+                        <div class="profile-pin">${generatePin()}</div>
+                    </div>
+                `;
+            }
+            
+            profilesContainer.innerHTML = profilesHTML;
+        }
+        
+        function addAccount(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('accountEmail').value.trim();
+            const password = document.getElementById('accountPassword').value.trim();
+            const country = document.getElementById('accountCountry').value;
+            const type = document.getElementById('accountType').value;
+            const clientName = document.getElementById('clientName').value.trim();
+            const clientPhone = document.getElementById('clientPhone').value.trim();
+            const purchaseDate = document.getElementById('purchaseDate').value;
+            const subscriptionType = document.getElementById('expirationDays').value;
+            
+            if (!email || !password || !clientName) {
+                alert('Por favor completa todos los campos obligatorios');
+                return;
+            }
+            
+            // Generar perfiles con PINs según la plataforma
+            const profileCount = getProfileCount(type);
+            const profiles = [];
+            
+            for (let i = 0; i < profileCount; i++) {
+                profiles.push({
+                    name: profileNames[i],
+                    pin: generatePin()
+                });
+            }
+            
+            // Calcular días restantes basado en el tipo de suscripción
+            let daysRemaining;
+            if (subscriptionType === 'monthly') {
+                daysRemaining = calculateDaysRemaining(purchaseDate, 30);
+            } else {
+                // Para anual, calcular 12 meses desde la fecha de compra
+                const purchase = new Date(purchaseDate);
+                const expiration = new Date(purchase.getFullYear() + 1, purchase.getMonth(), purchase.getDate());
+                const today = new Date();
+                const diffTime = expiration - today;
+                daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            }
+            
+            const status = getAccountStatus(daysRemaining);
+            
+            const newAccount = {
+                id: editingAccountId || generateId(),
+                email: email,
+                password: password,
+                country: country,
+                type: type,
+                clientName: clientName,
+                clientPhone: clientPhone || '',
+                purchaseDate: purchaseDate,
+                subscriptionType: subscriptionType,
+                daysRemaining: daysRemaining,
+                status: status,
+                profiles: profiles,
+                createdAt: new Date().toISOString()
+            };
+            
+            if (editingAccountId) {
+                // Editar cuenta existente
+                const index = accounts.findIndex(acc => acc.id === editingAccountId);
+                if (index !== -1) {
+                    accounts[index] = newAccount;
+                }
+            } else {
+                // Agregar nueva cuenta
+                accounts.push(newAccount);
+            }
+            
+            // Guardar y actualizar todo
+            saveAccounts();
+            renderAccounts();
+            updateStats();
+            closeModal();
+            
+            // Limpiar formulario
+            document.getElementById('accountForm').reset();
+            
+            alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nID: ${newAccount.id}\nCliente: ${newAccount.clientName}\nPerfiles con PINs generados: ${newAccount.profiles.length}`);
+        }
+        
+        function editAccount(accountId) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            editingAccountId = accountId;
+            document.getElementById('modalTitle').textContent = 'Editar Cuenta';
+            document.getElementById('accountEmail').value = account.email;
+            document.getElementById('accountPassword').value = account.password;
+            document.getElementById('accountCountry').value = account.country;
+            document.getElementById('accountType').value = account.type;
+            document.getElementById('clientName').value = account.clientName;
+            document.getElementById('clientPhone').value = account.clientPhone;
+            document.getElementById('purchaseDate').value = account.purchaseDate;
+            document.getElementById('expirationDays').value = account.subscriptionType || 'monthly';
+            
+            // Mostrar perfiles existentes
+            const profilesContainer = document.getElementById('profilesPreview');
+            profilesContainer.innerHTML = account.profiles.map(profile => `
+                <div class="profile-card">
+                    <div class="profile-name">${profile.name}</div>
+                    <div class="profile-pin">${profile.pin}</div>
+                </div>
+            `).join('');
+            
+            // Actualizar el tipo de cuenta para mostrar los perfiles correctos
+            document.getElementById('accountType').addEventListener('change', generateProfilesPreview);
+            
+            document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        function deleteAccount(accountId) {
+            if (confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
+                accounts = accounts.filter(acc => acc.id !== accountId);
+                saveAccounts();
+                renderAccounts();
+                updateStats();
+            }
+        }
+        
+        // Variables globales
+                
+        let accounts = JSON.parse(localStorage.getItem('streamingAccountsPro')) || [];
+        let editingAccountId = null;
+        let currentAccountForCommunication = null;
+        let currentCommunicationText = '';
+        
+        const profileNames = ['Perfil 1', 'Perfil 2', 'Perfil 3', 'Perfil 4', 'Perfil 5'];
+        const countryFlags = {
+            'PE': '🇵🇪',
+            'US': '🇺🇸',
+            'GB': '🇬🇧',
+            'ES': '🇪🇸'
+        };
+        
+        function showProfileCommunications(accountId) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            currentAccountForCommunication = account;
+            
+            // Cargar perfiles en el selector
+            const profileGrid = document.getElementById('profileSelectGrid');
+            profileGrid.innerHTML = account.profiles.map((profile, index) => `
+                <div class="profile-card" style="cursor: pointer; transition: all 0.3s ease;" onclick="generateIndividualCommunication('${account.id}', ${index})">
+                    <div class="profile-name">${profile.name}</div>
+                    <div class="profile-pin">${profile.pin}</div>
+                    <div style="margin-top: 10px; font-size: 0.8em; color: #666;">Clic para generar comunicado</div>
+                </div>
+            `).join('');
+            
+            document.getElementById('profileSelectModal').style.display = 'block';
+        }
+        
+        function closeProfileSelectModal() {
+            document.getElementById('profileSelectModal').style.display = 'none';
+        }
+        
+        function generateIndividualCommunication(accountId, profileIndex) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            const profile = account.profiles[profileIndex];
+            if (!profile) return;
+            
+            const today = new Date();
+            const formattedDate = today.toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            const communicationHTML = `
+                <div style="max-width: 700px; margin: 0 auto; font-family: Arial, sans-serif;">
+                    <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #e50914, #dc143c); color: white; border-radius: 10px;">
+                        <h1 style="margin: 0; font-size: 2.2em;">🎬 NETFLIX</h1>
+                        <p style="margin: 10px 0 0 0; font-size: 1.1em; opacity: 0.9;">Servicio de Streaming Premium</p>
+                    </div>
+                    
+                    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                        <div style="text-align: right; margin-bottom: 20px; color: #666; font-size: 0.9em;">
+                            <strong>Fecha:</strong> ${formattedDate}<br>
+                            <strong>ID de Cuenta:</strong> ${account.id}<br>
+                            <strong>Perfil:</strong> ${profile.name}
+                        </div>
+                        
+                        <h2 style="color: #e50914; margin-bottom: 20px; font-size: 1.8em; border-bottom: 2px solid #e50914; padding-bottom: 10px;">
+                            📧 COMUNICADO INDIVIDUAL - ACCESO ${profile.name.toUpperCase()}
+                        </h2>
+                        
+                        <div style="margin-bottom: 25px;">
+                            <p style="font-size: 1.1em; margin-bottom: 15px;"><strong>Estimado/a Usuario del ${profile.name},</strong></p>
+                            <p style="margin-bottom: 15px; text-align: justify;">
+                                Le informamos que su acceso a <strong>${account.type}</strong> ha sido configurado exitosamente. 
+                                Este comunicado contiene sus credenciales de acceso exclusivas y las condiciones 
+                                de uso que debe cumplir para mantener el servicio activo.
+                            </p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #e50914;">
+                            <h3 style="color: #e50914; margin-top: 0; margin-bottom: 15px;">🔐 SUS DATOS DE ACCESO EXCLUSIVOS</h3>
+                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 15px; margin-bottom: 15px;">
+                                <strong>Email/Usuario:</strong> 
+                                <span style="font-family: monospace; background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 1.1em;">
+                                    ${account.email}
+                                </span>
+                                <strong>Contraseña:</strong> 
+                                <span style="font-family: monospace; background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 1.1em;">
+                                    ${account.password}
+                                </span>
+                                <strong>Servicio:</strong> 
+                                <span style="color: #e50914; font-weight: bold; font-size: 1.1em;">
+                                    ${account.type}
+                                </span>
+                                <strong>País:</strong> 
+                                <span style="font-size: 1.1em;">
+                                    ${countryFlags[account.country]} ${account.country}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #e3f2fd; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #2196f3;">
+                            <h3 style="color: #1976d2; margin-top: 0; margin-bottom: 15px;">👤 SU PERFIL Y CÓDIGO PIN</h3>
+                            <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #2196f3;">
+                                <div style="font-size: 1.5em; font-weight: bold; margin-bottom: 15px; color: #333;">
+                                    ${profile.name}
+                                </div>
+                                <div style="font-family: monospace; font-size: 2.5em; color: #e50914; font-weight: bold; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 2px dashed #e50914;">
+                                    ${profile.pin}
+                                </div>
+                                <div style="margin-top: 15px; font-size: 1.1em; color: #666;">
+                                    <strong>Guarde este PIN</strong> - Lo necesitará para acceder a su perfil
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #fff3cd; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
+                            <h3 style="color: #856404; margin-top: 0; margin-bottom: 15px;">⚠️ TÉRMINOS Y CONDICIONES DE USO</h3>
+                            <ul style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 1.1em;">
+                                <li><strong>Uso Individual:</strong> Esta cuenta es para uso exclusivo de <strong>UN (1) DISPOSITIVO</strong> únicamente.</li>
+                                <li><strong>Monitoreo de Actividad:</strong> Se realiza monitoreo constante de la actividad de la cuenta.</li>
+                                <li><strong>Suspensión Automática:</strong> Si se detecta actividad inusual o uso simultáneo en <strong>2 o más dispositivos</strong>, el acceso será <strong>SUSPENDIDO INMEDIATAMENTE</strong> sin previo aviso.</li>
+                                <li><strong>Responsabilidad del Usuario:</strong> Usted es responsable de mantener la confidencialidad de sus credenciales de acceso.</li>
+                                <li><strong>Perfil Exclusivo:</strong> Use únicamente el perfil <strong>"${profile.name}"</strong> con el PIN <strong>"${profile.pin}"</strong>.</li>
+                            </ul>
+                        </div>
+                        
+                        <div style="background: #d4edda; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #28a745;">
+                            <h3 style="color: #155724; margin-top: 0; margin-bottom: 15px;">💳 INFORMACIÓN DE PAGOS</h3>
+                            <div style="line-height: 1.8; font-size: 1.1em;">
+                                <p style="margin: 0 0 10px 0;"><strong>Días Restantes:</strong> <span style="color: #e50914; font-weight: bold; font-size: 1.2em;">${account.daysRemaining} días</span></p>
+                                <p style="margin: 0 0 10px 0;"><strong>Fecha de Renovación:</strong> <span style="color: #e50914; font-weight: bold;">01 de cada mes</span></p>
+                                <p style="margin: 0; background: #f8f9fa; padding: 10px; border-radius: 5px;"><strong>Importante:</strong> Los pagos deben realizarse puntualmente el día 1 de cada mes para mantener el servicio activo.</p>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #f8d7da; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #dc3545;">
+                            <h3 style="color: #721c24; margin-top: 0; margin-bottom: 15px;">🚫 ADVERTENCIAS IMPORTANTES</h3>
+                            <ul style="margin: 0; padding-left: 20px; line-height: 1.8; color: #721c24; font-size: 1.1em;">
+                                <li><strong>NO</strong> comparta sus credenciales de acceso con terceros.</li>
+                                <li><strong>NO</strong> use la cuenta en múltiples dispositivos simultáneamente.</li>
+                                <li><strong>NO</strong> use perfiles diferentes al asignado <strong>"${profile.name}"</strong>.</li>
+                                <li><strong>NO</strong> modifique la configuración de la cuenta.</li>
+                                <li>El incumplimiento de estas condiciones resultará en la <strong>CANCELACIÓN INMEDIATA</strong> del servicio.</li>
+                            </ul>
+                        </div>
+                        
+                        <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #28a745;">
+                            <h3 style="color: #155724; margin-top: 0; margin-bottom: 15px;">📝 INSTRUCCIONES DE ACCESO</h3>
+                            <ol style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 1.1em;">
+                                <li>Ingrese a <strong>www.netflix.com</strong></li>
+                                <li>Haga clic en <strong>"Iniciar Sesión"</strong></li>
+                                <li>Ingrese su email: <strong>${account.email}</strong></li>
+                                <li>Ingrese su contraseña: <strong>${account.password}</strong></li>
+                                <li>Seleccione su perfil: <strong>"${profile.name}"</strong></li>
+                                <li>Cuando se le solicite, ingrese su PIN: <strong>${profile.pin}</strong></li>
+                            </ol>
+                        </div>
+                        
+                        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                            <p style="margin: 0 0 10px 0; font-size: 1.2em; color: #333;">
+                                <strong>Contacto de Soporte:</strong>
+                            </p>
+                            <p style="margin: 0; color: #666; font-size: 1.1em;">
+                                Para consultas o problemas técnicos, comuníquese a través de los canales oficiales de atención al cliente.
+                            </p>
+                        </div>
+                        
+                        <div style="text-align: center; margin-top: 30px; padding: 20px; border-top: 2px solid #e50914;">
+                            <p style="margin: 0; font-size: 1em; color: #666;">
+                                <em>Este comunicado es generado automáticamente por el sistema de gestión.</em><br>
+                                <strong>Conserve este documento para futuras referencias.</strong><br>
+                                <span style="color: #e50914; font-weight: bold;">Perfil: ${profile.name} | PIN: ${profile.pin}</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Preparar texto plano para WhatsApp
+            currentCommunicationText = `
+🎬 *COMUNICADO INDIVIDUAL - ACCESO STREAMING*
+📧 *SERVICIO: ${account.type.toUpperCase()}*
+👤 *PERFIL: ${profile.name.toUpperCase()}*
+
+👋 Estimado/a Usuario del ${profile.name},
+
+Su acceso a ${account.type} ha sido configurado exitosamente.
+
+🔐 *SUS DATOS DE ACCESO EXCLUSIVOS:*
+📧 Email/Usuario: ${account.email}
+🔒 Contraseña: ${account.password}
+📱 Servicio: ${account.type}
+🌍 País: ${countryFlags[account.country]} ${account.country}
+
+👤 *SU PERFIL Y CÓDIGO PIN:*
+📛 Perfil: ${profile.name}
+🔢 PIN: *${profile.pin}*
+
+⚠️ *TÉRMINOS Y CONDICIONES DE USO:*
+• Uso Individual: Esta cuenta es para uso exclusivo de UN (1) DISPOSITIVO únicamente.
+• Monitoreo de Actividad: Se realiza monitoreo constante de la actividad de la cuenta.
+• Suspensión Automática: Si se detecta actividad inusual o uso simultáneo en 2 o más dispositivos, el acceso será SUSPENDIDO INMEDIATAMENTE sin previo aviso.
+• Perfil Exclusivo: Use únicamente el perfil "${profile.name}" con el PIN "${profile.pin}".
+
+💳 *INFORMACIÓN DE PAGOS:*
+⏰ Días Restantes: ${account.daysRemaining} días
+📅 Próximo Pago: 01 del próximo mes
+⚠️ El servicio se suspende automáticamente si no se paga el día 1 de cada mes.
+
+🚫 *ADVERTENCIAS IMPORTANTES:*
+• NO comparta sus credenciales de acceso con terceros.
+• NO use la cuenta en múltiples dispositivos simultáneamente.
+• NO use perfiles diferentes al asignado "${profile.name}".
+• NO modifique la configuración de la cuenta.
+• El incumplimiento resultará en CANCELACIÓN INMEDIATA del servicio.
+
+📝 *INSTRUCCIONES DE ACCESO:*
+Servicio: ${account.type}
+Email: ${account.email}
+Contraseña: ${account.password}
+Perfil asignado: ${profile.name}
+PIN: ${profile.pin}
+
+*Conserve este documento para futuras referencias.*
+*Servicio: ${account.type} | Perfil: ${profile.name} | PIN: ${profile.pin}*
+            `.trim();
+            
+            document.getElementById('communicationContent').innerHTML = communicationHTML;
+            document.getElementById('profileSelectModal').style.display = 'none';
+            document.getElementById('communicationModal').style.display = 'block';
+        }
+        
+        function generateAllProfileCommunications() {
+            if (!currentAccountForCommunication) return;
+            
+            const account = currentAccountForCommunication;
+            let allCommunications = '';
+            
+            account.profiles.forEach((profile, index) => {
+                const today = new Date();
+                const formattedDate = today.toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                const communicationText = `
+🎬 *COMUNICADO INDIVIDUAL - ACCESO STREAMING*
+📧 *SERVICIO: ${account.type.toUpperCase()}*
+👤 *PERFIL: ${profile.name.toUpperCase()}*
+
+👋 Estimado/a Usuario del ${profile.name},
+
+Su acceso a ${account.type} ha sido configurado exitosamente.
+
+🔐 *SUS DATOS DE ACCESO EXCLUSIVOS:*
+📧 Email/Usuario: ${account.email}
+🔒 Contraseña: ${account.password}
+📱 Servicio: ${account.type}
+🌍 País: ${countryFlags[account.country]} ${account.country}
+
+👤 *SU PERFIL Y CÓDIGO PIN:*
+📛 Perfil: ${profile.name}
+🔢 PIN: *${profile.pin}*
+
+⚠️ *TÉRMINOS Y CONDICIONES DE USO:*
+• Uso Individual: Esta cuenta es para uso exclusivo de UN (1) DISPOSITIVO únicamente.
+• Monitoreo de Actividad: Se realiza monitoreo constante de la actividad de la cuenta.
+• Suspensión Automática: Si se detecta actividad inusual o uso simultáneo en 2 o más dispositivos, el acceso será SUSPENDIDO INMEDIATAMENTE sin previo aviso.
+• Perfil Exclusivo: Use únicamente el perfil "${profile.name}" con el PIN "${profile.pin}".
+
+💳 *INFORMACIÓN DE PAGOS:*
+⏰ Días Restantes: ${account.daysRemaining} días
+📅 Próximo Pago: 01 del próximo mes
+⚠️ El servicio se suspende automáticamente si no se paga el día 1 de cada mes.
+
+🚫 *ADVERTENCIAS IMPORTANTES:*
+• NO comparta sus credenciales de acceso con terceros.
+• NO use la cuenta en múltiples dispositivos simultáneamente.
+• NO use perfiles diferentes al asignado "${profile.name}".
+• NO modifique la configuración de la cuenta.
+• El incumplimiento resultará en CANCELACIÓN INMEDIATA del servicio.
+
+📝 *INSTRUCCIONES DE ACCESO:*
+Servicio: ${account.type}
+Email: ${account.email}
+Contraseña: ${account.password}
+Perfil asignado: ${profile.name}
+PIN: ${profile.pin}
+
+*Conserve este documento para futuras referencias.*
+*Servicio: ${account.type} | Perfil: ${profile.name} | PIN: ${profile.pin}*
+
+=====================================
+
+                `;
+                
+                allCommunications += communicationText;
+            });
+            
+            // Copiar todos los comunicados al portapapeles
+            navigator.clipboard.writeText(allCommunications).then(() => {
+                alert(`✅ Se han copiado los ${account.profiles.length} comunicados individuales al portapapeles.\n\nPuede pegarlos y enviar cada uno por separado a cada usuario.`);
+            });
+            
+            closeProfileSelectModal();
+        }
+        
+        function closeCommunicationModal() {
+            document.getElementById('communicationModal').style.display = 'none';
+        }
+        
+        function viewAccount(accountId) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            const profilesInfo = account.profiles.map(profile => `${profile.name}: ${profile.pin}`).join('\n');
+            
+            alert(`INFORMACIÓN DE LA CUENTA
+            
+ID: ${account.id}
+Cliente: ${account.clientName}
+Teléfono: ${account.clientPhone}
+Email: ${account.email}
+Contraseña: ${account.password}
+País: ${countryFlags[account.country]} ${account.country}
+Tipo: ${account.type}
+Estado: ${account.status.toUpperCase()}
+Días restantes: ${account.daysRemaining}
+Fecha de compra: ${account.purchaseDate}
+
+PERFILES Y PINS:
+${profilesInfo}`);
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Mostrar feedback visual
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓';
+                btn.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#6c757d';
+                }, 1000);
+            });
+        }
+        
+        function saveAccounts() {
+            try {
+                localStorage.setItem('streamingAccountsPro', JSON.stringify(accounts));
+                console.log('Cuentas guardadas exitosamente:', accounts.length);
+            } catch (error) {
+                console.error('Error al guardar cuentas:', error);
+                alert('Error al guardar los datos. Verifica el espacio en tu navegador.');
+            }
+        }
+        
+        function loadAccounts() {
+            try {
+                const saved = localStorage.getItem('streamingAccountsPro');
+                if (saved) {
+                    accounts = JSON.parse(saved);
+                    console.log('Cuentas cargadas:', accounts.length);
+                } else {
+                    accounts = [];
+                    console.log('No hay cuentas guardadas');
+                }
+            } catch (error) {
+                console.error('Error al cargar cuentas:', error);
+                accounts = [];
+            }
+        }
+        
+        function updateStats() {
+            const totalAccounts = accounts.length;
+            const activeAccounts = accounts.filter(acc => acc.status === 'active').length;
+            const totalProfiles = accounts.reduce((total, account) => total + account.profiles.length, 0);
+            const expiringAccounts = accounts.filter(acc => acc.daysRemaining <= 5 && acc.daysRemaining > 0).length;
+            
+            document.getElementById('totalAccounts').textContent = totalAccounts;
+            document.getElementById('activeAccounts').textContent = activeAccounts;
+            document.getElementById('totalProfiles').textContent = totalProfiles;
+            document.getElementById('expiringAccounts').textContent = expiringAccounts;
+        }
+        
+        function renderAccounts() {
+            const tbody = document.getElementById('accountsTableBody');
+            
+            if (accounts.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="12" class="no-accounts">
+                            <h3>📱 No hay cuentas registradas</h3>
+                            <p>Haz clic en "Agregar Cuenta" para comenzar</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Actualizar días restantes para cuentas mensuales
+            accounts.forEach(account => {
+                if (account.subscriptionType === 'monthly' || !account.subscriptionType) {
+                    account.daysRemaining = calculateDaysRemaining(account.purchaseDate, 30);
+                } else {
+                    // Para cuentas anuales
+                    const purchase = new Date(account.purchaseDate);
+                    const expiration = new Date(purchase.getFullYear() + 1, purchase.getMonth(), purchase.getDate());
+                    const today = new Date();
+                    const diffTime = expiration - today;
+                    account.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                }
+                account.status = getAccountStatus(account.daysRemaining);
+            });
+            
+            tbody.innerHTML = accounts.map(account => `
+                <tr>
+                    <td><strong>${account.id}</strong></td>
+                    <td>
+                        <span class="status-badge status-${account.status}">
+                            ${account.status === 'active' ? 'Activo' : account.status === 'inactive' ? 'Inactivo' : 'Vencido'}
+                        </span>
+                    </td>
+                    <td>
+                        ${account.email}
+                        <button class="copy-btn" onclick="copyToClipboard('${account.email}')">📋</button>
+                    </td>
+                    <td>
+                        ••••••••••••
+                        <button class="copy-btn" onclick="copyToClipboard('${account.password}')">📋</button>
+                    </td>
+                    <td>
+                        <div class="profile-pills">
+                            ${account.profiles.map(profile => `<span class="profile-pill">${profile.pin}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td>${countryFlags[account.country]} ${account.country}</td>
+                    <td>${account.type}</td>
+                    <td>${account.purchaseDate}</td>
+                    <td>
+                        <span class="days-remaining ${account.daysRemaining > 5 ? 'days-high' : account.daysRemaining > 0 ? 'days-medium' : 'days-low'}">
+                            ${account.daysRemaining}
+                        </span>
+                    </td>
+                    <td>
+                        <strong>${account.clientName}</strong>
+                        <button class="copy-btn" onclick="copyToClipboard('${account.clientName}')">📋</button>
+                    </td>
+                    <td>
+                        ${account.clientPhone}
+                        <button class="copy-btn" onclick="copyToClipboard('${account.clientPhone}')">📋</button>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-sm btn-view" onclick="viewAccount('${account.id}')">👁️</button>
+                            <button class="btn-sm btn-edit" onclick="editAccount('${account.id}')">✏️</button>
+                            <button class="btn-sm" style="background: #17a2b8; color: white;" onclick="showProfileCommunications('${account.id}')">📧</button>
+                            <button class="btn-sm btn-delete" onclick="deleteAccount('${account.id}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function filterAccounts() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const countryFilter = document.getElementById('countryFilter').value;
+            
+            const filteredAccounts = accounts.filter(account => {
+                const matchesSearch = !searchTerm || 
+                    account.id.toLowerCase().includes(searchTerm) ||
+                    account.email.toLowerCase().includes(searchTerm) ||
+                    account.clientName.toLowerCase().includes(searchTerm) ||
+                    account.clientPhone.includes(searchTerm);
+                
+                const matchesStatus = !statusFilter || account.status === statusFilter;
+                const matchesCountry = !countryFilter || account.country === countryFilter;
+                
+                return matchesSearch && matchesStatus && matchesCountry;
+            });
+            
+            // Renderizar solo las cuentas filtradas
+            const tbody = document.getElementById('accountsTableBody');
+            
+            if (filteredAccounts.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="12" class="no-accounts">
+                            <h3>🔍 No se encontraron resultados</h3>
+                            <p>Intenta cambiar los filtros de búsqueda</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = filteredAccounts.map(account => `
+                <tr>
+                    <td><strong>${account.id}</strong></td>
+                    <td>
+                        <span class="status-badge status-${account.status}">
+                            ${account.status === 'active' ? 'Activo' : account.status === 'inactive' ? 'Inactivo' : 'Vencido'}
+                        </span>
+                    </td>
+                    <td>
+                        ${account.email}
+                        <button class="copy-btn" onclick="copyToClipboard('${account.email}')">📋</button>
+                    </td>
+                    <td>
+                        ••••••••••••
+                        <button class="copy-btn" onclick="copyToClipboard('${account.password}')">📋</button>
+                    </td>
+                    <td>
+                        <div class="profile-pills">
+                            ${account.profiles.map(profile => `<span class="profile-pill">${profile.pin}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td>${countryFlags[account.country]} ${account.country}</td>
+                    <td>${account.type}</td>
+                    <td>${account.purchaseDate}</td>
+                    <td>
+                        <span class="days-remaining ${account.daysRemaining > 7 ? 'days-high' : account.daysRemaining > 0 ? 'days-medium' : 'days-low'}">
+                            ${account.daysRemaining}
+                        </span>
+                    </td>
+                    <td>
+                        <strong>${account.clientName}</strong>
+                        <button class="copy-btn" onclick="copyToClipboard('${account.clientName}')">📋</button>
+                    </td>
+                    <td>
+                        ${account.clientPhone}
+                        <button class="copy-btn" onclick="copyToClipboard('${account.clientPhone}')">📋</button>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-sm btn-view" onclick="viewAccount('${account.id}')">👁️</button>
+                            <button class="btn-sm btn-edit" onclick="editAccount('${account.id}')">✏️</button>
+                            <button class="btn-sm btn-delete" onclick="deleteAccount('${account.id}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // Event listeners - Reemplazar la sección anterior
+        // Inicializar aplicación
+        window.onload = function() {
+            checkAuth();
+            
+            // Configurar fecha por defecto
+            const today = new Date().toISOString().split('T')[0];
+            const purchaseDateInput = document.getElementById('purchaseDate');
+            if (purchaseDateInput) {
+                purchaseDateInput.value = today;
+            }
+            
+            // Inicializar todos los event listeners
+            initializeEvents();
+            
+            console.log('Streaming Manager Admin iniciado correctamente');
+        };
+    </script>
+</body>
+</html>
