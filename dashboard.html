@@ -586,6 +586,30 @@
             </div>
         </div>
         
+        <!-- Modal para cambiar PINs -->
+        <div id="pinModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2 class="modal-title">🔐 Cambiar PINs de Perfiles</h2>
+                    <button class="close-btn" id="closePinBtn">&times;</button>
+                </div>
+                
+                <div style="padding: 20px;">
+                    <p style="margin-bottom: 20px; color: #666; text-align: center;">
+                        Modifica los PINs de los perfiles que han infringido las normas:
+                    </p>
+                    <div id="pinEditGrid" style="display: grid; gap: 15px;">
+                        <!-- Los campos de PINs se cargarán aquí -->
+                    </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="savePins()">💾 Guardar PINs</button>
+                        <button class="btn" onclick="regenerateAllPins()" style="background: #6f42c1; color: white;">🔄 Regenerar Todos</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="controls">
             <input type="text" class="search-box" id="searchInput" placeholder="🔍 Buscar cuentas...">
             <button class="add-btn" id="addAccountBtn">➕ Agregar Cuenta</button>
@@ -771,6 +795,7 @@
         let editingAccountId = null;
         let currentAccount = null;
         let currentCommunicationText = '';
+        let editingPinAccountId = null;
         
         // Configuración de perfiles por plataforma
         const platformProfiles = {
@@ -879,12 +904,22 @@
             return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
         }
         
-        // Calcular días restantes
-        function calculateDaysRemaining() {
+        // Calcular próxima fecha de pago
+        function getNextPaymentDate() {
             const today = new Date();
-            const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-            const diffTime = nextMonth - today;
-            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 5);
+            
+            // Si ya pasó el día 5 del mes actual, ir al 5 del siguiente mes
+            if (today.getDate() > 5) {
+                nextMonth.setMonth(nextMonth.getMonth() + 1);
+            }
+            
+            // Formatear como dd/mm/yy
+            const day = nextMonth.getDate().toString().padStart(2, '0');
+            const month = (nextMonth.getMonth() + 1).toString().padStart(2, '0');
+            const year = nextMonth.getFullYear().toString().slice(-2);
+            
+            return `${day}/${month}/${year}`;
         }
         
         // Obtener estado de cuenta
@@ -892,6 +927,11 @@
             if (daysRemaining > 5) return 'active';
             if (daysRemaining > 0) return 'inactive';
             return 'expired';
+        }
+        
+        // Calcular días restantes (22 días por defecto para el sistema)
+        function calculateDaysRemaining() {
+            return 22; // Días desde que compras las cuentas
         }
         
         // Obtener número de perfiles
@@ -914,6 +954,7 @@
             document.getElementById('accountModal').style.display = 'none';
             document.getElementById('communicationModal').style.display = 'none';
             document.getElementById('messageModal').style.display = 'none';
+            document.getElementById('pinModal').style.display = 'none';
         }
         
         // Editar cuenta
@@ -945,25 +986,6 @@
                 updateStats();
                 alert('✅ Cuenta eliminada exitosamente');
             }
-        }
-        
-        // Generar comunicados
-        function generateCommunications(accountId) {
-            const account = accounts.find(acc => acc.id === accountId);
-            if (!account) return;
-            
-            currentAccount = account;
-            
-            const profileGrid = document.getElementById('profileGrid');
-            profileGrid.innerHTML = account.profiles.map((profile, index) => `
-                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6; cursor: pointer; transition: all 0.3s ease;" onclick="generateIndividualCommunication(${index})">
-                    <div style="font-weight: bold; margin-bottom: 8px; color: #333;">${profile.name}</div>
-                    <div style="font-family: monospace; font-size: 1.2em; color: #dc3545; font-weight: bold;">${profile.pin}</div>
-                    <div style="margin-top: 8px; font-size: 0.8em; color: #666;">Clic para generar</div>
-                </div>
-            `).join('');
-            
-            document.getElementById('communicationModal').style.display = 'block';
         }
         
         // Generar comunicado individual
@@ -1014,8 +1036,9 @@
                 
                 <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
                     <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
-                    <p><strong>Días Restantes:</strong> ${currentAccount.daysRemaining} días</p>
+                    <p><strong>Días Restantes:</strong> 30 días</p>
                     <p><strong>Próximo Pago:</strong> 01 del próximo mes</p>
+                    <p><strong>Yape/Plin:</strong> 981804056</p>
                     <p><strong>⚠️ El servicio se suspende automáticamente si no se paga el día 1.</strong></p>
                 </div>
                 
@@ -1054,8 +1077,9 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 • Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
 
 💳 *INFORMACIÓN DE PAGOS:*
-⏰ Días Restantes: ${currentAccount.daysRemaining} días
+⏰ Días Restantes: 30 días
 📅 Próximo Pago: 01 del próximo mes
+💰 Yape/Plin: 981804056
 ⚠️ El servicio se suspende automáticamente si no se paga el día 1.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
@@ -1102,12 +1126,15 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 • Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
 
 💳 *INFORMACIÓN DE PAGOS:*
-⏰ Días Restantes: ${currentAccount.daysRemaining} días
-📅 Próximo Pago: 01 del próximo mes
-⚠️ El servicio se suspende automáticamente si no se paga el día 1.
+⏰ Días Restantes: 30 días
+📅 Próximo Pago: ${getNextPaymentDate()}
+💰 Yape/Plin: 981804056
+⚠️ El servicio se suspende automáticamente si no se paga el día 5.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
 *ID: ${currentAccount.id} | Fecha: ${today}*
+
+💝 *¡Gracias por preferirnos!* 💝
 
 ═══════════════════════════════
 
@@ -1130,6 +1157,77 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             });
         }
         
+        // Editar PINs
+        function editPins(accountId) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            editingPinAccountId = accountId;
+            
+            const pinEditGrid = document.getElementById('pinEditGrid');
+            pinEditGrid.innerHTML = account.profiles.map((profile, index) => `
+                <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #dee2e6;">
+                    <div style="flex: 1;">
+                        <strong>${profile.name}</strong>
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="text" 
+                               id="pin_${index}" 
+                               value="${profile.pin}" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1.1em; text-align: center;"
+                               maxlength="4"
+                               placeholder="PIN">
+                    </div>
+                    <div>
+                        <button class="btn" onclick="regeneratePin(${index})" style="background: #17a2b8; color: white; padding: 8px 12px; font-size: 0.8em;">🔄 Nuevo</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('pinModal').style.display = 'block';
+        }
+        
+        // Regenerar PIN individual
+        function regeneratePin(profileIndex) {
+            const newPin = generatePin();
+            document.getElementById(`pin_${profileIndex}`).value = newPin;
+        }
+        
+        // Regenerar todos los PINs
+        function regenerateAllPins() {
+            const account = accounts.find(acc => acc.id === editingPinAccountId);
+            if (!account) return;
+            
+            account.profiles.forEach((profile, index) => {
+                const newPin = generatePin();
+                document.getElementById(`pin_${index}`).value = newPin;
+            });
+            
+            alert('🔄 Todos los PINs han sido regenerados');
+        }
+        
+        // Guardar PINs
+        function savePins() {
+            const account = accounts.find(acc => acc.id === editingPinAccountId);
+            if (!account) return;
+            
+            // Actualizar PINs con los valores del formulario
+            account.profiles.forEach((profile, index) => {
+                const newPin = document.getElementById(`pin_${index}`).value.trim();
+                if (newPin && newPin.length === 4) {
+                    profile.pin = newPin;
+                } else {
+                    profile.pin = generatePin(); // Generar nuevo si está vacío o inválido
+                }
+            });
+            
+            saveAccounts();
+            renderAccounts();
+            closeModal();
+            
+            alert('✅ PINs actualizados exitosamente');
+        }
+        
         // Enviar por WhatsApp
         function sendWhatsApp() {
             const message = encodeURIComponent(currentCommunicationText);
@@ -1144,9 +1242,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 window.location.href = 'login.html';
             }
         }
-        
-        // Agregar cuenta
-        function addAccount(event) {
             event.preventDefault();
             
             const clientName = document.getElementById('clientName').value.trim();
@@ -1215,7 +1310,8 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nPINs generados automáticamente`);
         }
         
-        // Guardar cuentas con mejor compatibilidad móvil
+        // Agregar cuenta
+        function addAccount(event) {
         function saveAccounts() {
             try {
                 const dataToSave = JSON.stringify(accounts);
@@ -1336,6 +1432,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                     
                     <div class="action-buttons">
                         <button class="btn btn-edit" onclick="editAccount('${account.id}')">✏️ Editar</button>
+                        <button class="btn" onclick="editPins('${account.id}')" style="background: #6f42c1; color: white;">🔐 Cambiar PINs</button>
                         <button class="btn btn-communication" onclick="generateCommunications('${account.id}')">📧 Comunicados</button>
                         <button class="btn btn-delete" onclick="deleteAccount('${account.id}')">🗑️ Eliminar</button>
                     </div>
@@ -1368,6 +1465,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             document.getElementById('closeModalBtn').addEventListener('click', closeModal);
             document.getElementById('closeCommunicationBtn').addEventListener('click', closeModal);
             document.getElementById('closeMessageBtn').addEventListener('click', closeModal);
+            document.getElementById('closePinBtn').addEventListener('click', closeModal);
             document.getElementById('cancelBtn').addEventListener('click', closeModal);
             document.getElementById('accountForm').addEventListener('submit', addAccount);
             
@@ -1380,11 +1478,13 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 if (e.target === this) closeModal();
             });
             
-            document.getElementById('messageModal').addEventListener('click', function(e) {
+            document.getElementById('pinModal').addEventListener('click', function(e) {
                 if (e.target === this) closeModal();
             });
             
-            // Guardar automáticamente cada 30 segundos (para móviles)
+            document.getElementById('messageModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
             setInterval(function() {
                 if (accounts.length > 0) {
                     saveAccounts();
