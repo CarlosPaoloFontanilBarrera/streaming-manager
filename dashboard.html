@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Streaming Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #e50914, #dc143c);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .welcome-section {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 1px solid #dee2e6;
+            text-align: center;
+        }
+        
+        .welcome-message {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .last-login {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .dashboard-message {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, rgba(229, 9, 20, 0.05), rgba(220, 20, 60, 0.05));
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .dashboard-message h2 {
+            font-size: 2.5em;
+            color: #e50914;
+            margin-bottom: 20px;
+        }
+        
+        .dashboard-message p {
+            font-size: 1.2em;
+            color: #666;
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #e50914;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        .feature-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .feature-description {
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .coming-soon-banner {
+            background: linear-gradient(45deg, #e50914, #dc143c);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .coming-soon-banner h3 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+        
+        .coming-soon-banner p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .quick-actions {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .action-btn {
+            background: linear-gradient(45deg, #e50914, #dc143c);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(229, 9, 20, 0.4);
+        }
+        
+        .version-info {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 20px 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .logout-btn {
+                position: static;
+                margin-bottom: 10px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .dashboard-message h2 {
+                font-size: 2em;
+            }
+            
+            .dashboard-message p {
+                font-size: 1.1em;
+            }
+            
+            .quick-actions {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .action-btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
+            <h1>🎬 Sistema de Gestión de Streaming</h1>
+            <p>Panel de Administración Multi-Plataforma</p>
+        </div>
+        
+        <div class="welcome-section">
+            <div class="welcome-message">
+                ¡Bienvenido de vuelta, <strong>Paolo</strong>! 👋
+            </div>
+            <div class="last-login" id="lastLogin">
+                Último acceso: <span id="loginTime"></span>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="dashboard-message">
+                <h2>🚧 Sistema en Desarrollo</h2>
+                <p>
+                    El panel principal del sistema está siendo desarrollado. Aquí podrás gestionar todas tus plataformas de streaming, 
+                    generar comunicados para clientes, administrar vencimientos y mucho más.
+                </p>
+                
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="showComingSoon()">📊 Ver Estadísticas</button>
+                    <button class="action-btn" onclick="showComingSoon()">➕ Agregar Cuenta</button>
+                    <button class="action-btn" onclick="showComingSoon()">📧 Generar Comunicados</button>
+                </div>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎬</div>
+                    <div class="feature-title">57 Plataformas</div>
+                    <div class="feature-description">
+                        Netflix, Disney+, Amazon Prime, Plex, IPTV, Flujo TV, y muchas más plataformas de streaming
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">👥</div>
+                    <div class="feature-title">Perfiles Inteligentes</div>
+                    <div class="feature-description">
+                        Generación automática de perfiles según la plataforma: Netflix (5), Disney+ (7), Amazon Prime (6)
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <div class="feature-title">Responsive Design</div>
+                    <div class="feature-description">
+                        Funciona perfectamente en móviles, tablets y desktop con diseño adaptativo
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📧</div>
+                    <div class="feature-title">Comunicados Automáticos</div>
+                    <div class="feature-description">
+                        Genera comunicados individuales para cada perfil con términos y condiciones personalizados
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">💰</div>
+                    <div class="feature-title">Precios en Soles</div>
+                    <div class="feature-description">
+                        Todos los precios están configurados en soles peruanos para tu mercado local
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📅</div>
+                    <div class="feature-title">Vencimientos Automáticos</div>
+                    <div class="feature-description">
+                        Sistema de vencimientos cada día 1 del mes con alertas y notificaciones
+                    </div>
+                </div>
+            </div>
+            
+            <div class="coming-soon-banner">
+                <h3>🎯 Próximamente</h3>
+                <p>
+                    El panel completo estará disponible muy pronto con todas las funcionalidades para 
+                    gestionar tus cuentas de streaming de manera profesional.
+                </p>
+            </div>
+            
+            <div class="version-info">
+                <strong>Streaming Manager v1.0</strong><br>
+                Desarrollado especialmente para gestión multi-plataforma<br>
+                <small>Sistema optimizado para el mercado peruano</small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Verificar autenticación al cargar
+        function checkAuth() {
+            const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
+            if (isLoggedIn !== 'true') {
+                // No está logueado, redirigir al login
+                window.location.href = 'login.html';
+                return;
+            }
+        }
+        
+        // Cerrar sesión
+        function logout() {
+            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                localStorage.removeItem('streamingAdminLoggedIn');
+                window.location.href = 'login.html';
+            }
+        }
+        
+        // Mostrar mensaje de próximamente
+        function showComingSoon() {
+            alert('🚧 Esta funcionalidad estará disponible muy pronto.\n\n✨ El sistema completo está en desarrollo y tendrá todas las herramientas necesarias para gestionar tus plataformas de streaming.');
+        }
+        
+        // Mostrar hora del último login
+        function updateLoginTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('es-PE', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('loginTime').textContent = timeString;
+        }
+        
+        // Inicializar dashboard
+        window.onload = function() {
+            checkAuth();
+            updateLoginTime();
+            console.log('Dashboard loaded successfully');
+            
+            // Efecto de entrada suave
+            document.body.style.opacity = '0';
+            setTimeout(() => {
+                document.body.style.transition = 'opacity 0.5s ease';
+                document.body.style.opacity = '1';
+            }, 100);
+        };
+        
+        // Prevenir navegación hacia atrás sin logout
+        window.addEventListener('beforeunload', function(e) {
+            // El usuario está saliendo del dashboard
+        });
+        
+        // Manejar teclas de acceso rápido
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + L = Logout
+            if (e.ctrlKey && e.key === 'l') {
+                e.preventDefault();
+                logout();
+            }
+        });
+    </script>
+</body>
+</html>
