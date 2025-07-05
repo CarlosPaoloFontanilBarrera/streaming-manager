@@ -540,7 +540,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <button class="logout-btn" id="logoutBtn">🚪 Cerrar Sesión</button>
+            <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
             <h1>🎬 JIREH Streaming Manager</h1>
             <p>Sistema profesional de gestión multi-plataforma</p>
         </div>
@@ -550,7 +550,7 @@
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
                     <h2 class="modal-title">📧 Comunicados por Perfil</h2>
-                    <button class="close-btn" id="closeCommunicationBtn">&times;</button>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
                 </div>
                 
                 <div id="profileSelection" style="padding: 20px;">
@@ -572,7 +572,7 @@
             <div class="modal-content" style="max-width: 700px;">
                 <div class="modal-header">
                     <h2 class="modal-title">📱 Comunicado Individual</h2>
-                    <button class="close-btn" id="closeMessageBtn">&times;</button>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
                 </div>
                 
                 <div id="communicationContent" style="background: #f8f9fa; padding: 20px; border-radius: 10px; font-family: Arial, sans-serif; line-height: 1.6; max-height: 400px; overflow-y: auto;">
@@ -591,7 +591,7 @@
             <div class="modal-content" style="max-width: 600px;">
                 <div class="modal-header">
                     <h2 class="modal-title">🔐 Cambiar PINs de Perfiles</h2>
-                    <button class="close-btn" id="closePinBtn">&times;</button>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
                 </div>
                 
                 <div style="padding: 20px;">
@@ -611,8 +611,8 @@
         </div>
         
         <div class="controls">
-            <input type="text" class="search-box" id="searchInput" placeholder="🔍 Buscar cuentas...">
-            <button class="add-btn" id="addAccountBtn">➕ Agregar Cuenta</button>
+            <input type="text" class="search-box" placeholder="🔍 Buscar cuentas...">
+            <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
         </div>
         
         <div class="stats">
@@ -649,10 +649,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title">Agregar Nueva Cuenta</h2>
-                <button class="close-btn" id="closeModalBtn">&times;</button>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
             </div>
             
-            <form id="accountForm">
+            <form id="accountForm" onsubmit="addAccount(event)">
                 <div class="form-group">
                     <label for="clientName">Nombre del Cliente *</label>
                     <input type="text" id="clientName" required>
@@ -777,12 +777,12 @@
                     <label for="customDays">Días restantes (opcional)</label>
                     <input type="number" id="customDays" min="0" max="365" placeholder="Deja vacío para calcular automáticamente">
                     <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
-                        Si no especificas, se calculará automáticamente hasta el próximo mes
+                        Si no especificas, se calculará automáticamente (22 días)
                     </small>
                 </div>
                 
                 <div class="btn-group">
-                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
                     <button type="submit" class="btn btn-primary">💾 Guardar Cuenta</button>
                 </div>
             </form>
@@ -922,16 +922,16 @@
             return `${day}/${month}/${year}`;
         }
         
+        // Calcular días restantes (22 días por defecto para el sistema)
+        function calculateDaysRemaining() {
+            return 22; // Días desde que compras las cuentas
+        }
+        
         // Obtener estado de cuenta
         function getAccountStatus(daysRemaining) {
             if (daysRemaining > 5) return 'active';
             if (daysRemaining > 0) return 'inactive';
             return 'expired';
-        }
-        
-        // Calcular días restantes (22 días por defecto para el sistema)
-        function calculateDaysRemaining() {
-            return 22; // Días desde que compras las cuentas
         }
         
         // Obtener número de perfiles
@@ -945,7 +945,6 @@
             document.querySelector('.modal-title').textContent = 'Agregar Nueva Cuenta';
             document.getElementById('accountModal').style.display = 'block';
             document.getElementById('accountForm').reset();
-            // Limpiar el campo de días personalizados
             document.getElementById('customDays').value = '';
         }
         
@@ -986,6 +985,25 @@
                 updateStats();
                 alert('✅ Cuenta eliminada exitosamente');
             }
+        }
+        
+        // Generar comunicados
+        function generateCommunications(accountId) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            currentAccount = account;
+            
+            const profileGrid = document.getElementById('profileGrid');
+            profileGrid.innerHTML = account.profiles.map((profile, index) => `
+                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6; cursor: pointer; transition: all 0.3s ease;" onclick="generateIndividualCommunication(${index})">
+                    <div style="font-weight: bold; margin-bottom: 8px; color: #333;">${profile.name}</div>
+                    <div style="font-family: monospace; font-size: 1.2em; color: #dc3545; font-weight: bold;">${profile.pin}</div>
+                    <div style="margin-top: 8px; font-size: 0.8em; color: #666;">Clic para generar</div>
+                </div>
+            `).join('');
+            
+            document.getElementById('communicationModal').style.display = 'block';
         }
         
         // Generar comunicado individual
@@ -1037,9 +1055,9 @@
                 <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
                     <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
                     <p><strong>Días Restantes:</strong> 30 días</p>
-                    <p><strong>Próximo Pago:</strong> 01 del próximo mes</p>
+                    <p><strong>Próximo Pago:</strong> ${getNextPaymentDate()}</p>
                     <p><strong>Yape/Plin:</strong> 981804056</p>
-                    <p><strong>⚠️ El servicio se suspende automáticamente si no se paga el día 1.</strong></p>
+                    <p><strong>⚠️ El servicio se suspende automáticamente si no se paga el día 5.</strong></p>
                 </div>
                 
                 <div style="text-align: center; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
@@ -1047,6 +1065,10 @@
                         <strong>JIREH STREAMING</strong> - <strong>Fecha:</strong> ${today} | <strong>ID:</strong> ${currentAccount.id}<br>
                         <em>Conserve este comunicado para futuras referencias</em>
                     </p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 15px; padding: 12px; background: linear-gradient(45deg, #28a745, #20c997); color: white; border-radius: 8px; font-weight: bold;">
+                    💝 ¡Gracias por preferirnos! 💝
                 </div>
             `;
             
@@ -1078,12 +1100,14 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 
 💳 *INFORMACIÓN DE PAGOS:*
 ⏰ Días Restantes: 30 días
-📅 Próximo Pago: 01 del próximo mes
+📅 Próximo Pago: ${getNextPaymentDate()}
 💰 Yape/Plin: 981804056
-⚠️ El servicio se suspende automáticamente si no se paga el día 1.
+⚠️ El servicio se suspende automáticamente si no se paga el día 5.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
 *ID: ${currentAccount.id} | Fecha: ${today}*
+
+💝 *¡Gracias por preferirnos!* 💝
             `.trim();
             
             document.getElementById('communicationContent').innerHTML = communicationHTML;
@@ -1157,6 +1181,13 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             });
         }
         
+        // Enviar por WhatsApp
+        function sendWhatsApp() {
+            const message = encodeURIComponent(currentCommunicationText);
+            const whatsappURL = `https://wa.me/?text=${message}`;
+            window.open(whatsappURL, '_blank');
+        }
+        
         // Editar PINs
         function editPins(accountId) {
             const account = accounts.find(acc => acc.id === accountId);
@@ -1228,13 +1259,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             alert('✅ PINs actualizados exitosamente');
         }
         
-        // Enviar por WhatsApp
-        function sendWhatsApp() {
-            const message = encodeURIComponent(currentCommunicationText);
-            const whatsappURL = `https://wa.me/?text=${message}`;
-            window.open(whatsappURL, '_blank');
-        }
-        
         // Logout
         function logout() {
             if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
@@ -1242,6 +1266,9 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 window.location.href = 'login.html';
             }
         }
+        
+        // Agregar cuenta
+        function addAccount(event) {
             event.preventDefault();
             
             const clientName = document.getElementById('clientName').value.trim();
@@ -1310,53 +1337,25 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nPINs generados automáticamente`);
         }
         
-        // Agregar cuenta
-        function addAccount(event) {
+        // Guardar cuentas con mejor compatibilidad
         function saveAccounts() {
             try {
                 const dataToSave = JSON.stringify(accounts);
-                localStorage.setItem('streamingAccountsPro', dataToSave);
+                localStorage.setItem('jirehStreamingAccounts', dataToSave);
                 
-                // Verificar que se guardó correctamente
-                const saved = localStorage.getItem('streamingAccountsPro');
-                if (!saved) {
-                    console.error('Error guardando en localStorage');
-                    alert('⚠️ Advertencia: Los datos podrían no guardarse correctamente en este dispositivo');
-                }
-                
-                // Backup adicional para móviles
+                // Backup adicional
                 try {
-                    sessionStorage.setItem('streamingBackup', dataToSave);
+                    sessionStorage.setItem('jirehStreamingBackup', dataToSave);
                 } catch (e) {
                     console.warn('SessionStorage no disponible');
                 }
                 
+                // Mostrar confirmación
+                console.log(`✅ Guardadas ${accounts.length} cuentas`);
+                
             } catch (error) {
                 console.error('Error al guardar:', error);
                 alert('❌ Error al guardar los datos. Verifica el espacio de almacenamiento.');
-            }
-        }
-        
-        // Cargar cuentas con mejor compatibilidad móvil
-        function loadAccounts() {
-            try {
-                let saved = localStorage.getItem('streamingAccountsPro');
-                
-                // Si no hay datos en localStorage, intentar con sessionStorage
-                if (!saved) {
-                    saved = sessionStorage.getItem('streamingBackup');
-                }
-                
-                if (saved) {
-                    const parsedData = JSON.parse(saved);
-                    if (Array.isArray(parsedData)) {
-                        accounts = parsedData;
-                        console.log(`Cargadas ${accounts.length} cuentas`);
-                    }
-                }
-            } catch (error) {
-                console.error('Error al cargar datos:', error);
-                accounts = [];
             }
         }
         
@@ -1440,51 +1439,73 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             `).join('');
         }
         
-        // Event listeners
-        document.addEventListener('DOMContentLoaded', function() {
+        // Agregar cuenta de prueba (solo para desarrollo)
+        function addTestAccount() {
+            const testAccount = {
+                id: generateId(),
+                clientName: 'Cliente de Prueba',
+                clientPhone: '987654321',
+                email: 'cliente@ejemplo.com',
+                password: 'password123',
+                type: 'Netflix Completa',
+                country: 'PE',
+                profiles: [
+                    { name: 'Perfil 1', pin: '1234' },
+                    { name: 'Perfil 2', pin: '5678' },
+                    { name: 'Perfil 3', pin: '9012' },
+                    { name: 'Perfil 4', pin: '3456' },
+                    { name: 'Perfil 5', pin: '7890' }
+                ],
+                daysRemaining: 22,
+                status: 'active',
+                createdAt: new Date().toISOString()
+            };
+            
+            accounts.push(testAccount);
+            saveAccounts();
+            renderAccounts();
+            updateStats();
+            
+            console.log('✅ Cuenta de prueba agregada');
+        }
+        
+        // Inicializar aplicación
+        function initApp() {
+            console.log('🚀 Iniciando JIREH Streaming Manager...');
+            
+            // Verificar autenticación
             if (!checkAuth()) return;
             
             // Verificar soporte de localStorage
             try {
-                const testKey = 'test_storage';
+                const testKey = 'test_storage_jireh';
                 localStorage.setItem(testKey, 'test');
                 localStorage.removeItem(testKey);
                 console.log('✅ localStorage disponible');
             } catch (e) {
                 console.warn('⚠️ localStorage limitado en este dispositivo');
-                alert('⚠️ Advertencia: El almacenamiento puede estar limitado en este dispositivo. Los datos podrían no guardarse correctamente.');
+                alert('⚠️ Advertencia: El almacenamiento puede estar limitado en este dispositivo.');
             }
             
+            // Cargar datos
             loadAccounts();
             renderAccounts();
             updateStats();
             
-            // Botones
-            document.getElementById('logoutBtn').addEventListener('click', logout);
-            document.getElementById('addAccountBtn').addEventListener('click', openAddModal);
-            document.getElementById('closeModalBtn').addEventListener('click', closeModal);
-            document.getElementById('closeCommunicationBtn').addEventListener('click', closeModal);
-            document.getElementById('closeMessageBtn').addEventListener('click', closeModal);
-            document.getElementById('closePinBtn').addEventListener('click', closeModal);
-            document.getElementById('cancelBtn').addEventListener('click', closeModal);
-            document.getElementById('accountForm').addEventListener('submit', addAccount);
+            // Si no hay cuentas, agregar una de prueba para desarrollo
+            if (accounts.length === 0) {
+                console.log('📝 No hay cuentas. Agregando cuenta de prueba...');
+                addTestAccount();
+            }
             
-            // Cerrar modal al hacer clic fuera
-            document.getElementById('accountModal').addEventListener('click', function(e) {
-                if (e.target === this) closeModal();
-            });
+            console.log('✅ JIREH Streaming Manager cargado exitosamente');
+        }
+        
+        // Event listeners cuando se carga la página
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
             
-            document.getElementById('communicationModal').addEventListener('click', function(e) {
-                if (e.target === this) closeModal();
-            });
-            
-            document.getElementById('pinModal').addEventListener('click', function(e) {
-                if (e.target === this) closeModal();
-            });
-            
-            document.getElementById('messageModal').addEventListener('click', function(e) {
-                if (e.target === this) closeModal();
-            });
+            // Guardar automáticamente cada 30 segundos
             setInterval(function() {
                 if (accounts.length > 0) {
                     saveAccounts();
@@ -1501,8 +1522,31 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 saveAccounts();
             });
             
-            console.log('JIREH Streaming Manager cargado exitosamente');
+            // Cerrar modales con Escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
         });
+        
+        // Funciones globales para debugging
+        window.jirehDebug = {
+            showAccounts: () => console.log('Cuentas:', accounts),
+            clearAccounts: () => {
+                accounts = [];
+                saveAccounts();
+                renderAccounts();
+                updateStats();
+                console.log('❌ Todas las cuentas eliminadas');
+            },
+            addTestAccount: addTestAccount,
+            exportAccounts: () => {
+                const data = JSON.stringify(accounts, null, 2);
+                console.log('📊 Exportar cuentas:', data);
+                return data;
+            }
+        };
     </script>
 </body>
 </html>
