@@ -763,7 +763,7 @@
                     <label for="customDays">Días restantes (opcional)</label>
                     <input type="number" id="customDays" min="0" max="365" placeholder="Deja vacío para calcular automáticamente">
                     <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
-                        Si no especificas, se calculará automáticamente (22 días)
+                        Si no especificas, se calculará automáticamente (30 días)
                     </small>
                 </div>
                 
@@ -924,9 +924,9 @@
             return `${day}/${month}/${year}`;
         }
         
-        // Calcular días restantes
+        // CORREGIDO: Calcular días restantes (30 días por defecto)
         function calculateDaysRemaining() {
-            return 22;
+            return 30;
         }
         
         // Obtener estado de cuenta
@@ -1209,7 +1209,6 @@
                     <p><strong>Días Restantes:</strong> ${currentAccount.daysRemaining} días</p>
                     <p><strong>Próximo Pago:</strong> ${getNextPaymentDate()}</p>
                     <p><strong>Yape:</strong> 981804056</p>
-                    <p><strong>📋 IMPORTANTE:</strong> Para compartir el perfil, debe adjuntar el voucher de pago.</p>
                     <p><strong>⚠️ El servicio se suspende automáticamente si no se paga el día 5.</strong></p>
                 </div>
                 
@@ -1255,7 +1254,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 ⏰ Días Restantes: ${currentAccount.daysRemaining} días
 📅 Próximo Pago: ${getNextPaymentDate()}
 💰 Yape: 981804056
-📋 IMPORTANTE: Para compartir el perfil, debe adjuntar el voucher de pago.
 ⚠️ El servicio se suspende automáticamente si no se paga el día 5.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
@@ -1307,7 +1305,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 ⏰ Días Restantes: ${currentAccount.daysRemaining} días
 📅 Próximo Pago: ${getNextPaymentDate()}
 💰 Yape: 981804056
-📋 IMPORTANTE: Para compartir el perfil, debe adjuntar el voucher de pago.
 ⚠️ El servicio se suspende automáticamente si no se paga el día 5.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
@@ -1584,7 +1581,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             });
         });
         
-        console.log('🎉 JIREH Streaming Manager con Railway cargado completamente');
+        console.log('🎉 JIREH Streaming Manager con Railway - FASE 1 completada');
     </script>
 </body>
 </html>
