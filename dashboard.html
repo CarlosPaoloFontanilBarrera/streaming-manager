@@ -1,23 +1,23 @@
 // Funciones globales para debugging y gestión
         window.jirehDebug = {
             showAccounts: () => console.log('Cuentas:', accounts),
-            clearAccounts: async () => {
+            clearAccounts: () => {
                 accounts = [];
-                await saveAccounts();
+                saveAccounts();
                 renderAccounts();
                 updateStats();
                 console.log('❌ Todas las cuentas eliminadas');
             },
             addTestAccount: addTestAccount,
-            exportAccounts: async () => {
-                const data = await db.export();
+            exportAccounts: () => {
+                const data = db.export();
                 console.log('📊 Exportar cuentas:', data);
                 return data;
             },
-            importAccounts: async (jsonData) => {
-                const success = await db.import(jsonData);
+            importAccounts: (jsonData) => {
+                const success = db.import(jsonData);
                 if (success) {
-                    await loadAccounts();
+                    loadAccounts();
                     renderAccounts();
                     updateStats();
                     console.log('✅ Cuentas importadas exitosamente');
@@ -30,16 +30,16 @@
                 console.log('📊 Estadísticas de BD:', stats);
                 return stats;
             },
-            forceBackup: async () => {
-                await saveAccounts();
+            forceBackup: () => {
+                saveAccounts();
                 console.log('💾 Backup forzado completado');
             }
         };
         
         // Función para descargar backup
-        window.downloadBackup = async function() {
+        window.downloadBackup = function() {
             try {
-                const data = await db.export();
+                const data = db.export();
                 const blob = new Blob([data], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1421,16 +1421,16 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         // Guardar cuentas usando la base de datos
-        async function saveAccounts() {
-            const success = await db.save(accounts);
+        function saveAccounts() {
+            const success = db.save(accounts);
             if (!success) {
                 alert('❌ Error al guardar los datos. Verifica el espacio de almacenamiento.');
             }
         }
         
         // Cargar cuentas usando la base de datos
-        async function loadAccounts() {
-            accounts = await db.load();
+        function loadAccounts() {
+            accounts = db.load();
         }
         
         // Actualizar estadísticas
@@ -1514,7 +1514,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         // Agregar cuenta de prueba (solo para desarrollo)
-        async function addTestAccount() {
+        function addTestAccount() {
             const testAccount = {
                 id: generateId(),
                 clientName: 'Cliente de Prueba',
@@ -1536,7 +1536,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             };
             
             accounts.push(testAccount);
-            await saveAccounts();
+            saveAccounts();
             renderAccounts();
             updateStats();
             
@@ -1544,7 +1544,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         // Inicializar aplicación
-        async function initApp() {
+        function initApp() {
             console.log('🚀 Iniciando JIREH Streaming Manager...');
             
             // Verificar autenticación
@@ -1562,14 +1562,14 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             }
             
             // Cargar datos
-            await loadAccounts();
+            loadAccounts();
             renderAccounts();
             updateStats();
             
             // Si no hay cuentas, agregar una de prueba para desarrollo
             if (accounts.length === 0) {
                 console.log('📝 No hay cuentas. Agregando cuenta de prueba...');
-                await addTestAccount();
+                addTestAccount();
             }
             
             // Mostrar estadísticas de la base de datos
@@ -1584,21 +1584,20 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             initApp();
             
             // Guardar automáticamente cada 30 segundos
-            setInterval(async function() {
+            setInterval(function() {
                 if (accounts.length > 0) {
-                    await saveAccounts();
+                    saveAccounts();
                 }
             }, 30000);
             
             // Guardar antes de cerrar/recargar página
             window.addEventListener('beforeunload', function() {
-                // Guardado síncrono para beforeunload
-                db.save(accounts);
+                saveAccounts();
             });
             
             // Guardar cuando la página pierde el foco (móvil)
-            window.addEventListener('blur', async function() {
-                await saveAccounts();
+            window.addEventListener('blur', function() {
+                saveAccounts();
             });
             
             // Cerrar modales con Escape
