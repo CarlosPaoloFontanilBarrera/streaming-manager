@@ -355,7 +355,46 @@
             <button class="logout-btn" id="logoutBtn">🚪 Cerrar Sesión</button>
             <h1>🎬 Sistema de Gestión de Streaming</h1>
             <p>Administración completa de cuentas y perfiles</p>
+        <!-- Modal para comunicados -->
+    <div id="communicationModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 class="modal-title">📧 Comunicados por Perfil</h2>
+                <button class="close-btn" id="closeCommunicationBtn">&times;</button>
+            </div>
+            
+            <div id="profileSelection" style="padding: 20px;">
+                <p style="margin-bottom: 20px; text-align: center; color: #666;">
+                    Selecciona un perfil para generar su comunicado individual:
+                </p>
+                <div id="profileGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <!-- Los perfiles se cargarán aquí -->
+                </div>
+                <div style="text-align: center;">
+                    <button class="btn btn-primary" onclick="generateAllCommunications()">📧 Generar Todos los Comunicados</button>
+                </div>
+            </div>
         </div>
+    </div>
+
+    <!-- Modal para mostrar comunicado individual -->
+    <div id="messageModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title">📱 Comunicado Individual</h2>
+                <button class="close-btn" id="closeMessageBtn">&times;</button>
+            </div>
+            
+            <div id="communicationContent" style="background: #f8f9fa; padding: 20px; border-radius: 10px; font-family: Arial, sans-serif; line-height: 1.6; max-height: 400px; overflow-y: auto;">
+                <!-- El contenido se generará aquí -->
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn btn-primary" onclick="copyCommunication()">📋 Copiar Mensaje</button>
+                <button class="btn" onclick="sendWhatsApp()" style="background: #25d366; color: white;">📱 Enviar por WhatsApp</button>
+            </div>
+        </div>
+    </div>
         
         <div class="controls">
             <input type="text" class="search-box" id="searchInput" placeholder="🔍 Buscar cuentas...">
@@ -457,6 +496,9 @@
     <script>
         // Variables globales
         let accounts = [];
+        let editingAccountId = null;
+        let currentAccount = null;
+        let currentCommunicationText = '';
         
         // Configuración de perfiles por plataforma
         const platformProfiles = {
@@ -521,6 +563,8 @@
         
         // Abrir modal
         function openAddModal() {
+            editingAccountId = null;
+            document.querySelector('.modal-title').textContent = 'Agregar Nueva Cuenta';
             document.getElementById('accountModal').style.display = 'block';
             document.getElementById('accountForm').reset();
         }
@@ -528,6 +572,226 @@
         // Cerrar modal
         function closeModal() {
             document.getElementById('accountModal').style.display = 'none';
+            document.getElementById('communicationModal').style.display = 'none';
+            document.getElementById('messageModal').style.display = 'none';
+        }
+        
+        // Editar cuenta
+        function editAccount(accountId) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            editingAccountId = accountId;
+            document.querySelector('.modal-title').textContent = 'Editar Cuenta';
+            
+            // Cargar datos en el formulario
+            document.getElementById('clientName').value = account.clientName;
+            document.getElementById('clientPhone').value = account.clientPhone;
+            document.getElementById('accountEmail').value = account.email;
+            document.getElementById('accountPassword').value = account.password;
+            document.getElementById('accountType').value = account.type;
+            document.getElementById('accountCountry').value = account.country;
+            
+            document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        // Eliminar cuenta
+        function deleteAccount(accountId) {
+            if (confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
+                accounts = accounts.filter(acc => acc.id !== accountId);
+                saveAccounts();
+                renderAccounts();
+                updateStats();
+                alert('✅ Cuenta eliminada exitosamente');
+            }
+        }
+        
+        // Generar comunicados
+        function generateCommunications(accountId) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            currentAccount = account;
+            
+            const profileGrid = document.getElementById('profileGrid');
+            profileGrid.innerHTML = account.profiles.map((profile, index) => `
+                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6; cursor: pointer; transition: all 0.3s ease;" onclick="generateIndividualCommunication(${index})">
+                    <div style="font-weight: bold; margin-bottom: 8px; color: #333;">${profile.name}</div>
+                    <div style="font-family: monospace; font-size: 1.2em; color: #e50914; font-weight: bold;">${profile.pin}</div>
+                    <div style="margin-top: 8px; font-size: 0.8em; color: #666;">Clic para generar</div>
+                </div>
+            `).join('');
+            
+            document.getElementById('communicationModal').style.display = 'block';
+        }
+        
+        // Generar comunicado individual
+        function generateIndividualCommunication(profileIndex) {
+            if (!currentAccount) return;
+            
+            const profile = currentAccount.profiles[profileIndex];
+            if (!profile) return;
+            
+            const today = new Date().toLocaleDateString('es-PE');
+            
+            const communicationHTML = `
+                <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #e50914, #dc143c); color: white; border-radius: 8px;">
+                    <h2 style="margin: 0; font-size: 1.5em;">🎬 COMUNICADO INDIVIDUAL</h2>
+                    <p style="margin: 5px 0 0 0; opacity: 0.9;">Acceso a ${currentAccount.type}</p>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <p style="font-size: 1.1em; margin-bottom: 10px;"><strong>Estimado/a Usuario del ${profile.name},</strong></p>
+                    <p>Su acceso a <strong>${currentAccount.type}</strong> ha sido configurado exitosamente.</p>
+                </div>
+                
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #007bff;">
+                    <h3 style="color: #007bff; margin-top: 0;">🔐 SUS DATOS DE ACCESO</h3>
+                    <p><strong>Email:</strong> ${currentAccount.email}</p>
+                    <p><strong>Contraseña:</strong> ${currentAccount.password}</p>
+                    <p><strong>Servicio:</strong> ${currentAccount.type}</p>
+                    <p><strong>País:</strong> ${countryFlags[currentAccount.country]} ${currentAccount.country}</p>
+                </div>
+                
+                <div style="background: #f0fff0; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
+                    <h3 style="color: #28a745; margin-top: 0;">👤 SU PERFIL Y PIN</h3>
+                    <div style="text-align: center; background: white; padding: 15px; border-radius: 8px; border: 2px solid #28a745;">
+                        <div style="font-size: 1.3em; font-weight: bold; margin-bottom: 10px;">${profile.name}</div>
+                        <div style="font-family: monospace; font-size: 2em; color: #e50914; font-weight: bold; background: #f8f9fa; padding: 10px; border-radius: 5px;">${profile.pin}</div>
+                    </div>
+                </div>
+                
+                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                    <h3 style="color: #856404; margin-top: 0;">⚠️ TÉRMINOS DE USO</h3>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li><strong>Uso Individual:</strong> Solo UN (1) DISPOSITIVO</li>
+                        <li><strong>Monitoreo:</strong> Se supervisa la actividad</li>
+                        <li><strong>Suspensión:</strong> 2+ dispositivos = suspensión inmediata</li>
+                        <li><strong>Perfil:</strong> Use solo "${profile.name}" con PIN "${profile.pin}"</li>
+                    </ul>
+                </div>
+                
+                <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
+                    <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
+                    <p><strong>Días Restantes:</strong> ${currentAccount.daysRemaining} días</p>
+                    <p><strong>Próximo Pago:</strong> 01 del próximo mes</p>
+                    <p><strong>⚠️ El servicio se suspende automáticamente si no se paga el día 1.</strong></p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <p style="margin: 0; color: #666; font-size: 0.9em;">
+                        <strong>Fecha:</strong> ${today} | <strong>ID:</strong> ${currentAccount.id}<br>
+                        <em>Conserve este comunicado para futuras referencias</em>
+                    </p>
+                </div>
+            `;
+            
+            // Texto para WhatsApp
+            currentCommunicationText = `
+🎬 *COMUNICADO INDIVIDUAL - ${currentAccount.type.toUpperCase()}*
+👤 *PERFIL: ${profile.name.toUpperCase()}*
+
+Estimado/a Usuario del ${profile.name},
+
+Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
+
+🔐 *DATOS DE ACCESO:*
+📧 Email: ${currentAccount.email}
+🔒 Contraseña: ${currentAccount.password}
+📱 Servicio: ${currentAccount.type}
+🌍 País: ${countryFlags[currentAccount.country]} ${currentAccount.country}
+
+👤 *SU PERFIL Y PIN:*
+📛 Perfil: ${profile.name}
+🔢 PIN: *${profile.pin}*
+
+⚠️ *TÉRMINOS DE USO:*
+• Uso Individual: Solo UN (1) DISPOSITIVO
+• Monitoreo: Se supervisa la actividad
+• Suspensión: 2+ dispositivos = suspensión inmediata
+• Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
+
+💳 *INFORMACIÓN DE PAGOS:*
+⏰ Días Restantes: ${currentAccount.daysRemaining} días
+📅 Próximo Pago: 01 del próximo mes
+⚠️ El servicio se suspende automáticamente si no se paga el día 1.
+
+*Conserve este comunicado para futuras referencias*
+*ID: ${currentAccount.id} | Fecha: ${today}*
+            `.trim();
+            
+            document.getElementById('communicationContent').innerHTML = communicationHTML;
+            document.getElementById('communicationModal').style.display = 'none';
+            document.getElementById('messageModal').style.display = 'block';
+        }
+        
+        // Generar todos los comunicados
+        function generateAllCommunications() {
+            if (!currentAccount) return;
+            
+            let allMessages = '';
+            
+            currentAccount.profiles.forEach((profile, index) => {
+                const today = new Date().toLocaleDateString('es-PE');
+                
+                const message = `
+🎬 *COMUNICADO INDIVIDUAL - ${currentAccount.type.toUpperCase()}*
+👤 *PERFIL: ${profile.name.toUpperCase()}*
+
+Estimado/a Usuario del ${profile.name},
+
+Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
+
+🔐 *DATOS DE ACCESO:*
+📧 Email: ${currentAccount.email}
+🔒 Contraseña: ${currentAccount.password}
+📱 Servicio: ${currentAccount.type}
+🌍 País: ${countryFlags[currentAccount.country]} ${currentAccount.country}
+
+👤 *SU PERFIL Y PIN:*
+📛 Perfil: ${profile.name}
+🔢 PIN: *${profile.pin}*
+
+⚠️ *TÉRMINOS DE USO:*
+• Uso Individual: Solo UN (1) DISPOSITIVO
+• Monitoreo: Se supervisa la actividad
+• Suspensión: 2+ dispositivos = suspensión inmediata
+• Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
+
+💳 *INFORMACIÓN DE PAGOS:*
+⏰ Días Restantes: ${currentAccount.daysRemaining} días
+📅 Próximo Pago: 01 del próximo mes
+⚠️ El servicio se suspende automáticamente si no se paga el día 1.
+
+*Conserve este comunicado para futuras referencias*
+*ID: ${currentAccount.id} | Fecha: ${today}*
+
+═══════════════════════════════
+
+                `;
+                
+                allMessages += message;
+            });
+            
+            navigator.clipboard.writeText(allMessages).then(() => {
+                alert(`✅ Se han copiado los ${currentAccount.profiles.length} comunicados al portapapeles.\n\nPuedes pegarlos y enviar cada uno por separado.`);
+            });
+            
+            closeModal();
+        }
+        
+        // Copiar comunicado
+        function copyCommunication() {
+            navigator.clipboard.writeText(currentCommunicationText).then(() => {
+                alert('✅ Comunicado copiado al portapapeles');
+            });
+        }
+        
+        // Enviar por WhatsApp
+        function sendWhatsApp() {
+            const message = encodeURIComponent(currentCommunicationText);
+            const whatsappURL = `https://wa.me/?text=${message}`;
+            window.open(whatsappURL, '_blank');
         }
         
         // Logout
@@ -568,7 +832,7 @@
             const status = getAccountStatus(daysRemaining);
             
             const newAccount = {
-                id: generateId(),
+                id: editingAccountId || generateId(),
                 clientName,
                 clientPhone,
                 email,
@@ -581,13 +845,23 @@
                 createdAt: new Date().toISOString()
             };
             
-            accounts.push(newAccount);
+            if (editingAccountId) {
+                // Editar cuenta existente
+                const index = accounts.findIndex(acc => acc.id === editingAccountId);
+                if (index !== -1) {
+                    accounts[index] = newAccount;
+                }
+            } else {
+                // Agregar nueva cuenta
+                accounts.push(newAccount);
+            }
+            
             saveAccounts();
             renderAccounts();
             updateStats();
             closeModal();
             
-            alert(`✅ Cuenta creada exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nPINs generados automáticamente`);
+            alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nPINs generados automáticamente`);
         }
         
         // Guardar cuentas
@@ -668,6 +942,12 @@
                             `).join('')}
                         </div>
                     </div>
+                    
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #dee2e6; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" onclick="editAccount('${account.id}')" style="padding: 8px 15px; font-size: 0.9em;">✏️ Editar</button>
+                        <button class="btn" onclick="generateCommunications('${account.id}')" style="background: #28a745; color: white; padding: 8px 15px; font-size: 0.9em;">📧 Comunicados</button>
+                        <button class="btn" onclick="deleteAccount('${account.id}')" style="background: #dc3545; color: white; padding: 8px 15px; font-size: 0.9em;">🗑️ Eliminar</button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -684,14 +964,22 @@
             document.getElementById('logoutBtn').addEventListener('click', logout);
             document.getElementById('addAccountBtn').addEventListener('click', openAddModal);
             document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+            document.getElementById('closeCommunicationBtn').addEventListener('click', closeModal);
+            document.getElementById('closeMessageBtn').addEventListener('click', closeModal);
             document.getElementById('cancelBtn').addEventListener('click', closeModal);
             document.getElementById('accountForm').addEventListener('submit', addAccount);
             
             // Cerrar modal al hacer clic fuera
             document.getElementById('accountModal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    closeModal();
-                }
+                if (e.target === this) closeModal();
+            });
+            
+            document.getElementById('communicationModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+            
+            document.getElementById('messageModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
             });
             
             console.log('Dashboard cargado exitosamente');
