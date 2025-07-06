@@ -1,4 +1,75 @@
-<!DOCTYPE html>
+// Manejar venta de perfil con lógica telefónica
+        async function handleSellProfile(event) {
+            event.preventDefault();
+            
+            const clienteName = document.getElementById('clienteName').value.trim();
+            const clientePhone = document.getElementById('clientePhone').value.trim();
+            const saleDate = document.getElementById('saleDate').value;
+            const expiryDate = document.getElementById('expiryDate').value;
+            
+            if (!clienteName || !saleDate || !expiryDate) {
+                alert('Por favor completa todos los campos obligatorios');
+                return;
+            }
+            
+            try {
+                const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
+                if (!account) return;
+                
+                const profile = account.profiles[currentProfileIndex];
+                
+                // Verificar si tiene voucher subido
+                if (!profile.voucherSubido && !profile.voucherImagen) {
+                    alert('⚠️ Debes subir un voucher antes de vender el perfil');
+                    return;
+                }
+                
+                // Calcular fechas automáticamente como empresa telefónica
+                const fechaHabilitacion = new Date(saleDate);
+                const fechaVencimiento = new Date(fechaHabilitacion);
+                fechaVencimiento.setDate(fechaVencimiento.getDate() + 30); // 30 días después de habilitación
+                
+                const fechaProximoPago = new Date(fechaVencimiento);
+                fechaProximoPago.setDate(fechaProximoPago.getDate() - 1); // 1 día antes del vencimiento
+                
+                const fechaCorte = new Date(fechaVencimiento); // Mismo día del vencimiento
+                
+                const diasRestantes = calculateDaysFromDates(saleDate, fechaVencimiento.toISOString().split('T')[0]);
+                
+                // Actualizar perfil con lógica telefónica
+                profile.estado = 'vendido';
+                profile.clienteNombre = clienteName;
+                profile.clienteTelefono = clientePhone;
+                profile.fechaVenta = saleDate;
+                profile.fechaHabilitacion = saleDate; // Fecha cuando se habilitó el servicio
+                profile.fechaVencimiento = fechaVencimiento.toISOString().split('T')[0];
+                profile.fechaProximoPago = fechaProximoPago.toISOString().split('T')[0];
+                profile.fechaCorte = fechaCorte.toISOString().split('T')[0];
+                profile.diasRestantes = diasRestantes;
+                profile.estadoPago = 'pagado'; // Ya tiene voucher
+                
+                // Guardar en base de datos
+                await apiRequest(`/accounts/${currentProfileAccountId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        ...account,
+                        client_name: account.clientName,
+                        client_phone: account.clientPhone,
+                        days_remaining: account.daysRemaining
+                    })
+                });
+                
+                await loadAccounts();
+                renderAccounts();
+                closeModal();
+                
+                alert(`✅ Perfil vendido exitosamente con lógica telefónica!\n\n👤 Cliente: ${clienteName}\n📱 Perfil: ${profile.name}\n📅 Habilitación: ${formatDate(saleDate)}\n📅 Vencimiento: ${formatDate(profile.fechaVencimiento)}\n💰 Próximo Pago: ${formatDate(profile.fechaProximoPago)}\n🚫 Corte: ${formatDate(profile.fechaCorte)}\n⏰ Días: ${diasRestantes}`);
+                
+            } catch (error) {
+                alert('❌ Error al vender perfil');
+                console.error('Error:', error);
+            }
+        }<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1262,10 +1333,10 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="providerEndDate">📅 Fecha Fin (Vencimiento Proveedor) *</label>
-                    <input type="date" id="providerEndDate" required>
-                    <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
-                        Fecha cuando se vence tu cuenta del proveedor (30 días después)
+                    <label for="providerEndDate">📅 Fecha Fin (Calculada Automáticamente)</label>
+                    <input type="date" id="providerEndDate" readonly style="background: #f8f9fa; color: #495057; font-weight: bold;">
+                    <small style="color: #28a745; font-size: 0.8em; margin-top: 5px; display: block; font-weight: 600;">
+                        ✅ Se calcula automáticamente: Fecha Inicio + 30 días
                     </small>
                 </div>
                 
@@ -1273,7 +1344,7 @@
                     <label for="customDays">📊 Días Restantes (Calculado Automáticamente)</label>
                     <input type="number" id="customDays" readonly style="background: #f8f9fa; color: #495057; font-weight: bold; font-size: 1.1em;">
                     <small style="color: #28a745; font-size: 0.8em; margin-top: 5px; display: block; font-weight: 600;">
-                        ✅ Se calcula automáticamente basado en las fechas del proveedor
+                        ✅ Se calcula automáticamente como empresas telefónicas
                     </small>
                 </div>
                 
@@ -1775,8 +1846,23 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
             return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
         }
         
-        // Calcular próxima fecha de pago (mismo día del vencimiento)
+        // Calcular próxima fecha de pago (1 día antes del vencimiento)
         function getNextPaymentDate(fechaVencimiento) {
+            if (!fechaVencimiento) return 'No especificado';
+            
+            const vencimiento = new Date(fechaVencimiento);
+            const proximoPago = new Date(vencimiento);
+            proximoPago.setDate(proximoPago.getDate() - 1); // 1 día antes
+            
+            const day = proximoPago.getDate().toString().padStart(2, '0');
+            const month = (proximoPago.getMonth() + 1).toString().padStart(2, '0');
+            const year = proximoPago.getFullYear().toString().slice(-2);
+            
+            return `${day}/${month}/${year}`;
+        }
+        
+        // Calcular fecha de corte automático (mismo día del vencimiento)
+        function getCutoffDate(fechaVencimiento) {
             if (!fechaVencimiento) return 'No especificado';
             
             const vencimiento = new Date(fechaVencimiento);
@@ -1784,21 +1870,6 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
             const day = vencimiento.getDate().toString().padStart(2, '0');
             const month = (vencimiento.getMonth() + 1).toString().padStart(2, '0');
             const year = vencimiento.getFullYear().toString().slice(-2);
-            
-            return `${day}/${month}/${year}`;
-        }
-        
-        // Calcular fecha de corte automático (día siguiente al vencimiento)
-        function getCutoffDate(fechaVencimiento) {
-            if (!fechaVencimiento) return 'No especificado';
-            
-            const vencimiento = new Date(fechaVencimiento);
-            const corte = new Date(vencimiento);
-            corte.setDate(corte.getDate() + 1);
-            
-            const day = corte.getDate().toString().padStart(2, '0');
-            const month = (corte.getMonth() + 1).toString().padStart(2, '0');
-            const year = corte.getFullYear().toString().slice(-2);
             
             return `${day}/${month}/${year}`;
         }
@@ -1815,12 +1886,22 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
             return Math.max(0, diffDays);
         }
         
-        // Actualizar días restantes automáticamente
+        // Calcular fecha de vencimiento automática (30 días después)
+        function calculateExpiryDate(startDate) {
+            const start = new Date(startDate);
+            const expiry = new Date(start);
+            expiry.setDate(expiry.getDate() + 30);
+            return expiry.toISOString().split('T')[0];
+        }
+        
+        // Actualizar días restantes automáticamente (solo para UI, el servidor calcula automáticamente)
         function updateDaysRemaining() {
             const startDate = document.getElementById('providerStartDate').value;
-            const endDate = document.getElementById('providerEndDate').value;
             
-            if (startDate && endDate) {
+            if (startDate) {
+                const endDate = calculateExpiryDate(startDate);
+                document.getElementById('providerEndDate').value = endDate;
+                
                 const days = calculateDaysFromDates(startDate, endDate);
                 document.getElementById('customDays').value = days;
             }
@@ -1895,7 +1976,7 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
             }
         }
         
-        // Guardar cuenta en Railway
+        // Guardar cuenta en Railway con fechas automáticas
         async function addAccount(event) {
             event.preventDefault();
             
@@ -1906,9 +1987,8 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
             const type = document.getElementById('accountType').value;
             const country = document.getElementById('accountCountry').value;
             const providerStartDate = document.getElementById('providerStartDate').value;
-            const providerEndDate = document.getElementById('providerEndDate').value;
             
-            if (!clientName || !email || !password || !providerStartDate || !providerEndDate) {
+            if (!clientName || !email || !password || !providerStartDate) {
                 alert('Por favor completa todos los campos obligatorios');
                 return;
             }
@@ -1924,10 +2004,6 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
                 });
             }
             
-            // Calcular días restantes basado en fechas del proveedor
-            const daysRemaining = calculateDaysFromDates(providerStartDate, providerEndDate);
-            const status = getAccountStatus(daysRemaining);
-            
             const accountData = {
                 id: editingAccountId || generateId(),
                 client_name: clientName,
@@ -1937,10 +2013,8 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
                 type,
                 country,
                 profiles,
-                days_remaining: daysRemaining,
-                status,
-                fecha_inicio_proveedor: providerStartDate,
-                fecha_vencimiento_proveedor: providerEndDate
+                fecha_inicio_proveedor: providerStartDate
+                // El servidor calculará automáticamente: fecha_vencimiento_proveedor, days_remaining, status
             };
             
             console.log('📤 Enviando datos:', accountData); // Debug
@@ -1969,7 +2043,7 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
                 renderAccounts();
                 closeModal();
                 
-                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nProveedor: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nInicio: ${formatDate(providerStartDate)}\nVencimiento: ${formatDate(providerEndDate)}`);
+                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nProveedor: ${clientName}\nPerfiles: ${profiles.length}\nFechas calculadas automáticamente por el servidor\nInicio: ${formatDate(providerStartDate)}`);
                 
             } catch (error) {
                 console.error('❌ Error completo:', error);
@@ -2159,7 +2233,26 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
             }
         }
         
-        // Manejar envío del formulario de voucher de perfil
+        // Subir voucher de perfil usando la nueva API
+        async function uploadProfileVoucher(accountId, profileIndex, formData) {
+            try {
+                const response = await fetch(`${API_BASE}/accounts/${accountId}/profile/${profileIndex}/voucher`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error subiendo voucher de perfil:', error);
+                throw error;
+            }
+        }
+        
+        // Manejar envío del formulario de voucher de perfil con lógica telefónica
         async function handleProfileVoucherSubmit(event) {
             event.preventDefault();
             
@@ -2173,54 +2266,41 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
             }
             
             try {
-                // Actualizar el perfil con voucher
                 const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
                 if (!account) return;
                 
                 const profile = account.profiles[currentProfileIndex];
                 
-                // Convertir imagen a base64
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    const base64 = e.target.result.split(',')[1];
-                    
-                    profile.voucherImagen = base64;
-                    profile.numeroOperacion = operationNumber;
-                    profile.montoPagado = parseFloat(paidAmount);
-                    profile.estadoPago = 'pagado';
-                    
-                    // Si el perfil está disponible, no extender fecha, solo marcar como con voucher
-                    if (profile.estado === 'disponible') {
-                        // Para perfiles disponibles, solo agregamos el voucher sin cambiar fechas
-                        profile.voucherSubido = true;
-                        alert(`✅ Voucher subido exitosamente!\n\nPerfil: ${profile.name}\nVoucher confirmado\nAhora puedes proceder a vender el perfil`);
-                    } else if (profile.estado === 'vendido') {
-                        // Para perfiles vendidos, extender fecha de vencimiento por 30 días
-                        const currentExpiry = new Date(profile.fechaVencimiento);
-                        const newExpiry = new Date(currentExpiry);
-                        newExpiry.setDate(newExpiry.getDate() + 30);
-                        profile.fechaVencimiento = newExpiry.toISOString().split('T')[0];
-                        profile.diasRestantes = calculateDaysFromDates(new Date().toISOString().split('T')[0], profile.fechaVencimiento);
-                        alert(`✅ Voucher subido y perfil renovado!\n\nPerfil: ${profile.name}\nNueva fecha: ${formatDate(profile.fechaVencimiento)}\n+30 días agregados`);
-                    }
-                    
-                    // Guardar en base de datos
-                    await apiRequest(`/accounts/${currentProfileAccountId}`, {
-                        method: 'PUT',
-                        body: JSON.stringify({
-                            ...account,
-                            client_name: account.clientName,
-                            client_phone: account.clientPhone,
-                            days_remaining: account.daysRemaining
-                        })
-                    });
-                    
-                    await loadAccounts();
-                    renderAccounts();
-                    closeModal();
-                };
+                // Crear FormData para enviar al servidor
+                const formData = new FormData();
+                formData.append('voucher', fileInput.files[0]);
+                formData.append('numero_operacion', operationNumber);
+                formData.append('monto_pagado', paidAmount);
                 
-                reader.readAsDataURL(fileInput.files[0]);
+                // Si el perfil está vendido, es una renovación
+                if (profile.estado === 'vendido') {
+                    // Para renovaciones, solo enviar voucher
+                    const result = await uploadProfileVoucher(currentProfileAccountId, currentProfileIndex, formData);
+                    
+                    if (result.success) {
+                        await loadAccounts();
+                        renderAccounts();
+                        closeModal();
+                        
+                        alert(`✅ Voucher de renovación subido!\n\nPerfil: ${profile.name}\nSe extendió 30 días más automáticamente`);
+                    }
+                } else {
+                    // Para perfiles disponibles, solo guardar voucher (no vender aún)
+                    const result = await uploadProfileVoucher(currentProfileAccountId, currentProfileIndex, formData);
+                    
+                    if (result.success) {
+                        await loadAccounts();
+                        renderAccounts();
+                        closeModal();
+                        
+                        alert(`✅ Voucher confirmado!\n\nPerfil: ${profile.name}\nVoucher guardado en la base de datos\nAhora puedes proceder a vender el perfil`);
+                    }
+                }
                 
             } catch (error) {
                 alert('❌ Error al subir voucher');
@@ -2281,16 +2361,10 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
                     ? account.fechaInicioProveedor.split('T')[0] 
                     : account.fechaInicioProveedor;
                 document.getElementById('providerStartDate').value = startDate;
+                
+                // Actualizar campos automáticos
+                updateDaysRemaining();
             }
-            if (account.fechaVencimientoProveedor) {
-                const endDate = account.fechaVencimientoProveedor.includes('T') 
-                    ? account.fechaVencimientoProveedor.split('T')[0] 
-                    : account.fechaVencimientoProveedor;
-                document.getElementById('providerEndDate').value = endDate;
-            }
-            
-            // Actualizar días restantes
-            updateDaysRemaining();
             
             console.log('📝 Editando cuenta:', account); // Debug
             
@@ -2836,12 +2910,20 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                                         <span>${profile.clienteTelefono || 'No especificado'}</span>
                                                     </div>
                                                     <div class="detail-row">
-                                                        <span>📅 Fecha Venta:</span>
+                                                        <span>📅 Fecha Habilitación:</span>
                                                         <span>${formatDate(profile.fechaVenta)}</span>
                                                     </div>
                                                     <div class="detail-row">
                                                         <span>📅 Vencimiento:</span>
                                                         <span>${formatDate(profile.fechaVencimiento)}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span>💰 Próximo Pago:</span>
+                                                        <span style="color: #007bff; font-weight: bold;">${formatDate(profile.fechaProximoPago || profile.fechaVencimiento)}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span>🚫 Corte Automático:</span>
+                                                        <span style="color: #dc3545; font-weight: bold;">${formatDate(profile.fechaCorte || profile.fechaVencimiento)}</span>
                                                     </div>
                                                     <div class="detail-row">
                                                         <span>⏰ Días restantes:</span>
@@ -2976,7 +3058,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             
             // Configurar cambio automático de fechas
             document.getElementById('providerStartDate').addEventListener('change', updateDaysRemaining);
-            document.getElementById('providerEndDate').addEventListener('change', updateDaysRemaining);
             
             // Cerrar modales con Escape
             document.addEventListener('keydown', function(e) {
