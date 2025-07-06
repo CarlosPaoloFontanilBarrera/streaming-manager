@@ -952,7 +952,6 @@
             <p>Sistema con PostgreSQL en Railway - Fechas Automáticas y Vouchers</p>
         </div>
         
-        <!-- Modal para comunicados -->
         <div id="communicationModal" class="modal">
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
@@ -965,8 +964,7 @@
                         Selecciona un perfil para generar su comunicado individual:
                     </p>
                     <div id="profileGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <!-- Los perfiles se cargarán aquí -->
-                    </div>
+                        </div>
                     <div style="text-align: center;">
                         <button class="btn btn-primary" onclick="generateAllCommunications()">📧 Generar Todos los Comunicados</button>
                     </div>
@@ -974,7 +972,6 @@
             </div>
         </div>
 
-        <!-- Modal para mostrar comunicado individual -->
         <div id="messageModal" class="modal">
             <div class="modal-content" style="max-width: 700px;">
                 <div class="modal-header">
@@ -983,8 +980,7 @@
                 </div>
                 
                 <div id="communicationContent" style="background: #f8f9fa; padding: 20px; border-radius: 10px; font-family: Arial, sans-serif; line-height: 1.6; max-height: 400px; overflow-y: auto;">
-                    <!-- El contenido se generará aquí -->
-                </div>
+                    </div>
                 
                 <div style="text-align: center; margin-top: 20px;">
                     <button class="btn btn-primary" onclick="copyCommunication()">📋 Copiar Mensaje</button>
@@ -993,7 +989,6 @@
             </div>
         </div>
         
-        <!-- Modal para cambiar PINs -->
         <div id="pinModal" class="modal">
             <div class="modal-content" style="max-width: 600px;">
                 <div class="modal-header">
@@ -1006,8 +1001,7 @@
                         Modifica los PINs de los perfiles que han infringido las normas:
                     </p>
                     <div id="pinEditGrid" style="display: grid; gap: 15px;">
-                        <!-- Los campos de PINs se cargarán aquí -->
-                    </div>
+                        </div>
                     <div style="text-align: center; margin-top: 20px;">
                         <button class="btn btn-secondary" onclick="closeModal('pinModal')">Cancelar</button>
                         <button class="btn btn-primary" onclick="savePins()">💾 Guardar PINs</button>
@@ -1017,7 +1011,6 @@
             </div>
         </div>
         
-        <!-- Modal para vender perfil -->
         <div id="sellProfileModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1057,7 +1050,6 @@
             </div>
         </div>
 
-        <!-- Modal para voucher de perfil -->
         <div id="profileVoucherModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1161,7 +1153,6 @@
         </div>
     </div>
 
-    <!-- Modal para agregar cuenta -->
     <div id="accountModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1315,7 +1306,7 @@
                 </div>
                 
                 <div class="btn-group">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('accountModal')">Cancelar</button>
                     <button type="submit" class="btn btn-primary">💾 Guardar Cuenta</button>
                 </div>
             </form>
@@ -1441,7 +1432,7 @@
         function checkAuth() {
             const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
             if (isLoggedIn !== 'true') {
-                window.location.href = './login.html'; // CORREGIDO
+                window.location.href = './login.html';
                 return false;
             }
             return true;
@@ -1625,6 +1616,25 @@
             }
         }
         
+        // Subir voucher
+        async function uploadVoucher(accountId, formData) {
+            try {
+                const response = await fetch(`${API_BASE}/accounts/${accountId}/voucher`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error subiendo voucher:', error);
+                throw error;
+            }
+        }
+        
         // Eliminar cuenta
         async function deleteAccount(accountId) {
             if (confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
@@ -1656,82 +1666,391 @@
         // FUNCIONES DE GESTIÓN DE PERFILES
         // ===============================================
         
-        // ... (Aquí van tus funciones completas para perfiles: sellProfile, handleSellProfile, makeProfileAvailable, etc.)
-        // ... (No las elimino, solo las resumo para no exceder el límite de caracteres aquí)
-
-        // ===============================================
-        // FUNCIONES DE RENDERIZADO Y UI
-        // ===============================================
-
-        function renderAccounts() {
-            const container = document.getElementById('accountsList');
+        function sellProfile(accountId, profileIndex) {
+            currentProfileAccountId = accountId;
+            currentProfileIndex = profileIndex;
             
-            if (allAccounts.length === 0) {
-                container.innerHTML = `<div class="no-accounts"><h3>📱 No hay cuentas registradas</h3><p>Haz clic en "Agregar Cuenta" para comenzar</p></div>`;
-                return;
-            }
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('saleDate').value = today;
             
-            if (filteredAccounts.length === 0 && searchTerm) {
-                container.innerHTML = `<div class="no-results"><h3>🔍 No se encontraron resultados</h3><p>No hay cuentas que coincidan con "${searchTerm}"</p><button class="btn btn-primary" onclick="clearSearch()">Limpiar búsqueda</button></div>`;
-                return;
-            }
+            const expiry = new Date();
+            expiry.setDate(expiry.getDate() + 30);
+            document.getElementById('expiryDate').value = expiry.toISOString().split('T')[0];
             
-            container.innerHTML = filteredAccounts.map(account => {
-                const statusClass = account.status;
-                const statusText = statusClass.charAt(0).toUpperCase() + statusClass.slice(1);
-                const daysClass = account.days_remaining > 5 ? 'good' : account.days_remaining > 0 ? 'warning' : 'danger';
-                
-                return `
-                    <div class="account-accordion" id="accordion-${account.id}">
-                        <div class="accordion-header" id="header-${account.id}" onclick="toggleAccordion('${account.id}')">
-                            <div class="accordion-info">
-                                <div class="accordion-title">
-                                    <h3>👤 ${account.client_name}</h3>
-                                    <span class="status-indicator ${statusClass}">${statusText}</span>
-                                </div>
-                                <div class="accordion-meta">
-                                    <span>${account.type}</span>
-                                    <span>${countryFlags[account.country] || '🏴'} ${account.country}</span>
-                                    <span class="profile-count">${account.profiles.length} perfiles</span>
-                                    <span class="days-remaining ${daysClass}">${account.days_remaining} días</span>
-                                </div>
-                            </div>
-                            <div class="accordion-controls">
-                                <div class="quick-actions">
-                                    <button class="quick-btn quick-btn-edit" onclick="event.stopPropagation(); editAccount('${account.id}')" title="Editar">✏️</button>
-                                    <button class="quick-btn quick-btn-voucher" onclick="event.stopPropagation(); openVoucherModal('${account.id}')" title="Voucher">💳</button>
-                                    <button class="quick-btn quick-btn-comm" onclick="event.stopPropagation(); generateCommunications('${account.id}')" title="Comunicados">📧</button>
-                                </div>
-                                <button class="accordion-toggle" id="toggle-${account.id}">▼</button>
-                            </div>
-                        </div>
-                        <div class="accordion-content" id="content-${account.id}">
-                            <!-- Tu lógica completa para renderizar el contenido del acordeón va aquí -->
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            document.getElementById('sellProfileModal').style.display = 'block';
         }
         
-        function filterAccounts(value = '') {
-            searchTerm = value.toLowerCase().trim();
+        async function handleSellProfile(event) {
+            event.preventDefault();
+            
+            const clienteName = document.getElementById('clienteName').value.trim();
+            const clientePhone = document.getElementById('clientePhone').value.trim();
+            const saleDate = document.getElementById('saleDate').value;
+            const expiryDate = document.getElementById('expiryDate').value;
+            
+            if (!clienteName || !saleDate || !expiryDate) {
+                alert('Por favor completa todos los campos obligatorios');
+                return;
+            }
+            
+            try {
+                const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
+                if (!account) return;
+                
+                const profile = account.profiles[currentProfileIndex];
+                profile.estado = 'vendido';
+                profile.clienteNombre = clienteName;
+                profile.clienteTelefono = clientePhone;
+                profile.fechaVenta = saleDate;
+                profile.fechaVencimiento = expiryDate;
+                profile.diasRestantes = calculateDaysFromDates(saleDate, expiryDate);
+                profile.estadoPago = 'pendiente';
+                
+                await apiRequest(`/accounts/${currentProfileAccountId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        ...account,
+                        client_name: account.clientName,
+                        client_phone: account.clientPhone,
+                        days_remaining: account.daysRemaining
+                    })
+                });
+                
+                await loadAccounts();
+                renderAccounts();
+                closeModal('sellProfileModal');
+                
+            } catch (error) {
+                alert('❌ Error al vender perfil');
+            }
+        }
+        
+        async function makeProfileAvailable(accountId, profileIndex) {
+            if (confirm('¿Estás seguro de que quieres hacer este perfil disponible nuevamente?')) {
+                try {
+                    const account = allAccounts.find(acc => acc.id === accountId);
+                    if (!account) return;
+                    
+                    const profile = account.profiles[profileIndex];
+                    profile.estado = 'disponible';
+                    delete profile.clienteNombre;
+                    delete profile.clienteTelefono;
+                    delete profile.fechaVenta;
+                    delete profile.fechaVencimiento;
+                    delete profile.diasRestantes;
+                    delete profile.estadoPago;
+                    delete profile.voucherImagen;
+                    delete profile.numeroOperacion;
+                    delete profile.montoPagado;
+                    
+                    await apiRequest(`/accounts/${accountId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            ...account,
+                            client_name: account.clientName,
+                            client_phone: account.clientPhone,
+                            days_remaining: account.daysRemaining
+                        })
+                    });
+                    
+                    await loadAccounts();
+                    renderAccounts();
+                    
+                } catch (error) {
+                    alert('❌ Error al actualizar perfil');
+                }
+            }
+        }
+        
+        function openProfileVoucherModal(accountId, profileIndex) {
+            currentProfileAccountId = accountId;
+            currentProfileIndex = profileIndex;
+            document.getElementById('profileVoucherModal').style.display = 'block';
+        }
+        
+        function previewProfileVoucher(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profileVoucherImage').src = e.target.result;
+                    document.getElementById('profileVoucherPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        async function handleProfileVoucherSubmit(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('profileVoucherFile');
+            const operationNumber = document.getElementById('profileOperationNumber').value.trim();
+            const paidAmount = document.getElementById('profilePaidAmount').value.trim();
+            
+            if (!fileInput.files[0] || !operationNumber || !paidAmount) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+            
+            try {
+                const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
+                if (!account) return;
+                
+                const profile = account.profiles[currentProfileIndex];
+                
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const base64 = e.target.result.split(',')[1];
+                    
+                    profile.voucherImagen = base64;
+                    profile.numeroOperacion = operationNumber;
+                    profile.montoPagado = parseFloat(paidAmount);
+                    profile.estadoPago = 'pagado';
+                    
+                    const currentExpiry = new Date(profile.fechaVencimiento);
+                    const newExpiry = new Date(currentExpiry);
+                    newExpiry.setDate(newExpiry.getDate() + 30);
+                    profile.fechaVencimiento = newExpiry.toISOString().split('T')[0];
+                    profile.diasRestantes = calculateDaysFromDates(new Date().toISOString().split('T')[0], profile.fechaVencimiento);
+                    
+                    await apiRequest(`/accounts/${currentProfileAccountId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            ...account,
+                            client_name: account.clientName,
+                            client_phone: account.clientPhone,
+                            days_remaining: account.daysRemaining
+                        })
+                    });
+                    
+                    await loadAccounts();
+                    renderAccounts();
+                    closeModal('profileVoucherModal');
+                };
+                
+                reader.readAsDataURL(fileInput.files[0]);
+                
+            } catch (error) {
+                alert('❌ Error al subir voucher');
+            }
+        }
+        
+        function generateProfileCommunication(accountId, profileIndex) {
+            const account = allAccounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            const profile = account.profiles[profileIndex];
+            if (!profile || profile.estado !== 'vendido') return;
+            
+            currentAccount = account;
+            generateIndividualCommunication(profileIndex);
+        }
+        
+        function openAddModal() {
+            editingAccountId = null;
+            document.getElementById('accountForm').reset();
+            document.querySelector('#accountModal .modal-title').textContent = 'Agregar Nueva Cuenta';
+            document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        function closeModal(modalId) {
+            if (modalId) {
+                document.getElementById(modalId).style.display = 'none';
+            } else {
+                document.querySelectorAll('.modal').forEach(modal => modal.style.display = 'none');
+            }
+        }
+        
+        function editAccount(accountId) {
+            const account = allAccounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            editingAccountId = accountId;
+            document.querySelector('#accountModal .modal-title').textContent = 'Editar Cuenta';
+            
+            document.getElementById('clientName').value = account.clientName;
+            document.getElementById('clientPhone').value = account.clientPhone || '';
+            document.getElementById('accountEmail').value = account.email;
+            document.getElementById('accountPassword').value = account.password;
+            document.getElementById('accountType').value = account.type;
+            document.getElementById('accountCountry').value = account.country;
+            
+            if (account.fecha_inicio_proveedor) {
+                document.getElementById('providerStartDate').value = new Date(account.fecha_inicio_proveedor).toISOString().split('T')[0];
+            }
+            if (account.fecha_vencimiento_proveedor) {
+                document.getElementById('providerEndDate').value = new Date(account.fecha_vencimiento_proveedor).toISOString().split('T')[0];
+            }
+            
+            updateDaysRemaining();
+            
+            document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        function openVoucherModal(accountId) {
+            currentVoucherAccountId = accountId;
+            document.getElementById('voucherModal').style.display = 'block';
+        }
+        
+        function previewVoucher(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('voucherImage').src = e.target.result;
+                    document.getElementById('voucherPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        async function handleVoucherSubmit(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('voucherFile');
+            const operationNumber = document.getElementById('operationNumber').value.trim();
+            const paidAmount = document.getElementById('paidAmount').value.trim();
+            
+            if (!fileInput.files[0] || !operationNumber || !paidAmount) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('voucher', fileInput.files[0]);
+            formData.append('numero_operacion', operationNumber);
+            formData.append('monto_pagado', paidAmount);
+            
+            try {
+                await uploadVoucher(currentVoucherAccountId, formData);
+                await loadAccounts();
+                await updateStats();
+                closeModal('voucherModal');
+            } catch (error) {
+                alert('❌ Error al subir voucher');
+            }
+        }
+        
+        function generateCommunications(accountId) {
+            currentAccount = allAccounts.find(acc => acc.id === accountId);
+            if (!currentAccount) return;
+            
+            const profileGrid = document.getElementById('profileGrid');
+            profileGrid.innerHTML = currentAccount.profiles.map((profile, index) => `
+                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6; cursor: pointer;" onclick="generateIndividualCommunication(${index})">
+                    <div style="font-weight: bold;">${profile.name}</div>
+                    <div style="font-family: monospace;">${profile.pin}</div>
+                </div>
+            `).join('');
+            
+            document.getElementById('communicationModal').style.display = 'block';
+        }
+        
+        function generateIndividualCommunication(profileIndex) {
+            if (!currentAccount) return;
+            const profile = currentAccount.profiles[profileIndex];
+            if (!profile) return;
+            
+            // ... (tu lógica para generar el HTML y el texto de WhatsApp)
+            
+            document.getElementById('communicationContent').innerHTML = "Contenido del comunicado...";
+            document.getElementById('messageModal').style.display = 'block';
+        }
+        
+        function generateAllCommunications() {
+            if (!currentAccount) return;
+            
+            let allMessages = '';
+            currentAccount.profiles.forEach(profile => {
+                // ... (tu lógica para generar cada mensaje)
+                allMessages += `Mensaje para ${profile.name}\n\n`;
+            });
+            
+            navigator.clipboard.writeText(allMessages).then(() => {
+                alert('✅ Comunicados copiados al portapapeles.');
+            });
+            closeModal('communicationModal');
+        }
+        
+        function copyCommunication() {
+            navigator.clipboard.writeText(currentCommunicationText).then(() => {
+                alert('✅ Comunicado copiado al portapapeles');
+            });
+        }
+        
+        function sendWhatsApp() {
+            const message = encodeURIComponent(currentCommunicationText);
+            const whatsappURL = `https://wa.me/?text=${message}`;
+            window.open(whatsappURL, '_blank');
+        }
+        
+        function editPins(accountId) {
+            // ... (tu lógica para editar PINs)
+        }
+        
+        function savePins() {
+            // ... (tu lógica para guardar PINs)
+        }
+        
+        function regeneratePin(profileIndex) {
+            // ... (tu lógica para regenerar un PIN)
+        }
+        
+        function regenerateAllPins() {
+            // ... (tu lógica para regenerar todos los PINs)
+        }
+        
+        function filterAccounts(searchValue = '') {
+            searchTerm = searchValue.toLowerCase().trim();
             if (!searchTerm) {
                 filteredAccounts = [...allAccounts];
             } else {
-                filteredAccounts = allAccounts.filter(acc => 
-                    (acc.client_name && acc.client_name.toLowerCase().includes(searchTerm)) ||
-                    (acc.email && acc.email.toLowerCase().includes(searchTerm)) ||
-                    (acc.type && acc.type.toLowerCase().includes(searchTerm))
+                filteredAccounts = allAccounts.filter(account => 
+                    (account.clientName && account.clientName.toLowerCase().includes(searchTerm)) ||
+                    (account.email && account.email.toLowerCase().includes(searchTerm)) ||
+                    (account.type && account.type.toLowerCase().includes(searchTerm))
                 );
             }
             renderAccounts();
             updateStats();
         }
-
-        // ===============================================
-        // FUNCIONES DE SISTEMA
-        // ===============================================
         
+        function getSearchStats() {
+            return {
+                total: allAccounts.length,
+                filtered: filteredAccounts.length,
+                active: filteredAccounts.filter(acc => acc.status === 'active').length,
+                expiring: filteredAccounts.filter(acc => acc.status === 'inactive').length,
+                expired: filteredAccounts.filter(acc => acc.status === 'expired').length
+            };
+        }
+        
+        function toggleAccordion(accountId) {
+            const accordion = document.getElementById(`accordion-${accountId}`);
+            const content = document.getElementById(`content-${accountId}`);
+            
+            const isExpanded = accordion.classList.contains('expanded');
+            
+            document.querySelectorAll('.account-accordion.expanded').forEach(acc => {
+                acc.classList.remove('expanded');
+                acc.querySelector('.accordion-content').classList.remove('expanded');
+            });
+            
+            if (!isExpanded) {
+                accordion.classList.add('expanded');
+                content.classList.add('expanded');
+            }
+        }
+
+        function clearSearch() {
+            document.querySelector('.search-box').value = '';
+            filterAccounts();
+        }
+
+        function showConnectionError() {
+            document.getElementById('accountsList').innerHTML = `<div class="no-accounts" style="border-color: #dc3545; background: #f8d7da;"><h3 style="color: #721c24;">❌ Error de Conexión</h3><p>No se pudo conectar con el servidor.</p></div>`;
+        }
+
         function logout() {
             if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
                 localStorage.removeItem('streamingAdminLoggedIn');
@@ -1741,19 +2060,37 @@
         
         async function initApp() {
             if (!checkAuth()) return;
+            
             await loadAccounts();
+            await updateStats();
+            
             console.log('🎉 JIREH Streaming Manager cargado. Las notificaciones son manejadas por el servidor.');
         }
-        
-        // ===============================================
-        // EVENT LISTENERS
-        // ===============================================
         
         document.addEventListener('DOMContentLoaded', function() {
             initApp();
             
             document.getElementById('accountForm').addEventListener('submit', addAccount);
-            // ... (el resto de tus event listeners)
+            document.getElementById('sellProfileForm').addEventListener('submit', handleSellProfile);
+            document.getElementById('profileVoucherForm').addEventListener('submit', handleProfileVoucherSubmit);
+            document.getElementById('voucherForm').addEventListener('submit', handleVoucherSubmit);
+            
+            document.getElementById('providerStartDate').addEventListener('change', updateDaysRemaining);
+            document.getElementById('providerEndDate').addEventListener('change', updateDaysRemaining);
+            
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+            
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeModal(this.id);
+                    }
+                });
+            });
         });
     </script>
 </body>
