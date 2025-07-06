@@ -889,7 +889,6 @@
             <p>Sistema con PostgreSQL en Railway - Fechas Automáticas y Vouchers</p>
         </div>
         
-        <!-- Modales -->
         <div id="communicationModal" class="modal">
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
@@ -1045,7 +1044,6 @@
         </div>
     </div>
 
-    <!-- Modal para agregar cuenta -->
     <div id="accountModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1253,23 +1251,22 @@
             return platformProfiles[platform] || 5;
         }
         
-        // Formatear fecha
-        // ... dentro de public/dashboard.html
-function formatDate(dateString) {
-    if (!dateString) return 'No especificado';
-    
-    // Crear la fecha y ajustarla por la diferencia de zona horaria del navegador
-    const date = new Date(dateString);
-    const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-    const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+        // ########## INICIO DEL CÓDIGO MODIFICADO (ZONA HORARIA) ##########
+        function formatDate(dateString) {
+            if (!dateString) return 'No especificado';
+            
+            // Crear la fecha y ajustarla por la diferencia de zona horaria del navegador
+            const date = new Date(dateString);
+            const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+            const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
 
-    return adjustedDate.toLocaleDateString('es-PE', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
-        
+            return adjustedDate.toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+        // ########## FIN DEL CÓDIGO MODIFICADO (ZONA HORARIA) ##########
         
         // Obtener próxima fecha de pago (1 día antes del vencimiento)
         function getNextPaymentDate(fechaVencimiento) {
@@ -1660,7 +1657,7 @@ function formatDate(dateString) {
             }
         }
         
-        // Manejar envío del formulario de voucher
+        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL) ##########
         async function handleProfileVoucherSubmit(event) {
             event.preventDefault();
             
@@ -1679,21 +1676,34 @@ function formatDate(dateString) {
                 
                 const profile = account.profiles[currentProfileIndex];
                 
-                // Crear FormData para enviar al servidor
                 const formData = new FormData();
                 formData.append('voucher', fileInput.files[0]);
                 formData.append('numero_operacion', operationNumber);
                 formData.append('monto_pagado', paidAmount);
                 
-                // Subir voucher usando la API
                 const result = await uploadProfileVoucher(currentProfileAccountId, currentProfileIndex, formData);
                 
                 if (result.success) {
+                    // 1. Guardar el estado actual de la UI (posición y acordeón abierto)
+                    const scrollPosition = window.scrollY;
+                    const expandedAccountId = currentProfileAccountId;
+                    
                     await loadAccounts();
                     await updateStats();
                     renderAccounts();
                     closeModal();
                     
+                    // 2. Restaurar el estado de la UI
+                    if (expandedAccountId) {
+                        // Forzar la apertura del acordeón que estaba abierto
+                        const accordion = document.getElementById(`accordion-${expandedAccountId}`);
+                        if (accordion && !accordion.classList.contains('expanded')) {
+                            toggleAccordion(expandedAccountId);
+                        }
+                    }
+                    // Restaurar la posición del scroll
+                    window.scrollTo(0, scrollPosition);
+
                     if (profile.estado === 'vendido') {
                         alert(`✅ Perfil renovado exitosamente!\n\n📱 Perfil: ${profile.name}\n⏰ Se extendió 30 días más automáticamente\n💳 Voucher guardado correctamente`);
                     } else {
@@ -1706,6 +1716,7 @@ function formatDate(dateString) {
                 console.error('Error:', error);
             }
         }
+        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL) ##########
         
         // Generar comunicado para perfil específico
         function generateProfileCommunication(accountId, profileIndex) {
@@ -2248,7 +2259,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                             ` : ''}
                                             
                                             ${profile.estado === 'vendido' ? `
-                                                <!-- Fechas del CLIENTE (independientes del proveedor) -->
                                                 <div class="profile-client-dates">
                                                     <h6>👤 Información del Cliente</h6>
                                                     <div class="client-date-row">
