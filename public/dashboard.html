@@ -1304,15 +1304,15 @@
                     <label for="providerEndDate">📅 Fecha Fin (Vencimiento Proveedor) *</label>
                     <input type="date" id="providerEndDate" required>
                     <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
-                        Fecha cuando se vence tu cuenta del proveedor
+                        Fecha cuando se vence tu cuenta del proveedor (30 días después)
                     </small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="customDays">Días restantes (calculados automáticamente)</label>
-                    <input type="number" id="customDays" readonly style="background: #f8f9fa;">
-                    <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
-                        Se calcula automáticamente basado en las fechas del proveedor
+                    <label for="customDays">📊 Días Restantes (Calculado Automáticamente)</label>
+                    <input type="number" id="customDays" readonly style="background: #f8f9fa; color: #495057; font-weight: bold; font-size: 1.1em;">
+                    <small style="color: #28a745; font-size: 0.8em; margin-top: 5px; display: block; font-weight: 600;">
+                        ✅ Se calcula automáticamente basado en las fechas del proveedor
                     </small>
                 </div>
                 
@@ -1463,40 +1463,85 @@
         // Verificar alarmas del proveedor
         function checkProviderAlarms() {
             const today = new Date();
-            const alertDate = new Date(today.getTime() + (ALARM_CONFIG.providerAlarmDays * 24 * 60 * 60 * 1000));
             
-            accounts.forEach(account => {
-                if (!account.fechaVencimiento) return;
+            allAccounts.forEach(account => {
+                if (!account.fechaVencimientoProveedor) return;
                 
-                const vencimiento = new Date(account.fechaVencimiento);
+                const vencimiento = new Date(account.fechaVencimientoProveedor);
                 const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
                 
-                // Alarma para renovar con el proveedor
+                // Alarma para renovar con el proveedor (3 días antes)
                 if (diffDays === ALARM_CONFIG.providerAlarmDays) {
                     const message = `
 🚨 *ALERTA PROVEEDOR - JIREH STREAMING*
 
 ⚠️ La cuenta del proveedor está por vencerse:
 
-📋 *DETALLES:*
-• Cliente: ${account.clientName}
+📋 *DETALLES DE LA CUENTA:*
+• Nombre: ${account.clientName}
 • Servicio: ${account.type}
 • Email: ${account.email}
-• Vencimiento: ${formatDate(account.fechaVencimiento)}
+• País: ${countryFlags[account.country]} ${account.country}
+
+📅 *FECHAS IMPORTANTES:*
+• Fecha Inicio: ${formatDate(account.fechaInicioProveedor)}
+• Vencimiento: ${formatDate(account.fechaVencimientoProveedor)}
 • Días restantes: ${diffDays} días
+
+👥 *PERFILES DISPONIBLES:*
+• Total perfiles: ${account.profiles.length}
+• Disponibles: ${account.profiles.filter(p => p.estado === 'disponible').length}
+• Vendidos: ${account.profiles.filter(p => p.estado === 'vendido').length}
 
 🔄 *ACCIÓN REQUERIDA:*
 • Renovar cuenta con el proveedor URGENTE
 • Contactar proveedor para extensión
 • Verificar pagos pendientes
 
-💰 *INFORMACIÓN:*
-• Yape Proveedor: [TU PROVEEDOR]
-• Monto renovación: [MONTO]
+💰 *RECORDATORIO:*
+• Renueva ANTES del vencimiento
+• Evita suspensión de servicio
+• Mantén activos los perfiles vendidos
 
 ⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
 
-*JIREH STREAMING - Sistema de Alarmas*
+*JIREH STREAMING - Sistema de Alarmas del Proveedor*
+                    `.trim();
+                    
+                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                }
+                
+                // Alarma de vencimiento inmediato del proveedor
+                if (diffDays === 0) {
+                    const message = `
+🚨 *CUENTA DEL PROVEEDOR VENCE HOY - JIREH STREAMING*
+
+⚠️ ATENCIÓN: Tu cuenta del proveedor vence HOY
+
+📋 *CUENTA VENCIENDO:*
+• Nombre: ${account.clientName}
+• Servicio: ${account.type}
+• Email: ${account.email}
+• Vencimiento: HOY (${formatDate(account.fechaVencimientoProveedor)})
+
+👥 *PERFILES AFECTADOS:*
+• Total: ${account.profiles.length} perfiles
+• Vendidos: ${account.profiles.filter(p => p.estado === 'vendido').length}
+• Clientes afectados si no renuevas
+
+🔄 *ACCIÓN INMEDIATA:*
+• Renovar cuenta del proveedor HOY
+• Contactar proveedor urgente
+• Evitar suspensión masiva
+
+⚠️ *CONSECUENCIAS:*
+• Todos los perfiles se suspenderán
+• Clientes perderán acceso
+• Posible pérdida de ingresos
+
+⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Sistema de Alarmas del Proveedor*
                     `.trim();
                     
                     sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
@@ -1504,79 +1549,98 @@
             });
         }
         
-        // Verificar alarmas de clientes
+        // Verificar alarmas de clientes (perfiles vendidos)
         function checkClientAlarms() {
             const today = new Date();
             
-            accounts.forEach(account => {
-                if (!account.fechaVencimiento) return;
-                
-                const vencimiento = new Date(account.fechaVencimiento);
-                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
-                
-                // Alarma para cobrar al cliente
-                if (diffDays === ALARM_CONFIG.clientAlarmDays) {
-                    const message = `
+            allAccounts.forEach(account => {
+                account.profiles.forEach((profile, index) => {
+                    // Solo verificar perfiles vendidos
+                    if (profile.estado !== 'vendido' || !profile.fechaVencimiento) return;
+                    
+                    const vencimiento = new Date(profile.fechaVencimiento);
+                    const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
+                    
+                    // Alarma para cobrar al cliente (2 días antes)
+                    if (diffDays === ALARM_CONFIG.clientAlarmDays) {
+                        const message = `
 💰 *ALERTA COBRO - JIREH STREAMING*
 
 ⏰ Cliente próximo a vencer:
 
 👤 *DATOS DEL CLIENTE:*
-• Nombre: ${account.clientName}
-• Teléfono: ${account.clientPhone || 'No especificado'}
-• Servicio: ${account.type}
-• Perfiles: ${account.profiles.length}
+• Nombre: ${profile.clienteNombre}
+• Teléfono: ${profile.clienteTelefono || 'No especificado'}
+• Perfil: ${profile.name} (PIN: ${profile.pin})
+
+📱 *SERVICIO:*
+• Cuenta: ${account.type}
+• Email: ${account.email}
+• País: ${countryFlags[account.country]} ${account.country}
 
 📅 *FECHAS IMPORTANTES:*
-• Vencimiento: ${formatDate(account.fechaVencimiento)}
-• Corte automático: ${getCutoffDate(account.fechaVencimiento)}
+• Fecha Venta: ${formatDate(profile.fechaVenta)}
+• Vencimiento: ${formatDate(profile.fechaVencimiento)}
 • Días restantes: ${diffDays} días
 
-💳 *ACCIÓN REQUERIDA:*
+💳 *ESTADO DE PAGO:*
+• Estado: ${profile.estadoPago === 'pagado' ? '✅ Pagado' : '❌ Pendiente'}
+• ${profile.estadoPago === 'pagado' ? 'Cliente al día' : 'Requiere renovación'}
+
+🔄 *ACCIÓN REQUERIDA:*
 • Contactar cliente para renovación
 • Enviar comunicado de pago
 • Verificar si ya pagó
 
 📱 *CONTACTO:*
-${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` : '• Sin teléfono registrado'}
+${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTelefono}` : '• Sin teléfono registrado'}
 
 ⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
 
-*JIREH STREAMING - Sistema de Alarmas*
-                    `.trim();
+*JIREH STREAMING - Sistema de Alarmas de Clientes*
+                        `.trim();
+                        
+                        sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                    }
                     
-                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
-                }
-                
-                // Alarma de vencimiento inmediato
-                if (diffDays === 0) {
-                    const message = `
-🚨 *ALERTA VENCIMIENTO HOY - JIREH STREAMING*
+                    // Alarma de vencimiento inmediato del perfil
+                    if (diffDays === 0) {
+                        const message = `
+🚨 *PERFIL VENCE HOY - JIREH STREAMING*
 
-⚠️ CUENTA VENCE HOY:
+⚠️ PERFIL VENCE HOY:
 
 👤 *CLIENTE:*
-• Nombre: ${account.clientName}
-• Teléfono: ${account.clientPhone || 'No especificado'}
-• Servicio: ${account.type}
+• Nombre: ${profile.clienteNombre}
+• Teléfono: ${profile.clienteTelefono || 'No especificado'}
+• Perfil: ${profile.name} (PIN: ${profile.pin})
+
+📱 *SERVICIO:*
+• Cuenta: ${account.type}
+• Email: ${account.email}
 
 📅 *ESTADO:*
-• Vence: HOY (${formatDate(account.fechaVencimiento)})
-• Corte: MAÑANA (${getCutoffDate(account.fechaVencimiento)})
-• Estado: ${account.estadoPago === 'activo' ? 'PAGADO ✅' : 'PENDIENTE ❌'}
+• Vence: HOY (${formatDate(profile.fechaVencimiento)})
+• Estado pago: ${profile.estadoPago === 'pagado' ? '✅ PAGADO' : '❌ PENDIENTE'}
 
 🔄 *ACCIÓN INMEDIATA:*
-• Verificar si pagó
+• Verificar si pagó la renovación
 • Contactar cliente urgente
-• Suspender servicio si no pagó
+• Suspender perfil si no pagó
+
+💰 *PARA RENOVAR:*
+• Cliente debe pagar y enviar voucher
+• Subir comprobante al sistema
+• Perfil se renovará automáticamente
 
 ⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
 
-*JIREH STREAMING - Sistema de Alarmas*
-                    `.trim();
-                    
-                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
-                }
+*JIREH STREAMING - Sistema de Alarmas de Clientes*
+                        `.trim();
+                        
+                        sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                    }
+                });
             });
         }
         
@@ -1818,6 +1882,8 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
                     profiles: typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles,
                     fechaVenta: account.fecha_venta,
                     fechaVencimiento: account.fecha_vencimiento,
+                    fechaInicioProveedor: account.fecha_inicio_proveedor,
+                    fechaVencimientoProveedor: account.fecha_vencimiento_proveedor,
                     voucherImagen: account.voucher_imagen,
                     numeroOperacion: account.numero_operacion,
                     montoPagado: account.monto_pagado,
@@ -2228,12 +2294,22 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
             
             // Cargar datos en el formulario
             document.getElementById('clientName').value = account.clientName;
-            document.getElementById('clientPhone').value = account.clientPhone;
+            document.getElementById('clientPhone').value = account.clientPhone || '';
             document.getElementById('accountEmail').value = account.email;
             document.getElementById('accountPassword').value = account.password;
             document.getElementById('accountType').value = account.type;
             document.getElementById('accountCountry').value = account.country;
-            document.getElementById('customDays').value = account.daysRemaining;
+            
+            // Cargar fechas del proveedor
+            if (account.fechaInicioProveedor) {
+                document.getElementById('providerStartDate').value = account.fechaInicioProveedor.split('T')[0];
+            }
+            if (account.fechaVencimientoProveedor) {
+                document.getElementById('providerEndDate').value = account.fechaVencimientoProveedor.split('T')[0];
+            }
+            
+            // Actualizar días restantes
+            updateDaysRemaining();
             
             document.getElementById('accountModal').style.display = 'block';
         }
