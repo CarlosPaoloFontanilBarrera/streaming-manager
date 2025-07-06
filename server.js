@@ -28,6 +28,7 @@ const upload = multer({
 
 // Función para calcular días restantes
 function calcularDiasRestantes(fechaVencimiento) {
+    if (!fechaVencimiento) return 0;
     const hoy = new Date();
     const vencimiento = new Date(fechaVencimiento);
     const diferencia = vencimiento.getTime() - hoy.getTime();
@@ -37,9 +38,9 @@ function calcularDiasRestantes(fechaVencimiento) {
 
 // Función para actualizar estado automáticamente
 function actualizarEstado(diasRestantes) {
-    if (diasRestantes > 5) return 'activo';
-    if (diasRestantes > 0) return 'por_vencer';
-    return 'vencido';
+    if (diasRestantes > 5) return 'active';
+    if (diasRestantes > 0) return 'inactive';
+    return 'expired';
 }
 
 // Crear tabla si no existe
@@ -60,6 +61,8 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT NOW(),
                 fecha_venta TIMESTAMP DEFAULT NOW(),
                 fecha_vencimiento TIMESTAMP,
+                fecha_inicio_proveedor TIMESTAMP,
+                fecha_vencimiento_proveedor TIMESTAMP,
                 voucher_imagen TEXT,
                 numero_operacion TEXT,
                 monto_pagado DECIMAL(10,2),
@@ -71,29 +74,37 @@ async function initDB() {
         const columnCheck = await pool.query(`
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name = 'accounts' AND column_name IN ('fecha_venta', 'fecha_vencimiento', 'voucher_imagen', 'numero_operacion', 'monto_pagado', 'estado_pago')
+            WHERE table_name = 'accounts' AND column_name IN (
+                'fecha_venta', 'fecha_vencimiento', 'fecha_inicio_proveedor', 
+                'fecha_vencimiento_proveedor', 'voucher_imagen', 'numero_operacion', 
+                'monto_pagado', 'estado_pago'
+            )
         `);
         
-        if (columnCheck.rows.length < 6) {
-            await pool.query(`
-                ALTER TABLE accounts 
-                ADD COLUMN IF NOT EXISTS fecha_venta TIMESTAMP DEFAULT NOW(),
-                ADD COLUMN IF NOT EXISTS fecha_vencimiento TIMESTAMP,
-                ADD COLUMN IF NOT EXISTS voucher_imagen TEXT,
-                ADD COLUMN IF NOT EXISTS numero_operacion TEXT,
-                ADD COLUMN IF NOT EXISTS monto_pagado DECIMAL(10,2),
-                ADD COLUMN IF NOT EXISTS estado_pago TEXT DEFAULT 'activo'
-            `);
-            
-            // Actualizar registros existentes
-            await pool.query(`
-                UPDATE accounts 
-                SET 
-                    fecha_venta = COALESCE(fecha_venta, created_at),
-                    fecha_vencimiento = COALESCE(fecha_vencimiento, created_at + INTERVAL '30 days'),
-                    estado_pago = COALESCE(estado_pago, 'activo')
-                WHERE fecha_vencimiento IS NULL
-            `);
+        const existingColumns = columnCheck.rows.map(row => row.column_name);
+        
+        // Agregar columnas que faltan
+        const columnsToAdd = [
+            'fecha_venta TIMESTAMP DEFAULT NOW()',
+            'fecha_vencimiento TIMESTAMP',
+            'fecha_inicio_proveedor TIMESTAMP',
+            'fecha_vencimiento_proveedor TIMESTAMP',
+            'voucher_imagen TEXT',
+            'numero_operacion TEXT',
+            'monto_pagado DECIMAL(10,2)',
+            'estado_pago TEXT DEFAULT \'activo\''
+        ];
+        
+        for (const column of columnsToAdd) {
+            const columnName = column.split(' ')[0];
+            if (!existingColumns.includes(columnName)) {
+                try {
+                    await pool.query(`ALTER TABLE accounts ADD COLUMN ${column}`);
+                    console.log(`✅ Columna ${columnName} agregada`);
+                } catch (error) {
+                    console.log(`ℹ️ Columna ${columnName} ya existe o error:`, error.message);
+                }
+            }
         }
         
         await pool.query(`
@@ -163,28 +174,23 @@ app.post('/api/login', async (req, res) => {
 app.get('/api/accounts', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT *, 
-                   CASE 
-                       WHEN fecha_vencimiento > NOW() THEN EXTRACT(days FROM fecha_vencimiento - NOW())::INTEGER
-                       ELSE 0
-                   END as dias_calculados
-            FROM accounts 
+            SELECT * FROM accounts 
             ORDER BY created_at DESC
         `);
         
-        // Actualizar días y estado para cada cuenta
+        // Actualizar días y estado para cada cuenta basado en fecha_vencimiento_proveedor
         const accounts = result.rows.map(account => {
-            const diasRestantes = calcularDiasRestantes(account.fecha_vencimiento);
+            const diasRestantes = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
             const estado = actualizarEstado(diasRestantes);
             
             return {
                 ...account,
                 days_remaining: diasRestantes,
-                status: estado,
-                dias_restantes: diasRestantes
+                status: estado
             };
         });
         
+        console.log(`📊 Enviando ${accounts.length} cuentas`);
         res.json(accounts);
     } catch (error) {
         console.error('Error obteniendo cuentas:', error);
@@ -192,35 +198,46 @@ app.get('/api/accounts', async (req, res) => {
     }
 });
 
-// Crear nueva cuenta con fechas automáticas
+// Crear nueva cuenta con fechas del proveedor
 app.post('/api/accounts', async (req, res) => {
     try {
         const { 
             id, client_name, client_phone, email, password, 
-            type, country, profiles, days_remaining, status 
+            type, country, profiles, days_remaining, status,
+            fecha_inicio_proveedor, fecha_vencimiento_proveedor
         } = req.body;
         
-        const fechaVenta = new Date();
-        const fechaVencimiento = new Date(fechaVenta);
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+        console.log('📥 Datos recibidos:', {
+            id, client_name, type, 
+            fecha_inicio_proveedor, 
+            fecha_vencimiento_proveedor,
+            days_remaining
+        });
+        
+        // Usar las fechas del proveedor
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimiento = fecha_vencimiento_proveedor ? new Date(fecha_vencimiento_proveedor) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         
         const result = await pool.query(
             `INSERT INTO accounts (
                 id, client_name, client_phone, email, password, type, country, 
-                profiles, days_remaining, status, fecha_venta, fecha_vencimiento, estado_pago
+                profiles, days_remaining, status, fecha_inicio_proveedor, 
+                fecha_vencimiento_proveedor, estado_pago, created_at
             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
              RETURNING *`,
             [
                 id, client_name, client_phone || '', email, password, type, country, 
-                JSON.stringify(profiles), 30, 'active', fechaVenta, fechaVencimiento, 'activo'
+                JSON.stringify(profiles), days_remaining || 30, status || 'active', 
+                fechaInicio, fechaVencimiento, 'activo'
             ]
         );
         
+        console.log('✅ Cuenta creada:', result.rows[0].id);
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('Error creando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error creando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
@@ -230,25 +247,39 @@ app.put('/api/accounts/:id', async (req, res) => {
         const { id } = req.params;
         const { 
             client_name, client_phone, email, password, 
-            type, country, profiles, days_remaining, status 
+            type, country, profiles, days_remaining, status,
+            fecha_inicio_proveedor, fecha_vencimiento_proveedor
         } = req.body;
+        
+        console.log('📝 Actualizando cuenta:', id, {
+            fecha_inicio_proveedor, 
+            fecha_vencimiento_proveedor
+        });
         
         const result = await pool.query(
             `UPDATE accounts SET 
                 client_name = $1, client_phone = $2, email = $3, password = $4, 
-                type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9
-             WHERE id = $10 RETURNING *`,
-            [client_name, client_phone || '', email, password, type, country, JSON.stringify(profiles), days_remaining, status, id]
+                type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9,
+                fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
+             WHERE id = $12 RETURNING *`,
+            [
+                client_name, client_phone || '', email, password, type, country, 
+                JSON.stringify(profiles), days_remaining, status,
+                fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : null,
+                fecha_vencimiento_proveedor ? new Date(fecha_vencimiento_proveedor) : null,
+                id
+            ]
         );
         
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Cuenta no encontrada' });
         }
         
+        console.log('✅ Cuenta actualizada:', id);
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('Error actualizando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error actualizando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
@@ -267,9 +298,9 @@ app.post('/api/accounts/:id/voucher', upload.single('voucher'), async (req, res)
         
         const account = accountResult.rows[0];
         
-        // Calcular nueva fecha de vencimiento (desde la fecha actual o desde vencimiento si aún es válida)
+        // Calcular nueva fecha de vencimiento del proveedor (extender 30 días)
         const fechaActual = new Date();
-        const fechaVencimientoActual = new Date(account.fecha_vencimiento);
+        const fechaVencimientoActual = new Date(account.fecha_vencimiento_proveedor);
         
         let nuevaFechaVencimiento;
         if (fechaVencimientoActual > fechaActual) {
@@ -288,10 +319,9 @@ app.post('/api/accounts/:id/voucher', upload.single('voucher'), async (req, res)
                 voucher_imagen = $1, 
                 numero_operacion = $2, 
                 monto_pagado = $3,
-                fecha_vencimiento = $4,
+                fecha_vencimiento_proveedor = $4,
                 estado_pago = 'activo',
-                status = 'active',
-                days_remaining = 30
+                status = 'active'
              WHERE id = $5 RETURNING *`,
             [voucherImagen, numero_operacion, parseFloat(monto_pagado), nuevaFechaVencimiento, id]
         );
@@ -356,14 +386,10 @@ app.get('/api/stats', async (req, res) => {
     try {
         const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
         
-        // Calcular estados en tiempo real
+        // Calcular estados en tiempo real basado en fecha_vencimiento_proveedor
         const accountsResult = await pool.query(`
             SELECT 
-                CASE 
-                    WHEN fecha_vencimiento > NOW() + INTERVAL '5 days' THEN 'active'
-                    WHEN fecha_vencimiento > NOW() THEN 'por_vencer'
-                    ELSE 'vencido'
-                END as estado_calculado,
+                fecha_vencimiento_proveedor,
                 profiles
             FROM accounts
         `);
@@ -371,13 +397,19 @@ app.get('/api/stats', async (req, res) => {
         let activeCount = 0;
         let expiringCount = 0;
         let totalProfiles = 0;
+        const today = new Date();
         
         accountsResult.rows.forEach(row => {
             const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles;
             totalProfiles += profiles.length;
             
-            if (row.estado_calculado === 'active') activeCount++;
-            if (row.estado_calculado === 'por_vencer') expiringCount++;
+            if (row.fecha_vencimiento_proveedor) {
+                const vencimiento = new Date(row.fecha_vencimiento_proveedor);
+                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays > 5) activeCount++;
+                else if (diffDays > 0) expiringCount++;
+            }
         });
         
         res.json({
@@ -417,8 +449,9 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
             console.log(`🌐 URL: http://localhost:${PORT}`);
-            console.log(`📅 Sistema de fechas automáticas: ACTIVO`);
+            console.log(`📅 Sistema de fechas del proveedor: ACTIVO`);
             console.log(`💳 Sistema de vouchers: ACTIVO`);
+            console.log(`🚨 Sistema de alarmas: ACTIVO`);
         });
     } catch (error) {
         console.error('❌ Error iniciando servidor:', error);
