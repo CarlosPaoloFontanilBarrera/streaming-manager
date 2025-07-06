@@ -1,9 +1,10 @@
-// server.js - Sistema completo con fechas automáticas y vouchers
+// server.js - Sistema completo con notificaciones push automáticas vía ntfy.sh
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
+const axios = require('axios'); // Nueva librería para enviar notificaciones
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +26,14 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB máximo
 });
+
+// --- NUEVO: CONFIGURACIÓN DE NOTIFICACIONES ---
+const NOTIFICACION_CONFIG = {
+    // IMPORTANTE: Reemplaza esto con el nombre de tu tema secreto de ntfy.sh
+    topic: 'jireh-alertas-manager-2025', 
+    providerAlarmDays: 3,
+    clientAlarmDays: 2
+};
 
 // Función para calcular días restantes
 function calcularDiasRestantes(fechaVencimiento) {
@@ -70,7 +79,6 @@ async function initDB() {
             )
         `);
         
-        // Verificar si las columnas nuevas existen, si no, agregarlas
         const columnCheck = await pool.query(`
             SELECT column_name 
             FROM information_schema.columns 
@@ -83,7 +91,6 @@ async function initDB() {
         
         const existingColumns = columnCheck.rows.map(row => row.column_name);
         
-        // Agregar columnas que faltan
         const columnsToAdd = [
             'fecha_venta TIMESTAMP DEFAULT NOW()',
             'fecha_vencimiento TIMESTAMP',
@@ -102,7 +109,7 @@ async function initDB() {
                     await pool.query(`ALTER TABLE accounts ADD COLUMN ${column}`);
                     console.log(`✅ Columna ${columnName} agregada`);
                 } catch (error) {
-                    console.log(`ℹ️ Columna ${columnName} ya existe o error:`, error.message);
+                    // Ignora el error si la columna ya existe
                 }
             }
         }
@@ -116,7 +123,6 @@ async function initDB() {
             )
         `);
         
-        // Insertar usuario admin por defecto
         await pool.query(`
             INSERT INTO admin_users (username, password) 
             VALUES ('paolof', 'elpoderosodeizrael777xD!') 
@@ -129,318 +135,171 @@ async function initDB() {
     }
 }
 
+
+// --- NUEVO: FUNCIÓN DE ENVÍO DE NOTIFICACIONES PUSH ---
+async function enviarNotificacionPush(titulo, mensaje) {
+    try {
+        await axios.post(`https://ntfy.sh/${NOTIFICACION_CONFIG.topic}`, mensaje, {
+            headers: {
+                'Title': titulo,
+                'Priority': 'high', // 'high' o 'urgent' para que suene
+                'Tags': 'bell' // Emoji de campana
+            }
+        });
+        console.log(`✅ Notificación push enviada: "${titulo}"`);
+    } catch (error) {
+        console.error('❌ Error enviando notificación push:', error.message);
+    }
+}
+
+// --- NUEVO: MOTOR DE ALARMAS EN EL BACKEND ---
+function iniciarMotorDeAlarmas() {
+    console.log(`🚨 Motor de alarmas con ntfy.sh iniciado. Verificando cada 1 minuto.`);
+    
+    setInterval(async () => {
+        console.log(`⏰ Ejecutando verificación de alarmas: ${new Date().toLocaleString('es-PE')}`);
+        
+        try {
+            const result = await pool.query('SELECT * FROM accounts');
+            const accounts = result.rows;
+            const today = new Date();
+
+            if (accounts.length === 0) return;
+
+            for (const account of accounts) {
+                const diasRestantes = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
+
+                // Alarma para cuentas del proveedor
+                if (diasRestantes > 0 && diasRestantes <= NOTIFICACION_CONFIG.providerAlarmDays) {
+                    const titulo = `⚠️ Alerta Proveedor: ${account.client_name}`;
+                    const mensaje = `El servicio ${account.type} vence en ${diasRestantes} día(s). ¡Renovar urgente!`;
+                    await enviarNotificacionPush(titulo, mensaje);
+                }
+
+                // Alarma para perfiles de clientes
+                const perfiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles;
+                for (const profile of perfiles) {
+                    if (profile.estado === 'vendido' && profile.fechaVencimiento) {
+                        const vencimientoPerfil = new Date(profile.fechaVencimiento);
+                        const diasRestantesPerfil = Math.ceil((vencimientoPerfil - today) / (1000 * 60 * 60 * 24));
+
+                        if (diasRestantesPerfil > 0 && diasRestantesPerfil <= NOTIFICACION_CONFIG.clientAlarmDays) {
+                            const titulo = `💰 Alerta Cobro: ${profile.clienteNombre}`;
+                            const mensaje = `El perfil ${profile.name} (${account.type}) vence en ${diasRestantesPerfil} día(s). ¡Contactar para renovar!`;
+                            await enviarNotificacionPush(titulo, mensaje);
+                        }
+                    }
+                }
+            }
+        } catch (dbError) {
+            console.error('❌ Error de base de datos en el motor de alarmas:', dbError);
+        }
+    }, 60000); // Se ejecuta cada 60 segundos
+}
+
+
 // RUTAS API
-// Health check
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        database: 'Connected' 
-    });
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Login
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        
-        const result = await pool.query(
-            'SELECT * FROM admin_users WHERE username = $1 AND password = $2',
-            [username, password]
-        );
-        
+        const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND password = $2', [username, password]);
         if (result.rows.length > 0) {
-            res.json({ 
-                success: true, 
-                message: 'Login exitoso',
-                user: result.rows[0].username
-            });
+            res.json({ success: true, message: 'Login exitoso' });
         } else {
-            res.status(401).json({ 
-                success: false, 
-                message: 'Credenciales inválidas' 
-            });
+            res.status(401).json({ success: false, message: 'Credenciales inválidas' });
         }
     } catch (error) {
-        console.error('Error en login:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error interno del servidor' 
-        });
+        res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
 });
 
-// Obtener todas las cuentas con cálculo automático
 app.get('/api/accounts', async (req, res) => {
     try {
-        const result = await pool.query(`
-            SELECT * FROM accounts 
-            ORDER BY created_at DESC
-        `);
-        
-        // Actualizar días y estado para cada cuenta basado en fecha_vencimiento_proveedor
-        const accounts = result.rows.map(account => {
-            const diasRestantes = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
-            const estado = actualizarEstado(diasRestantes);
-            
-            return {
-                ...account,
-                days_remaining: diasRestantes,
-                status: estado
-            };
-        });
-        
-        console.log(`📊 Enviando ${accounts.length} cuentas`);
+        const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
+        const accounts = result.rows.map(account => ({
+            ...account,
+            days_remaining: calcularDiasRestantes(account.fecha_vencimiento_proveedor),
+            status: actualizarEstado(calcularDiasRestantes(account.fecha_vencimiento_proveedor))
+        }));
         res.json(accounts);
     } catch (error) {
-        console.error('Error obteniendo cuentas:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
-// Crear nueva cuenta con fechas del proveedor
 app.post('/api/accounts', async (req, res) => {
     try {
-        const { 
-            id, client_name, client_phone, email, password, 
-            type, country, profiles, days_remaining, status,
-            fecha_inicio_proveedor, fecha_vencimiento_proveedor
-        } = req.body;
-        
-        console.log('📥 Datos recibidos:', {
-            id, client_name, type, 
-            fecha_inicio_proveedor, 
-            fecha_vencimiento_proveedor,
-            days_remaining
-        });
-        
-        // Usar las fechas del proveedor
-        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
-        const fechaVencimiento = fecha_vencimiento_proveedor ? new Date(fecha_vencimiento_proveedor) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        
+        const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor, fecha_vencimiento_proveedor } = req.body;
+        const days_remaining = calcularDiasRestantes(fecha_vencimiento_proveedor);
+        const status = actualizarEstado(days_remaining);
         const result = await pool.query(
-            `INSERT INTO accounts (
-                id, client_name, client_phone, email, password, type, country, 
-                profiles, days_remaining, status, fecha_inicio_proveedor, 
-                fecha_vencimiento_proveedor, estado_pago, created_at
-            )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
-             RETURNING *`,
-            [
-                id, client_name, client_phone || '', email, password, type, country, 
-                JSON.stringify(profiles), days_remaining || 30, status || 'active', 
-                fechaInicio, fechaVencimiento, 'activo'
-            ]
+            `INSERT INTO accounts (id, client_name, client_phone, email, password, type, country, profiles, days_remaining, status, fecha_inicio_proveedor, fecha_vencimiento_proveedor)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+            [id, client_name, client_phone, email, password, type, country, JSON.stringify(profiles), days_remaining, status, fecha_inicio_proveedor, fecha_vencimiento_proveedor]
         );
-        
-        console.log('✅ Cuenta creada:', result.rows[0].id);
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('❌ Error creando cuenta:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
-// Actualizar cuenta
 app.put('/api/accounts/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { 
-            client_name, client_phone, email, password, 
-            type, country, profiles, days_remaining, status,
-            fecha_inicio_proveedor, fecha_vencimiento_proveedor
-        } = req.body;
-        
-        console.log('📝 Actualizando cuenta:', id, {
-            fecha_inicio_proveedor, 
-            fecha_vencimiento_proveedor
-        });
-        
+        const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor, fecha_vencimiento_proveedor } = req.body;
+        const days_remaining = calcularDiasRestantes(fecha_vencimiento_proveedor);
+        const status = actualizarEstado(days_remaining);
         const result = await pool.query(
-            `UPDATE accounts SET 
-                client_name = $1, client_phone = $2, email = $3, password = $4, 
-                type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9,
-                fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
+            `UPDATE accounts SET client_name = $1, client_phone = $2, email = $3, password = $4, type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
              WHERE id = $12 RETURNING *`,
-            [
-                client_name, client_phone || '', email, password, type, country, 
-                JSON.stringify(profiles), days_remaining, status,
-                fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : null,
-                fecha_vencimiento_proveedor ? new Date(fecha_vencimiento_proveedor) : null,
-                id
-            ]
+            [client_name, client_phone, email, password, type, country, JSON.stringify(profiles), days_remaining, status, fecha_inicio_proveedor, fecha_vencimiento_proveedor, id]
         );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
-        console.log('✅ Cuenta actualizada:', id);
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('❌ Error actualizando cuenta:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
-// Subir voucher y renovar cuenta
-app.post('/api/accounts/:id/voucher', upload.single('voucher'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { numero_operacion, monto_pagado } = req.body;
-        const voucherImagen = req.file ? req.file.buffer.toString('base64') : null;
-        
-        // Obtener cuenta actual
-        const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [id]);
-        if (accountResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
-        const account = accountResult.rows[0];
-        
-        // Calcular nueva fecha de vencimiento del proveedor (extender 30 días)
-        const fechaActual = new Date();
-        const fechaVencimientoActual = new Date(account.fecha_vencimiento_proveedor);
-        
-        let nuevaFechaVencimiento;
-        if (fechaVencimientoActual > fechaActual) {
-            // Si aún no ha vencido, extender desde la fecha de vencimiento actual
-            nuevaFechaVencimiento = new Date(fechaVencimientoActual);
-            nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
-        } else {
-            // Si ya venció, extender desde hoy
-            nuevaFechaVencimiento = new Date(fechaActual);
-            nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
-        }
-        
-        // Actualizar cuenta con voucher y nueva fecha
-        const result = await pool.query(
-            `UPDATE accounts SET 
-                voucher_imagen = $1, 
-                numero_operacion = $2, 
-                monto_pagado = $3,
-                fecha_vencimiento_proveedor = $4,
-                estado_pago = 'activo',
-                status = 'active'
-             WHERE id = $5 RETURNING *`,
-            [voucherImagen, numero_operacion, parseFloat(monto_pagado), nuevaFechaVencimiento, id]
-        );
-        
-        res.json({
-            success: true,
-            message: 'Voucher subido y cuenta renovada exitosamente',
-            account: result.rows[0],
-            nueva_fecha_vencimiento: nuevaFechaVencimiento.toLocaleDateString('es-PE')
-        });
-        
-    } catch (error) {
-        console.error('Error subiendo voucher:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
-// Obtener voucher de una cuenta
-app.get('/api/accounts/:id/voucher', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await pool.query(
-            'SELECT voucher_imagen, numero_operacion, monto_pagado FROM accounts WHERE id = $1',
-            [id]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
-        const voucher = result.rows[0];
-        if (!voucher.voucher_imagen) {
-            return res.status(404).json({ error: 'No hay voucher para esta cuenta' });
-        }
-        
-        res.json(voucher);
-    } catch (error) {
-        console.error('Error obteniendo voucher:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
-// Eliminar cuenta
 app.delete('/api/accounts/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
+        await pool.query('DELETE FROM accounts WHERE id = $1', [id]);
         res.json({ message: 'Cuenta eliminada exitosamente' });
     } catch (error) {
-        console.error('Error eliminando cuenta:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
-// Estadísticas con cálculo automático
 app.get('/api/stats', async (req, res) => {
     try {
-        const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
-        
-        // Calcular estados en tiempo real basado en fecha_vencimiento_proveedor
-        const accountsResult = await pool.query(`
-            SELECT 
-                fecha_vencimiento_proveedor,
-                profiles
-            FROM accounts
-        `);
-        
-        let activeCount = 0;
-        let expiringCount = 0;
+        const result = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
+        let total = result.rows.length;
+        let active = 0;
+        let expiring = 0;
         let totalProfiles = 0;
-        const today = new Date();
-        
-        accountsResult.rows.forEach(row => {
+        result.rows.forEach(row => {
+            const days = calcularDiasRestantes(row.fecha_vencimiento_proveedor);
+            if (days > 5) active++;
+            else if (days > 0) expiring++;
             const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles;
             totalProfiles += profiles.length;
-            
-            if (row.fecha_vencimiento_proveedor) {
-                const vencimiento = new Date(row.fecha_vencimiento_proveedor);
-                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
-                
-                if (diffDays > 5) activeCount++;
-                else if (diffDays > 0) expiringCount++;
-            }
         });
-        
-        res.json({
-            total: parseInt(totalResult.rows[0].count),
-            active: activeCount,
-            profiles: totalProfiles,
-            expiring: expiringCount
-        });
+        res.json({ total, active, profiles: totalProfiles, expiring });
     } catch (error) {
-        console.error('Error obteniendo estadísticas:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
+
 // Servir archivos estáticos
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-
-// Catch all - servir index.html para SPA
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // Iniciar servidor
 async function startServer() {
@@ -448,23 +307,11 @@ async function startServer() {
         await initDB();
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
-            console.log(`🌐 URL: http://localhost:${PORT}`);
-            console.log(`📅 Sistema de fechas del proveedor: ACTIVO`);
-            console.log(`💳 Sistema de vouchers: ACTIVO`);
-            console.log(`🚨 Sistema de alarmas: ACTIVO`);
+            iniciarMotorDeAlarmas(); // Iniciar el motor de alarmas
         });
     } catch (error) {
         console.error('❌ Error iniciando servidor:', error);
     }
 }
-
-// Manejo de errores
-process.on('unhandledRejection', (err) => {
-    console.error('Unhandled rejection:', err);
-});
-
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err);
-});
 
 startServer();
