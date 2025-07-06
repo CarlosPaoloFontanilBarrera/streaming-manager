@@ -253,6 +253,110 @@
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
         }
         
+        /* NUEVOS ESTILOS PARA VOUCHERS Y FECHAS */
+        .date-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .date-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #28a745;
+            text-align: center;
+        }
+        
+        .date-card.expiring {
+            border-left-color: #ffc107;
+        }
+        
+        .date-card.expired {
+            border-left-color: #dc3545;
+        }
+        
+        .date-label {
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .date-value {
+            font-size: 1.2em;
+            color: #212529;
+            font-weight: 600;
+        }
+        
+        .voucher-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .voucher-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .voucher-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .voucher-upload {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px dashed #dee2e6;
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        .voucher-upload-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .voucher-upload-btn:hover {
+            background: #138496;
+            transform: translateY(-2px);
+        }
+        
+        .voucher-preview {
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        .voucher-preview img {
+            max-width: 300px;
+            max-height: 200px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .voucher-preview img:hover {
+            transform: scale(1.05);
+            border-color: #17a2b8;
+        }
+        
         .account-details {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -349,6 +453,12 @@
             background: linear-gradient(45deg, #dc3545, #c82333);
             color: white;
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+        
+        .btn-voucher {
+            background: linear-gradient(45deg, #17a2b8, #138496);
+            color: white;
+            box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
         }
         
         .btn:hover {
@@ -485,6 +595,36 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* ESTILOS PARA FORMULARIO DE VOUCHER */
+        .voucher-form {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .voucher-form input {
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        
+        .voucher-form input:focus {
+            outline: none;
+            border-color: #17a2b8;
+        }
+        
+        .voucher-image-preview {
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        .voucher-image-preview img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+        }
+        
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -513,6 +653,10 @@
                 grid-template-columns: 1fr;
             }
             
+            .date-info {
+                grid-template-columns: 1fr;
+            }
+            
             .profiles-grid {
                 grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             }
@@ -528,7 +672,7 @@
         <div class="header">
             <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
             <h1>🎬 JIREH Streaming Manager</h1>
-            <p>Sistema con PostgreSQL en Railway</p>
+            <p>Sistema con PostgreSQL en Railway - Fechas Automáticas y Vouchers</p>
         </div>
         
         <!-- Modal para comunicados -->
@@ -593,6 +737,42 @@
                         <button class="btn" onclick="regenerateAllPins()" style="background: #6f42c1; color: white;">🔄 Regenerar Todos</button>
                     </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Modal para subir voucher -->
+        <div id="voucherModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">💳 Subir Voucher de Pago</h2>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                </div>
+                
+                <form id="voucherForm" class="voucher-form">
+                    <div class="form-group">
+                        <label for="voucherFile">Imagen del Voucher *</label>
+                        <input type="file" id="voucherFile" accept="image/*" required onchange="previewVoucher(this)">
+                    </div>
+                    
+                    <div class="voucher-image-preview" id="voucherPreview" style="display: none;">
+                        <img id="voucherImage" src="" alt="Vista previa del voucher">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="operationNumber">Número de Operación *</label>
+                        <input type="text" id="operationNumber" required placeholder="Ej: 123456789">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="paidAmount">Monto Pagado *</label>
+                        <input type="number" id="paidAmount" step="0.01" required placeholder="Ej: 35.50">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">💾 Subir Voucher y Renovar</button>
+                    </div>
+                </form>
             </div>
         </div>
         
@@ -787,6 +967,7 @@
         let currentAccount = null;
         let currentCommunicationText = '';
         let editingPinAccountId = null;
+        let currentVoucherAccountId = null;
         
         // Función para hacer peticiones API
         async function apiRequest(endpoint, options = {}) {
@@ -924,7 +1105,7 @@
             return `${day}/${month}/${year}`;
         }
         
-        // CORREGIDO: Calcular días restantes (30 días por defecto)
+        // Calcular días restantes (30 días por defecto)
         function calculateDaysRemaining() {
             return 30;
         }
@@ -941,6 +1122,17 @@
             return platformProfiles[platform] || 5;
         }
         
+        // Formatear fecha
+        function formatDate(dateString) {
+            if (!dateString) return 'No especificado';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+        
         // ===============================================
         // FUNCIONES DE API CON RAILWAY
         // ===============================================
@@ -950,13 +1142,19 @@
             try {
                 const data = await apiRequest('/accounts');
                 
-                // Parsear profiles si es string
+                // Parsear profiles si es string y agregar campos de voucher
                 accounts = data.map(account => ({
                     ...account,
                     clientName: account.client_name,
                     clientPhone: account.client_phone,
                     daysRemaining: account.days_remaining,
-                    profiles: typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles
+                    profiles: typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles,
+                    fechaVenta: account.fecha_venta,
+                    fechaVencimiento: account.fecha_vencimiento,
+                    voucherImagen: account.voucher_imagen,
+                    numeroOperacion: account.numero_operacion,
+                    montoPagado: account.monto_pagado,
+                    estadoPago: account.estado_pago || 'activo'
                 }));
                 
                 console.log(`✅ Cargadas ${accounts.length} cuentas desde Railway`);
@@ -1047,6 +1245,25 @@
             }
         }
         
+        // Subir voucher
+        async function uploadVoucher(accountId, formData) {
+            try {
+                const response = await fetch(`${API_BASE}/accounts/${accountId}/voucher`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error subiendo voucher:', error);
+                throw error;
+            }
+        }
+        
         // Eliminar cuenta
         async function deleteAccount(accountId) {
             if (confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
@@ -1113,6 +1330,11 @@
             document.getElementById('communicationModal').style.display = 'none';
             document.getElementById('messageModal').style.display = 'none';
             document.getElementById('pinModal').style.display = 'none';
+            document.getElementById('voucherModal').style.display = 'none';
+            
+            // Limpiar formulario de voucher
+            document.getElementById('voucherForm').reset();
+            document.getElementById('voucherPreview').style.display = 'none';
         }
         
         // Editar cuenta
@@ -1133,6 +1355,63 @@
             document.getElementById('customDays').value = account.daysRemaining;
             
             document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        // Abrir modal de voucher
+        function openVoucherModal(accountId) {
+            currentVoucherAccountId = accountId;
+            document.getElementById('voucherModal').style.display = 'block';
+        }
+        
+        // Vista previa del voucher
+        function previewVoucher(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('voucherImage').src = e.target.result;
+                    document.getElementById('voucherPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Manejar envío del formulario de voucher
+        async function handleVoucherSubmit(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('voucherFile');
+            const operationNumber = document.getElementById('operationNumber').value.trim();
+            const paidAmount = document.getElementById('paidAmount').value.trim();
+            
+            if (!fileInput.files[0] || !operationNumber || !paidAmount) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('voucher', fileInput.files[0]);
+            formData.append('numero_operacion', operationNumber);
+            formData.append('monto_pagado', paidAmount);
+            
+            try {
+                const result = await uploadVoucher(currentVoucherAccountId, formData);
+                
+                if (result.success) {
+                    // Recargar datos
+                    await loadAccounts();
+                    await updateStats();
+                    renderAccounts();
+                    closeModal();
+                    
+                    alert(`✅ Voucher subido exitosamente!\n\nCuenta renovada por 30 días más\nNueva fecha de vencimiento: ${result.nueva_fecha_vencimiento}`);
+                } else {
+                    alert('❌ Error al subir voucher');
+                }
+            } catch (error) {
+                alert('❌ Error al subir voucher');
+                console.error('Error:', error);
+            }
         }
         
         // ===============================================
@@ -1462,6 +1741,17 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                         </span>
                     </div>
                     
+                    <div class="date-info">
+                        <div class="date-card">
+                            <div class="date-label">📅 Fecha de Venta</div>
+                            <div class="date-value">${formatDate(account.fechaVenta)}</div>
+                        </div>
+                        <div class="date-card ${account.daysRemaining <= 5 ? (account.daysRemaining > 0 ? 'expiring' : 'expired') : ''}">
+                            <div class="date-label">📅 Fecha de Vencimiento</div>
+                            <div class="date-value">${formatDate(account.fechaVencimiento)}</div>
+                        </div>
+                    </div>
+                    
                     <div class="account-details">
                         <div class="detail-item">
                             <div class="detail-label">📧 Email</div>
@@ -1484,6 +1774,31 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                         </div>
                     </div>
                     
+                    <div class="voucher-section">
+                        <div class="voucher-info">
+                            <h4>💳 Estado del Pago</h4>
+                            <div class="voucher-status">
+                                <span style="color: ${account.estadoPago === 'activo' ? '#28a745' : '#dc3545'}; font-weight: bold;">
+                                    ${account.estadoPago === 'activo' ? '✅ Pagado' : '❌ Pendiente'}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        ${account.voucherImagen ? `
+                            <div class="voucher-preview">
+                                <img src="data:image/jpeg;base64,${account.voucherImagen}" alt="Voucher de pago" onclick="window.open(this.src, '_blank')">
+                                <p><strong>Operación:</strong> ${account.numeroOperacion} | <strong>Monto:</strong> S/ ${account.montoPagado}</p>
+                            </div>
+                        ` : `
+                            <div class="voucher-upload">
+                                <p>No hay voucher registrado</p>
+                                <button class="voucher-upload-btn" onclick="openVoucherModal('${account.id}')">
+                                    💳 Subir Voucher
+                                </button>
+                            </div>
+                        `}
+                    </div>
+                    
                     <div class="profiles-section">
                         <div class="profiles-header">👥 Perfiles (${account.profiles.length}):</div>
                         <div class="profiles-grid">
@@ -1496,6 +1811,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                     <div class="action-buttons">
                         <button class="btn btn-edit" onclick="editAccount('${account.id}')">✏️ Editar</button>
                         <button class="btn" onclick="editPins('${account.id}')" style="background: #6f42c1; color: white;">🔐 Cambiar PINs</button>
+                        <button class="btn btn-voucher" onclick="openVoucherModal('${account.id}')">💳 Voucher</button>
                         <button class="btn btn-communication" onclick="generateCommunications('${account.id}')">📧 Comunicados</button>
                         <button class="btn btn-delete" onclick="deleteAccount('${account.id}')">🗑️ Eliminar</button>
                     </div>
@@ -1531,7 +1847,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         
         // Inicializar aplicación
         async function initApp() {
-            console.log('🚀 Iniciando JIREH Streaming Manager con Railway...');
+            console.log('🚀 Iniciando JIREH Streaming Manager con Railway y Vouchers...');
             
             // Verificar autenticación
             if (!checkAuth()) return;
@@ -1541,7 +1857,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             await updateStats();
             renderAccounts();
             
-            console.log('✅ JIREH Streaming Manager con Railway cargado exitosamente');
+            console.log('✅ JIREH Streaming Manager con Railway y Vouchers cargado exitosamente');
         }
         
         // ===============================================
@@ -1552,9 +1868,12 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         document.addEventListener('DOMContentLoaded', function() {
             initApp();
             
-            // Configurar formulario
+            // Configurar formularios
             const form = document.getElementById('accountForm');
             form.addEventListener('submit', addAccount);
+            
+            const voucherForm = document.getElementById('voucherForm');
+            voucherForm.addEventListener('submit', handleVoucherSubmit);
             
             // Cerrar modales con Escape
             document.addEventListener('keydown', function(e) {
@@ -1579,9 +1898,13 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             document.getElementById('pinModal').addEventListener('click', function(e) {
                 if (e.target === this) closeModal();
             });
+            
+            document.getElementById('voucherModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
         });
         
-        console.log('🎉 JIREH Streaming Manager con Railway - FASE 1 completada');
+        console.log('🎉 JIREH Streaming Manager con Railway y Sistema de Vouchers - Completado');
     </script>
 </body>
 </html>
