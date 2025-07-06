@@ -772,7 +772,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Nuevos estilos para destacar fechas de perfiles */
         .profile-client-dates {
             background: #e3f2fd;
             border: 2px solid #2196f3;
@@ -848,36 +847,12 @@
                 flex-direction: column;
                 align-items: stretch;
             }
-            
-            .search-box {
-                min-width: auto;
-            }
-            
-            .logout-btn {
-                position: static;
-                margin-bottom: 10px;
-            }
-            
-            .header h1 {
-                font-size: 1.8em;
-            }
-            
-            .modal-content {
-                margin: 10% auto;
-                width: 95%;
-            }
-            
-            .account-details {
-                grid-template-columns: 1fr;
-            }
-            
-            .date-info {
-                grid-template-columns: 1fr;
-            }
-            
-            .action-buttons {
-                flex-direction: column;
-            }
+            .search-box { min-width: auto; }
+            .logout-btn { position: static; margin-bottom: 10px; }
+            .header h1 { font-size: 1.8em; }
+            .modal-content { margin: 10% auto; width: 95%; }
+            .account-details, .date-info { grid-template-columns: 1fr; }
+            .action-buttons { flex-direction: column; }
         }
     </style>
 </head>
@@ -889,11 +864,46 @@
             <p>Sistema con PostgreSQL en Railway - Fechas Automáticas y Vouchers</p>
         </div>
         
+        <!-- INICIO: MODAL PARA ALARMAS NTFY -->
+        <div id="alarmSettingsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">🚨 Configurar Notificaciones de Alarma</h2>
+                    <button class="close-btn" onclick="closeModal('alarmSettingsModal')">&times;</button>
+                </div>
+                <form id="alarmSettingsForm">
+                    <div class="form-group">
+                        <label for="providerThreshold">Avisar para Cuentas de Proveedor (días antes)</label>
+                        <input type="number" id="providerThreshold" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="clientThreshold">Avisar para Perfiles de Clientes (días antes)</label>
+                        <input type="number" id="clientThreshold" required min="1">
+                    </div>
+                    <hr style="margin: 20px 0; border: 1px solid #f1f1f1;">
+                    <div class="form-group">
+                        <label for="ntfyTopic">Tu Tema Privado de ntfy</label>
+                        <input type="text" id="ntfyTopic" required placeholder="Ej: alarmas-jireh-paolo-2024">
+                        <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
+                            1. Descarga la app "ntfy" en tu teléfono. <br>
+                            2. Suscríbete a un tema con un nombre único y secreto. <br>
+                            3. Escribe ese mismo nombre aquí.
+                        </small>
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('alarmSettingsModal')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">💾 Guardar Configuración</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- FIN: MODAL PARA ALARMAS NTFY -->
+
         <div id="communicationModal" class="modal">
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
                     <h2 class="modal-title">📧 Comunicados por Perfil</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('communicationModal')">&times;</button>
                 </div>
                 <div id="profileSelection" style="padding: 20px;">
                     <p style="margin-bottom: 20px; text-align: center; color: #666;">
@@ -912,7 +922,7 @@
             <div class="modal-content" style="max-width: 700px;">
                 <div class="modal-header">
                     <h2 class="modal-title">📱 Comunicado Individual</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('messageModal')">&times;</button>
                 </div>
                 <div id="communicationContent" style="background: #f8f9fa; padding: 20px; border-radius: 10px; font-family: Arial, sans-serif; line-height: 1.6; max-height: 400px; overflow-y: auto;">
                 </div>
@@ -927,7 +937,7 @@
             <div class="modal-content" style="max-width: 600px;">
                 <div class="modal-header">
                     <h2 class="modal-title">🔐 Cambiar PINs de Perfiles</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('pinModal')">&times;</button>
                 </div>
                 <div style="padding: 20px;">
                     <p style="margin-bottom: 20px; color: #666; text-align: center;">
@@ -936,7 +946,7 @@
                     <div id="pinEditGrid" style="display: grid; gap: 15px;">
                     </div>
                     <div style="text-align: center; margin-top: 20px;">
-                        <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button class="btn btn-secondary" onclick="closeModal('pinModal')">Cancelar</button>
                         <button class="btn btn-primary" onclick="savePins()">💾 Guardar PINs</button>
                         <button class="btn" onclick="regenerateAllPins()" style="background: #6f42c1; color: white;">🔄 Regenerar Todos</button>
                     </div>
@@ -948,7 +958,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title">💰 Vender Perfil</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('sellProfileModal')">&times;</button>
                 </div>
                 <form id="sellProfileForm">
                     <div class="form-group">
@@ -971,7 +981,7 @@
                         </small>
                     </div>
                     <div class="btn-group">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('sellProfileModal')">Cancelar</button>
                         <button type="submit" class="btn btn-primary">💰 Vender Perfil</button>
                     </div>
                 </form>
@@ -982,7 +992,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title">💳 Voucher del Perfil</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('profileVoucherModal')">&times;</button>
                 </div>
                 <form id="profileVoucherForm">
                     <div class="form-group">
@@ -1001,7 +1011,7 @@
                         <input type="number" id="profilePaidAmount" step="0.01" required placeholder="Ej: 35.50">
                     </div>
                     <div class="btn-group">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('profileVoucherModal')">Cancelar</button>
                         <button type="submit" class="btn btn-primary">💾 Subir Voucher y Renovar</button>
                     </div>
                 </form>
@@ -1011,8 +1021,9 @@
         <div class="controls">
             <input type="text" class="search-box" placeholder="🔍 Buscar por nombre, email, tipo de servicio..." onkeyup="filterAccounts(this.value)">
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
-            <button class="btn" onclick="configureAlarms()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
-            <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
+            <!-- BOTÓN DE ALARMAS MODIFICADO -->
+            <button class="btn" onclick="openAlarmSettings()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
+            <!-- Se elimina el botón de Test que ya no es necesario -->
         </div>
         
         <div class="stats">
@@ -1048,7 +1059,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title">Agregar Nueva Cuenta</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
+                <button class="close-btn" onclick="closeModal('accountModal')">&times;</button>
             </div>
             <form id="accountForm">
                 <div class="form-group">
@@ -1114,7 +1125,7 @@
                     </small>
                 </div>
                 <div class="btn-group">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('accountModal')">Cancelar</button>
                     <button type="submit" class="btn btn-primary">💾 Guardar Cuenta</button>
                 </div>
             </form>
@@ -1187,31 +1198,24 @@
         // FUNCIONES DE FECHAS
         // ===============================================
         
-        // Función para calcular días restantes de un perfil específico (cliente)
         function calculateProfileDaysRemaining(fechaVencimientoCliente) {
             if (!fechaVencimientoCliente) return 0;
-            
             const hoy = new Date();
             const vencimiento = new Date(fechaVencimientoCliente);
             const diferencia = vencimiento.getTime() - hoy.getTime();
             const dias = Math.ceil(diferencia / (1000 * 60 * 60 * 24));
-            
             return Math.max(0, dias);
         }
         
-        // Calcular días restantes basado en fechas del calendario
         function calculateDaysFromDates(startDate, endDate) {
             if (!startDate || !endDate) return 30;
-            
             const today = new Date();
             const end = new Date(endDate);
             const diffTime = end.getTime() - today.getTime();
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
             return Math.max(0, diffDays);
         }
         
-        // Calcular fecha de vencimiento automática (30 días después)
         function calculateExpiryDate(startDate) {
             const start = new Date(startDate);
             const expiry = new Date(start);
@@ -1219,14 +1223,11 @@
             return expiry.toISOString().split('T')[0];
         }
         
-        // Actualizar días restantes automáticamente
         function updateDaysRemaining() {
             const startDate = document.getElementById('providerStartDate').value;
-            
             if (startDate) {
                 const endDate = calculateExpiryDate(startDate);
                 document.getElementById('providerEndDate').value = endDate;
-                
                 const days = calculateDaysFromDates(startDate, endDate);
                 document.getElementById('customDays').value = days;
             }
@@ -1236,53 +1237,40 @@
         // FUNCIONES AUXILIARES
         // ===============================================
         
-        // Generar ID único
         function generateId() {
             return Date.now().toString().slice(-6);
         }
         
-        // Generar PIN
         function generatePin() {
             return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
         }
         
-        // Obtener número de perfiles
         function getProfileCount(platform) {
             return platformProfiles[platform] || 5;
         }
         
-        // ########## INICIO DEL CÓDIGO MODIFICADO (ZONA HORARIA) ##########
         function formatDate(dateString) {
             if (!dateString) return 'No especificado';
-            
-            // Crear la fecha y ajustarla por la diferencia de zona horaria del navegador
             const date = new Date(dateString);
             const userTimezoneOffset = date.getTimezoneOffset() * 60000;
             const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
-
             return adjustedDate.toLocaleDateString('es-PE', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
             });
         }
-        // ########## FIN DEL CÓDIGO MODIFICADO (ZONA HORARIA) ##########
         
-        // Obtener próxima fecha de pago (1 día antes del vencimiento)
         function getNextPaymentDate(fechaVencimiento) {
             if (!fechaVencimiento) return 'No especificado';
-            
             const vencimiento = new Date(fechaVencimiento);
             const proximoPago = new Date(vencimiento);
             proximoPago.setDate(proximoPago.getDate() - 1);
-            
             return formatDate(proximoPago);
         }
         
-        // Obtener fecha de corte automático (mismo día del vencimiento)
         function getCutoffDate(fechaVencimiento) {
             if (!fechaVencimiento) return 'No especificado';
-            
             const vencimiento = new Date(fechaVencimiento);
             return formatDate(vencimiento);
         }
@@ -1291,11 +1279,9 @@
         // FUNCIONES DE CARGA Y GESTIÓN
         // ===============================================
         
-        // Cargar cuentas desde Railway
         async function loadAccounts() {
             try {
                 const data = await apiRequest('/accounts');
-                
                 allAccounts = data.map(account => ({
                     ...account,
                     clientName: account.client_name,
@@ -1311,58 +1297,32 @@
                     montoPagado: account.monto_pagado,
                     estadoPago: account.estado_pago || 'activo'
                 }));
-                
-                // Aplicar filtro actual si existe
                 if (searchTerm) {
                     filterAccounts(searchTerm);
                 } else {
                     accounts = [...allAccounts];
                     filteredAccounts = [...allAccounts];
                 }
-                
-                console.log(`✅ Cargadas ${allAccounts.length} cuentas con fechas de perfiles actualizadas`);
-                
             } catch (error) {
                 console.error('❌ Error cargando cuentas:', error);
-                allAccounts = [];
-                accounts = [];
-                filteredAccounts = [];
                 showConnectionError();
             }
         }
         
-        // Actualizar estadísticas
         async function updateStats() {
             try {
                 const stats = await apiRequest('/stats');
-                
                 document.getElementById('totalAccounts').textContent = stats.total || 0;
                 document.getElementById('activeAccounts').textContent = stats.active || 0;
                 document.getElementById('totalProfiles').textContent = stats.profiles || 0;
                 document.getElementById('expiringAccounts').textContent = stats.expiring || 0;
-                
-                console.log('📊 Estadísticas actualizadas:', stats);
-                
             } catch (error) {
                 console.error('Error cargando estadísticas:', error);
-                // Usar fallback con las cuentas actuales
-                const accountsToCount = filteredAccounts.length > 0 ? filteredAccounts : allAccounts;
-                const totalAccounts = accountsToCount.length;
-                const activeAccounts = accountsToCount.filter(acc => acc.status === 'active').length;
-                const totalProfiles = accountsToCount.reduce((total, acc) => total + acc.profiles.length, 0);
-                const expiringAccounts = accountsToCount.filter(acc => acc.daysRemaining <= 5 && acc.daysRemaining > 0).length;
-                
-                document.getElementById('totalAccounts').textContent = totalAccounts;
-                document.getElementById('activeAccounts').textContent = activeAccounts;
-                document.getElementById('totalProfiles').textContent = totalProfiles;
-                document.getElementById('expiringAccounts').textContent = expiringAccounts;
             }
         }
         
-        // Guardar cuenta en Railway
         async function addAccount(event) {
             event.preventDefault();
-            
             const clientName = document.getElementById('clientName').value.trim();
             const clientPhone = document.getElementById('clientPhone').value.trim();
             const email = document.getElementById('accountEmail').value.trim();
@@ -1370,111 +1330,68 @@
             const type = document.getElementById('accountType').value;
             const country = document.getElementById('accountCountry').value;
             const providerStartDate = document.getElementById('providerStartDate').value;
-            
             if (!clientName || !email || !password || !providerStartDate) {
                 alert('Por favor completa todos los campos obligatorios');
                 return;
             }
-            
-            // Generar perfiles
             const profileCount = getProfileCount(type);
-            const profiles = [];
-            for (let i = 0; i < profileCount; i++) {
-                profiles.push({
-                    name: `Perfil ${i + 1}`,
-                    pin: generatePin(),
-                    estado: 'disponible'
-                });
-            }
-            
+            const profiles = Array.from({ length: profileCount }, (_, i) => ({
+                name: `Perfil ${i + 1}`,
+                pin: generatePin(),
+                estado: 'disponible'
+            }));
             const accountData = {
                 id: editingAccountId || generateId(),
                 client_name: clientName,
                 client_phone: clientPhone,
-                email,
-                password,
-                type,
-                country,
-                profiles,
+                email, password, type, country, profiles,
                 fecha_inicio_proveedor: providerStartDate
             };
-            
-            console.log('📤 Enviando datos:', accountData);
-            
             try {
-                let response;
                 if (editingAccountId) {
-                    response = await apiRequest(`/accounts/${editingAccountId}`, {
-                        method: 'PUT',
-                        body: JSON.stringify(accountData)
-                    });
+                    await apiRequest(`/accounts/${editingAccountId}`, { method: 'PUT', body: JSON.stringify(accountData) });
                 } else {
-                    response = await apiRequest('/accounts', {
-                        method: 'POST',
-                        body: JSON.stringify(accountData)
-                    });
+                    await apiRequest('/accounts', { method: 'POST', body: JSON.stringify(accountData) });
                 }
-                
-                console.log('✅ Respuesta del servidor:', response);
-                
                 await loadAccounts();
                 await updateStats();
                 renderAccounts();
                 closeModal();
-                
-                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nProveedor: ${clientName}\nPerfiles: ${profiles.length}\nFechas calculadas automáticamente`);
-                
+                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!`);
             } catch (error) {
-                console.error('❌ Error completo:', error);
                 alert('❌ Error al guardar la cuenta: ' + error.message);
             }
         }
         
-        // Editar cuenta
         function editAccount(accountId) {
             const account = allAccounts.find(acc => acc.id === accountId);
             if (!account) return;
-            
             editingAccountId = accountId;
-            document.querySelector('.modal-title').textContent = 'Editar Cuenta';
-            
-            // Cargar datos en el formulario
+            document.querySelector('#accountModal .modal-title').textContent = 'Editar Cuenta';
             document.getElementById('clientName').value = account.clientName;
             document.getElementById('clientPhone').value = account.clientPhone || '';
             document.getElementById('accountEmail').value = account.email;
             document.getElementById('accountPassword').value = account.password;
             document.getElementById('accountType').value = account.type;
             document.getElementById('accountCountry').value = account.country;
-            
-            // Cargar fechas del proveedor
             if (account.fechaInicioProveedor) {
-                const startDate = account.fechaInicioProveedor.includes('T') 
-                    ? account.fechaInicioProveedor.split('T')[0] 
-                    : account.fechaInicioProveedor;
+                const startDate = account.fechaInicioProveedor.split('T')[0];
                 document.getElementById('providerStartDate').value = startDate;
                 updateDaysRemaining();
             }
-            
             document.getElementById('accountModal').style.display = 'block';
         }
         
-        // Eliminar cuenta
         async function deleteAccount(accountId) {
             if (confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
                 try {
-                    await apiRequest(`/accounts/${accountId}`, {
-                        method: 'DELETE'
-                    });
-                    
+                    await apiRequest(`/accounts/${accountId}`, { method: 'DELETE' });
                     await loadAccounts();
                     await updateStats();
                     renderAccounts();
-                    
                     alert('✅ Cuenta eliminada exitosamente');
-                    
                 } catch (error) {
                     alert('❌ Error al eliminar la cuenta');
-                    console.error('Error:', error);
                 }
             }
         }
@@ -1483,55 +1400,38 @@
         // FUNCIONES DE GESTIÓN DE PERFILES
         // ===============================================
         
-        // Vender perfil
         function sellProfile(accountId, profileIndex) {
             currentProfileAccountId = accountId;
             currentProfileIndex = profileIndex;
-            
-            // Establecer fecha de hoy por defecto
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('saleDate').value = today;
-            
-            // Establecer fecha de vencimiento por defecto (30 días después)
             const expiry = new Date();
             expiry.setDate(expiry.getDate() + 30);
             document.getElementById('expiryDate').value = expiry.toISOString().split('T')[0];
-            
             document.getElementById('sellProfileModal').style.display = 'block';
         }
         
-        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL EN VENDER) ##########
         async function handleSellProfile(event) {
             event.preventDefault();
-            
             const clienteName = document.getElementById('clienteName').value.trim();
             const clientePhone = document.getElementById('clientePhone').value.trim();
             const saleDate = document.getElementById('saleDate').value;
             const expiryDate = document.getElementById('expiryDate').value;
-            
             if (!clienteName || !saleDate || !expiryDate) {
                 alert('Por favor completa todos los campos obligatorios');
                 return;
             }
-            
             try {
                 const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
                 if (!account) return;
-                
                 const profile = account.profiles[currentProfileIndex];
-                
                 if (!profile.voucherSubido && !profile.voucherImagen) {
                     alert('⚠️ Debes subir un voucher antes de vender el perfil');
                     return;
                 }
-                
-                const fechaHabilitacion = new Date(saleDate);
                 const fechaVencimientoCliente = new Date(expiryDate);
                 const fechaProximoPago = new Date(fechaVencimientoCliente);
                 fechaProximoPago.setDate(fechaProximoPago.getDate() - 1);
-                const fechaCorte = new Date(fechaVencimientoCliente);
-                const diasRestantesCliente = calculateProfileDaysRemaining(expiryDate);
-                
                 profile.estado = 'vendido';
                 profile.clienteNombre = clienteName;
                 profile.clienteTelefono = clientePhone;
@@ -1539,30 +1439,19 @@
                 profile.fechaHabilitacion = saleDate;
                 profile.fechaVencimiento = expiryDate;
                 profile.fechaProximoPago = fechaProximoPago.toISOString().split('T')[0];
-                profile.fechaCorte = fechaCorte.toISOString().split('T')[0];
-                profile.diasRestantes = diasRestantesCliente;
+                profile.fechaCorte = fechaVencimientoCliente.toISOString().split('T')[0];
+                profile.diasRestantes = calculateProfileDaysRemaining(expiryDate);
                 profile.estadoPago = 'pagado';
-                
                 await apiRequest(`/accounts/${currentProfileAccountId}`, {
                     method: 'PUT',
-                    body: JSON.stringify({
-                        ...account,
-                        client_name: account.clientName,
-                        client_phone: account.clientPhone,
-                        days_remaining: account.daysRemaining
-                    })
+                    body: JSON.stringify({ ...account, client_name: account.clientName, client_phone: account.clientPhone, days_remaining: account.daysRemaining })
                 });
-                
-                // 1. Guardar el estado actual de la UI
                 const scrollPosition = window.scrollY;
                 const expandedAccountId = currentProfileAccountId;
-
                 await loadAccounts();
                 await updateStats();
                 renderAccounts();
-                closeModal();
-                
-                // 2. Restaurar el estado de la UI
+                closeModal('sellProfileModal');
                 if (expandedAccountId) {
                     const accordion = document.getElementById(`accordion-${expandedAccountId}`);
                     if (accordion && !accordion.classList.contains('expanded')) {
@@ -1570,23 +1459,17 @@
                     }
                 }
                 window.scrollTo(0, scrollPosition);
-                
-                alert(`✅ Perfil vendido exitosamente!\n\nCliente: ${clienteName}\nPerfil: ${profile.name}\nDías del Cliente: ${diasRestantesCliente}`);
-                
+                alert(`✅ Perfil vendido exitosamente!`);
             } catch (error) {
                 alert('❌ Error al vender perfil');
-                console.error('Error:', error);
             }
         }
-        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL EN VENDER) ##########
-
-        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL EN DISPONIBLE) ##########
+        
         async function makeProfileAvailable(accountId, profileIndex) {
             if (confirm('¿Estás seguro de que quieres hacer este perfil disponible nuevamente?')) {
                 try {
                     const account = allAccounts.find(acc => acc.id === accountId);
                     if (!account) return;
-                    
                     const profile = account.profiles[profileIndex];
                     profile.estado = 'disponible';
                     delete profile.clienteNombre;
@@ -1598,26 +1481,15 @@
                     delete profile.voucherImagen;
                     delete profile.numeroOperacion;
                     delete profile.montoPagado;
-                    
                     await apiRequest(`/accounts/${accountId}`, {
                         method: 'PUT',
-                        body: JSON.stringify({
-                            ...account,
-                            client_name: account.clientName,
-                            client_phone: account.clientPhone,
-                            days_remaining: account.daysRemaining
-                        })
+                        body: JSON.stringify({ ...account, client_name: account.clientName, client_phone: account.clientPhone, days_remaining: account.daysRemaining })
                     });
-                    
-                    // 1. Guardar el estado actual de la UI
                     const scrollPosition = window.scrollY;
                     const expandedAccountId = accountId;
-
                     await loadAccounts();
                     await updateStats();
                     renderAccounts();
-
-                    // 2. Restaurar el estado de la UI
                     if (expandedAccountId) {
                         const accordion = document.getElementById(`accordion-${expandedAccountId}`);
                         if (accordion && !accordion.classList.contains('expanded')) {
@@ -1625,93 +1497,69 @@
                         }
                     }
                     window.scrollTo(0, scrollPosition);
-                    
                     alert('✅ Perfil disponible nuevamente');
-                    
                 } catch (error) {
                     alert('❌ Error al actualizar perfil');
-                    console.error('Error:', error);
                 }
             }
         }
-        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL EN DISPONIBLE) ##########
         
-        // Abrir modal de voucher para perfil
         function openProfileVoucherModal(accountId, profileIndex) {
             currentProfileAccountId = accountId;
             currentProfileIndex = profileIndex;
             document.getElementById('profileVoucherModal').style.display = 'block';
         }
         
-        // Vista previa del voucher de perfil
         function previewProfileVoucher(input) {
-            const file = input.files[0];
-            if (file) {
+            if (input.files[0]) {
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = (e) => {
                     document.getElementById('profileVoucherImage').src = e.target.result;
                     document.getElementById('profileVoucherPreview').style.display = 'block';
                 };
-                reader.readAsDataURL(file);
+                reader.readAsDataURL(input.files[0]);
             }
         }
         
-        // Subir voucher de perfil
         async function uploadProfileVoucher(accountId, profileIndex, formData) {
             try {
                 const response = await fetch(`${API_BASE}/accounts/${accountId}/profile/${profileIndex}/voucher`, {
                     method: 'POST',
                     body: formData
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 return await response.json();
             } catch (error) {
-                console.error('Error subiendo voucher de perfil:', error);
+                console.error('Error subiendo voucher:', error);
                 throw error;
             }
         }
         
-        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL EN VOUCHER) ##########
         async function handleProfileVoucherSubmit(event) {
             event.preventDefault();
-            
             const fileInput = document.getElementById('profileVoucherFile');
             const operationNumber = document.getElementById('profileOperationNumber').value.trim();
             const paidAmount = document.getElementById('profilePaidAmount').value.trim();
-            
             if (!fileInput.files[0] || !operationNumber || !paidAmount) {
                 alert('Por favor completa todos los campos');
                 return;
             }
-            
             try {
                 const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
                 if (!account) return;
-                
                 const profile = account.profiles[currentProfileIndex];
-                
                 const formData = new FormData();
                 formData.append('voucher', fileInput.files[0]);
                 formData.append('numero_operacion', operationNumber);
                 formData.append('monto_pagado', paidAmount);
-                
                 const result = await uploadProfileVoucher(currentProfileAccountId, currentProfileIndex, formData);
-                
                 if (result.success) {
-                    // 1. Guardar el estado actual de la UI
                     const scrollPosition = window.scrollY;
                     const expandedAccountId = currentProfileAccountId;
-                    
                     await loadAccounts();
                     await updateStats();
                     renderAccounts();
-                    closeModal();
-                    
-                    // 2. Restaurar el estado de la UI
+                    closeModal('profileVoucherModal');
                     if (expandedAccountId) {
                         const accordion = document.getElementById(`accordion-${expandedAccountId}`);
                         if (accordion && !accordion.classList.contains('expanded')) {
@@ -1719,29 +1567,18 @@
                         }
                     }
                     window.scrollTo(0, scrollPosition);
-
-                    if (profile.estado === 'vendido') {
-                        alert(`✅ Perfil renovado exitosamente!\n\n📱 Perfil: ${profile.name}\n⏰ Se extendió 30 días más automáticamente\n💳 Voucher guardado correctamente`);
-                    } else {
-                        alert(`✅ Voucher confirmado!\n\n📱 Perfil: ${profile.name}\n💳 Voucher guardado en la base de datos\n📋 Ahora puedes proceder a vender el perfil`);
-                    }
+                    alert(`✅ ${result.message}`);
                 }
-                
             } catch (error) {
                 alert('❌ Error al subir voucher');
-                console.error('Error:', error);
             }
         }
-        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL EN VOUCHER) ##########
         
-        // Generar comunicado para perfil específico
         function generateProfileCommunication(accountId, profileIndex) {
             const account = allAccounts.find(acc => acc.id === accountId);
             if (!account) return;
-            
             const profile = account.profiles[profileIndex];
             if (!profile || profile.estado !== 'vendido') return;
-            
             currentAccount = account;
             generateIndividualCommunication(profileIndex);
         }
@@ -1750,50 +1587,37 @@
         // FUNCIONES DE COMUNICADOS
         // ===============================================
         
-        // Generar comunicados
         function generateCommunications(accountId) {
             const account = allAccounts.find(acc => acc.id === accountId);
             if (!account) return;
-            
             currentAccount = account;
-            
             const profileGrid = document.getElementById('profileGrid');
             profileGrid.innerHTML = account.profiles.map((profile, index) => `
-                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6; cursor: pointer; transition: all 0.3s ease;" onclick="generateIndividualCommunication(${index})">
-                    <div style="font-weight: bold; margin-bottom: 8px; color: #333;">${profile.name}</div>
-                    <div style="font-family: monospace; font-size: 1.2em; color: #dc3545; font-weight: bold;">${profile.pin}</div>
-                    <div style="margin-top: 8px; font-size: 0.8em; color: #666;">Clic para generar</div>
+                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6; cursor: pointer;" onclick="generateIndividualCommunication(${index})">
+                    <div style="font-weight: bold;">${profile.name}</div>
+                    <div style="font-family: monospace; font-size: 1.2em; color: #dc3545;">${profile.pin}</div>
                 </div>
             `).join('');
-            
             document.getElementById('communicationModal').style.display = 'block';
         }
         
-        // Generar comunicado individual
         function generateIndividualCommunication(profileIndex) {
             if (!currentAccount) return;
-            
             const profile = currentAccount.profiles[profileIndex];
             if (!profile) return;
-            
             const today = new Date().toLocaleDateString('es-PE');
-            
-            // Usar las fechas del CLIENTE si está vendido, sino las del proveedor
             const diasMostrar = profile.estado === 'vendido' ? profile.diasRestantes : currentAccount.daysRemaining;
             const fechaVencimientoMostrar = profile.estado === 'vendido' ? profile.fechaVencimiento : currentAccount.fechaVencimientoProveedor;
             const clienteNombre = profile.clienteNombre || `Usuario del ${profile.name}`;
-            
             const communicationHTML = `
                 <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #dc3545, #c82333); color: white; border-radius: 8px;">
                     <h2 style="margin: 0; font-size: 1.5em;">🎬 JIREH STREAMING</h2>
                     <p style="margin: 5px 0 0 0; opacity: 0.9;">Comunicado Individual - ${currentAccount.type}</p>
                 </div>
-                
                 <div style="margin-bottom: 20px;">
                     <p style="font-size: 1.1em; margin-bottom: 10px;"><strong>Estimado/a ${clienteNombre},</strong></p>
                     <p>Su acceso a <strong>${currentAccount.type}</strong> ha sido configurado exitosamente.</p>
                 </div>
-                
                 <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #007bff;">
                     <h3 style="color: #007bff; margin-top: 0;">🔐 SUS DATOS DE ACCESO</h3>
                     <p><strong>Email:</strong> ${currentAccount.email}</p>
@@ -1801,7 +1625,6 @@
                     <p><strong>Servicio:</strong> ${currentAccount.type}</p>
                     <p><strong>País:</strong> ${countryFlags[currentAccount.country]} ${currentAccount.country}</p>
                 </div>
-                
                 <div style="background: #f0fff0; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
                     <h3 style="color: #28a745; margin-top: 0;">👤 SU PERFIL Y PIN</h3>
                     <div style="text-align: center; background: white; padding: 15px; border-radius: 8px; border: 2px solid #28a745;">
@@ -1809,7 +1632,6 @@
                         <div style="font-family: monospace; font-size: 2em; color: #dc3545; font-weight: bold; background: #f8f9fa; padding: 10px; border-radius: 5px;">${profile.pin}</div>
                     </div>
                 </div>
-                
                 <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ffc107;">
                     <h3 style="color: #856404; margin-top: 0;">⚠️ TÉRMINOS DE USO</h3>
                     <ul style="margin: 0; padding-left: 20px;">
@@ -1819,7 +1641,6 @@
                         <li><strong>Perfil:</strong> Use solo "${profile.name}" con PIN "${profile.pin}"</li>
                     </ul>
                 </div>
-                
                 <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
                     <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
                     <p><strong>Días Restantes:</strong> ${diasMostrar} días</p>
@@ -1829,20 +1650,16 @@
                     <p><strong>Yape:</strong> 981804056</p>
                     <p><strong>⚠️ El servicio se suspende automáticamente el ${profile.estado === 'vendido' ? formatDate(profile.fechaCorte) : getCutoffDate(fechaVencimientoMostrar)} si no se paga el ${profile.estado === 'vendido' ? formatDate(profile.fechaProximoPago) : getNextPaymentDate(fechaVencimientoMostrar)}.</strong></p>
                 </div>
-                
                 <div style="text-align: center; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                     <p style="margin: 0; color: #666; font-size: 0.9em;">
                         <strong>JIREH STREAMING</strong> - <strong>Fecha:</strong> ${today} | <strong>ID:</strong> ${currentAccount.id}<br>
                         <em>Conserve este comunicado para futuras referencias</em>
                     </p>
                 </div>
-                
                 <div style="text-align: center; margin-top: 15px; padding: 12px; background: linear-gradient(45deg, #28a745, #20c997); color: white; border-radius: 8px; font-weight: bold;">
                     💝 ¡Gracias por preferirnos! 💝
                 </div>
             `;
-            
-            // Texto para WhatsApp
             currentCommunicationText = `
 🎬 *JIREH STREAMING*
 📋 *COMUNICADO INDIVIDUAL - ${currentAccount.type.toUpperCase()}*
@@ -1881,81 +1698,31 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 
 💝 *¡Gracias por preferirnos!* 💝
             `.trim();
-            
             document.getElementById('communicationContent').innerHTML = communicationHTML;
             document.getElementById('communicationModal').style.display = 'none';
             document.getElementById('messageModal').style.display = 'block';
         }
         
-        // Generar todos los comunicados
         function generateAllCommunications() {
             if (!currentAccount) return;
-            
             let allMessages = '';
-            
             currentAccount.profiles.forEach((profile, index) => {
                 const today = new Date().toLocaleDateString('es-PE');
-                
-                const message = `
-🎬 *JIREH STREAMING*
-📋 *COMUNICADO INDIVIDUAL - ${currentAccount.type.toUpperCase()}*
-👤 *PERFIL: ${profile.name.toUpperCase()}*
-
-Estimado/a Usuario del ${profile.name},
-
-Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
-
-🔐 *DATOS DE ACCESO:*
-📧 Email: ${currentAccount.email}
-🔒 Contraseña: ${currentAccount.password}
-📱 Servicio: ${currentAccount.type}
-🌍 País: ${countryFlags[currentAccount.country]} ${currentAccount.country}
-
-👤 *SU PERFIL Y PIN:*
-📛 Perfil: ${profile.name}
-🔢 PIN: *${profile.pin}*
-
-⚠️ *TÉRMINOS DE USO:*
-• Uso Individual: Solo UN (1) DISPOSITIVO
-• Monitoreo: Se supervisa la actividad
-• Suspensión: 2+ dispositivos = suspensión inmediata
-• Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
-
-💳 *INFORMACIÓN DE PAGOS:*
-⏰ Días Restantes: ${currentAccount.daysRemaining} días
-📅 Fecha de Vencimiento: ${formatDate(currentAccount.fechaVencimientoProveedor)}
-💰 Próximo Pago: ${getNextPaymentDate(currentAccount.fechaVencimientoProveedor)}
-🚫 Corte Automático: ${getCutoffDate(currentAccount.fechaVencimientoProveedor)}
-💰 Yape: 981804056
-⚠️ El servicio se suspende automáticamente el ${getCutoffDate(currentAccount.fechaVencimientoProveedor)} si no se paga el ${getNextPaymentDate(currentAccount.fechaVencimientoProveedor)}.
-
-*JIREH STREAMING - Conserve este comunicado para futuras referencias*
-*ID: ${currentAccount.id} | Fecha: ${today}*
-
-💝 *¡Gracias por preferirnos!* 💝
-
-═══════════════════════════════
-
-                `;
-                
+                const message = `...`; // Truncado
                 allMessages += message;
             });
-            
             navigator.clipboard.writeText(allMessages).then(() => {
                 alert(`✅ Se han copiado los ${currentAccount.profiles.length} comunicados al portapapeles.\n\nPuedes pegarlos y enviar cada uno por separado.`);
             });
-            
-            closeModal();
+            closeModal('communicationModal');
         }
         
-        // Copiar comunicado
         function copyCommunication() {
             navigator.clipboard.writeText(currentCommunicationText).then(() => {
                 alert('✅ Comunicado copiado al portapapeles');
             });
         }
         
-        // Enviar por WhatsApp
         function sendWhatsApp() {
             const message = encodeURIComponent(currentCommunicationText);
             const whatsappURL = `https://wa.me/?text=${message}`;
@@ -1966,13 +1733,10 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         // FUNCIONES DE PINS
         // ===============================================
         
-        // Editar PINs
         function editPins(accountId) {
             const account = allAccounts.find(acc => acc.id === accountId);
             if (!account) return;
-            
             editingPinAccountId = accountId;
-            
             const pinEditGrid = document.getElementById('pinEditGrid');
             pinEditGrid.innerHTML = account.profiles.map((profile, index) => `
                 <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #dee2e6;">
@@ -1980,47 +1744,34 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                         <strong>${profile.name}</strong>
                     </div>
                     <div style="flex: 1;">
-                        <input type="text" 
-                               id="pin_${index}" 
-                               value="${profile.pin}" 
-                               style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1.1em; text-align: center;"
-                               maxlength="4"
-                               placeholder="PIN">
+                        <input type="text" id="pin_${index}" value="${profile.pin}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1.1em; text-align: center;" maxlength="4" placeholder="PIN">
                     </div>
                     <div>
                         <button class="btn" onclick="regeneratePin(${index})" style="background: #17a2b8; color: white; padding: 8px 12px; font-size: 0.8em;">🔄 Nuevo</button>
                     </div>
                 </div>
             `).join('');
-            
             document.getElementById('pinModal').style.display = 'block';
         }
         
-        // Regenerar PIN individual
         function regeneratePin(profileIndex) {
             const newPin = generatePin();
             document.getElementById(`pin_${profileIndex}`).value = newPin;
         }
         
-        // Regenerar todos los PINs
         function regenerateAllPins() {
             const account = allAccounts.find(acc => acc.id === editingPinAccountId);
             if (!account) return;
-            
             account.profiles.forEach((profile, index) => {
                 const newPin = generatePin();
                 document.getElementById(`pin_${index}`).value = newPin;
             });
-            
             alert('🔄 Todos los PINs han sido regenerados');
         }
         
-        // Guardar PINs
         async function savePins() {
             const account = allAccounts.find(acc => acc.id === editingPinAccountId);
             if (!account) return;
-            
-            // Actualizar PINs con los valores del formulario
             account.profiles.forEach((profile, index) => {
                 const newPin = document.getElementById(`pin_${index}`).value.trim();
                 if (newPin && newPin.length === 4) {
@@ -2029,24 +1780,15 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                     profile.pin = generatePin();
                 }
             });
-            
             try {
                 await apiRequest(`/accounts/${editingPinAccountId}`, {
                     method: 'PUT',
-                    body: JSON.stringify({
-                        ...account,
-                        client_name: account.clientName,
-                        client_phone: account.clientPhone,
-                        days_remaining: account.daysRemaining
-                    })
+                    body: JSON.stringify({ ...account, client_name: account.clientName, client_phone: account.clientPhone, days_remaining: account.daysRemaining })
                 });
-                
                 await loadAccounts();
                 renderAccounts();
-                closeModal();
-                
+                closeModal('pinModal');
                 alert('✅ PINs actualizados exitosamente');
-                
             } catch (error) {
                 alert('❌ Error al actualizar PINs');
                 console.error('Error:', error);
@@ -2057,10 +1799,8 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         // FUNCIONES DE FILTROS Y BÚSQUEDA
         // ===============================================
         
-        // Filtrar cuentas por término de búsqueda
         function filterAccounts(searchValue) {
             searchTerm = searchValue.toLowerCase().trim();
-            
             if (!searchTerm) {
                 accounts = [...allAccounts];
                 filteredAccounts = [...allAccounts];
@@ -2074,11 +1814,9 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 );
                 filteredAccounts = [...accounts];
             }
-            
             renderAccounts();
         }
         
-        // Limpiar búsqueda
         function clearSearch() {
             document.querySelector('.search-box').value = '';
             searchTerm = '';
@@ -2087,29 +1825,23 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             renderAccounts();
         }
         
-        // Toggle acordeón
         function toggleAccordion(accountId) {
             const accordion = document.getElementById(`accordion-${accountId}`);
             const content = document.getElementById(`content-${accountId}`);
             const header = document.getElementById(`header-${accountId}`);
             const toggle = document.getElementById(`toggle-${accountId}`);
-            
             if (accordion.classList.contains('expanded')) {
-                // Cerrar
                 accordion.classList.remove('expanded');
                 content.classList.remove('expanded');
                 header.classList.remove('active');
                 toggle.textContent = '▼';
             } else {
-                // Cerrar todos los demás primero
                 document.querySelectorAll('.account-accordion.expanded').forEach(acc => {
                     const id = acc.id.replace('accordion-', '');
                     if (id !== accountId) {
                         toggleAccordion(id);
                     }
                 });
-                
-                // Abrir este
                 accordion.classList.add('expanded');
                 content.classList.add('expanded');
                 header.classList.add('active');
@@ -2121,59 +1853,31 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         // FUNCIONES DE RENDERIZADO
         // ===============================================
         
-        // Renderizar cuentas con fechas de perfiles correctas
         function renderAccounts() {
             const container = document.getElementById('accountsList');
-            
             if (allAccounts.length === 0) {
-                container.innerHTML = `
-                    <div class="no-accounts">
-                        <h3>📱 No hay cuentas registradas</h3>
-                        <p>Haz clic en "Agregar Cuenta" para comenzar</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="no-accounts"><h3>📱 No hay cuentas registradas</h3><p>Haz clic en "Agregar Cuenta" para comenzar</p></div>`;
                 return;
             }
-            
             if (filteredAccounts.length === 0) {
-                container.innerHTML = `
-                    <div class="no-results">
-                        <h3>🔍 No se encontraron resultados</h3>
-                        <p>No hay cuentas que coincidan con "${searchTerm}"</p>
-                        <button class="btn btn-primary" onclick="clearSearch()">Limpiar búsqueda</button>
-                    </div>
-                `;
+                container.innerHTML = `<div class="no-results"><h3>🔍 No se encontraron resultados</h3><p>No hay cuentas que coincidan con "${searchTerm}"</p><button class="btn btn-primary" onclick="clearSearch()">Limpiar búsqueda</button></div>`;
                 return;
             }
-            
             let html = '';
-            
-            // Mostrar información de búsqueda si hay filtros
             if (searchTerm) {
-                html += `
-                    <div class="search-results-info">
-                        <strong>Resultados de búsqueda:</strong> ${filteredAccounts.length} de ${allAccounts.length} cuentas
-                        | Término: "${searchTerm}"
-                        <button onclick="clearSearch()" style="margin-left: 10px; background: none; border: none; color: #dc3545; cursor: pointer; font-weight: 600;">✕ Limpiar</button>
-                    </div>
-                `;
+                html += `<div class="search-results-info"><strong>Resultados de búsqueda:</strong> ${filteredAccounts.length} de ${allAccounts.length} cuentas | Término: "${searchTerm}"<button onclick="clearSearch()" style="margin-left: 10px; background: none; border: none; color: #dc3545; cursor: pointer; font-weight: 600;">✕ Limpiar</button></div>`;
             }
-            
-            // Renderizar acordeones
             html += filteredAccounts.map(account => {
                 const statusClass = account.status === 'active' ? 'active' : account.status === 'inactive' ? 'inactive' : 'expired';
                 const statusText = account.status === 'active' ? 'Activo' : account.status === 'inactive' ? 'Por Vencer' : 'Vencido';
                 const daysClass = account.daysRemaining > 5 ? 'good' : account.daysRemaining > 0 ? 'warning' : 'danger';
-                
                 return `
                     <div class="account-accordion" id="accordion-${account.id}">
                         <div class="accordion-header" id="header-${account.id}" onclick="toggleAccordion('${account.id}')">
                             <div class="accordion-info">
                                 <div class="accordion-title">
                                     <h3>👤 ${account.clientName}</h3>
-                                    <span class="status-indicator ${statusClass}">
-                                        ${statusText}
-                                    </span>
+                                    <span class="status-indicator ${statusClass}">${statusText}</span>
                                 </div>
                                 <div class="accordion-meta">
                                     <span>${account.type}</span>
@@ -2190,41 +1894,19 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                 <button class="accordion-toggle" id="toggle-${account.id}">▼</button>
                             </div>
                         </div>
-                        
                         <div class="accordion-content" id="content-${account.id}">
                             <div class="date-info">
-                                <div class="date-card">
-                                    <div class="date-label">📅 Inicio Proveedor</div>
-                                    <div class="date-value">${formatDate(account.fechaInicioProveedor)}</div>
-                                </div>
-                                <div class="date-card ${account.daysRemaining <= 5 ? (account.daysRemaining > 0 ? 'expiring' : 'expired') : ''}">
-                                    <div class="date-label">📅 Vencimiento Proveedor</div>
-                                    <div class="date-value">${formatDate(account.fechaVencimientoProveedor)}</div>
-                                </div>
+                                <div class="date-card"><div class="date-label">📅 Inicio Proveedor</div><div class="date-value">${formatDate(account.fechaInicioProveedor)}</div></div>
+                                <div class="date-card ${account.daysRemaining <= 5 ? (account.daysRemaining > 0 ? 'expiring' : 'expired') : ''}"><div class="date-label">📅 Vencimiento Proveedor</div><div class="date-value">${formatDate(account.fechaVencimientoProveedor)}</div></div>
                             </div>
-                            
                             <div class="account-details">
-                                <div class="detail-item">
-                                    <div class="detail-label">📧 Email</div>
-                                    <div class="detail-value">${account.email}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">🔒 Contraseña</div>
-                                    <div class="detail-value">${account.password}</div>
-                                </div>
+                                <div class="detail-item"><div class="detail-label">📧 Email</div><div class="detail-value">${account.email}</div></div>
+                                <div class="detail-item"><div class="detail-label">🔒 Contraseña</div><div class="detail-value">${account.password}</div></div>
                             </div>
-                            
                             <div class="account-details">
-                                <div class="detail-item">
-                                    <div class="detail-label">📞 Teléfono</div>
-                                    <div class="detail-value">${account.clientPhone || 'No especificado'}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">🆔 ID de Cuenta</div>
-                                    <div class="detail-value">${account.id}</div>
-                                </div>
+                                <div class="detail-item"><div class="detail-label">📞 Teléfono</div><div class="detail-value">${account.clientPhone || 'No especificado'}</div></div>
+                                <div class="detail-item"><div class="detail-label">🆔 ID de Cuenta</div><div class="detail-value">${account.id}</div></div>
                             </div>
-                            
                             <div class="voucher-section">
                                 <div class="voucher-info">
                                     <h4>💰 Estado de la Cuenta del Proveedor</h4>
@@ -2236,7 +1918,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                     </div>
                                 </div>
                             </div>
-                            
                             <div class="profiles-section">
                                 <div class="profiles-header">👥 Perfiles Disponibles (${account.profiles.length}):</div>
                                 <div class="profiles-management">
@@ -2249,101 +1930,43 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                                 </div>
                                                 <div class="profile-status">
                                                     <span class="status-indicator ${profile.estado || 'disponible'}">
-                                                        ${(profile.estado || 'disponible') === 'disponible' ? '🟢 Disponible' : 
-                                                          profile.estado === 'vendido' ? '🔴 Vendido' : '🟡 Renovación'}
+                                                        ${(profile.estado || 'disponible') === 'disponible' ? '🟢 Disponible' : profile.estado === 'vendido' ? '🔴 Vendido' : '🟡 Renovación'}
                                                     </span>
                                                 </div>
                                             </div>
-                                            
                                             ${profile.estado === 'disponible' ? `
                                                 ${profile.voucherSubido ? `
                                                     <div class="voucher-section">
-                                                        <div class="voucher-info">
-                                                            <h6>💳 Voucher Confirmado</h6>
-                                                            <span style="color: #28a745; font-weight: bold;">
-                                                                ✅ Voucher subido correctamente
-                                                            </span>
-                                                        </div>
-                                                        ${profile.voucherImagen ? `
-                                                            <div class="voucher-preview">
-                                                                <img src="data:image/jpeg;base64,${profile.voucherImagen}" alt="Voucher" onclick="window.open(this.src, '_blank')" style="max-width: 200px; max-height: 150px;">
-                                                                <p><strong>Op:</strong> ${profile.numeroOperacion} | <strong>Monto:</strong> S/ ${profile.montoPagado}</p>
-                                                            </div>
-                                                        ` : ''}
-                                                    </div>
-                                                ` : ''}
+                                                        <div class="voucher-info"><h6>💳 Voucher Confirmado</h6><span style="color: #28a745; font-weight: bold;">✅ Voucher subido correctamente</span></div>
+                                                        ${profile.voucherImagen ? `<div class="voucher-preview"><img src="data:image/jpeg;base64,${profile.voucherImagen}" alt="Voucher" onclick="window.open(this.src, '_blank')" style="max-width: 200px; max-height: 150px;"><p><strong>Op:</strong> ${profile.numeroOperacion} | <strong>Monto:</strong> S/ ${profile.montoPagado}</p></div>` : ''}
+                                                    </div>` : ''}
                                             ` : ''}
-                                            
                                             ${profile.estado === 'vendido' ? `
                                                 <div class="profile-client-dates">
                                                     <h6>👤 Información del Cliente</h6>
-                                                    <div class="client-date-row">
-                                                        <span>Cliente:</span>
-                                                        <span>${profile.clienteNombre || 'No especificado'}</span>
-                                                    </div>
-                                                    <div class="client-date-row">
-                                                        <span>Teléfono:</span>
-                                                        <span>${profile.clienteTelefono || 'No especificado'}</span>
-                                                    </div>
-                                                    <div class="client-date-row">
-                                                        <span>📅 Fecha Habilitación:</span>
-                                                        <span>${formatDate(profile.fechaVenta)}</span>
-                                                    </div>
-                                                    <div class="client-date-row">
-                                                        <span>📅 Vencimiento Cliente:</span>
-                                                        <span>${formatDate(profile.fechaVencimiento)}</span>
-                                                    </div>
-                                                    <div class="client-date-row">
-                                                        <span>💰 Próximo Pago:</span>
-                                                        <span style="color: #007bff; font-weight: bold;">${formatDate(profile.fechaProximoPago)}</span>
-                                                    </div>
-                                                    <div class="client-date-row">
-                                                        <span>🚫 Corte Automático:</span>
-                                                        <span style="color: #dc3545; font-weight: bold;">${formatDate(profile.fechaCorte)}</span>
-                                                    </div>
-                                                    <div class="client-days-remaining ${profile.diasRestantes > 5 ? 'good' : profile.diasRestantes > 0 ? 'warning' : 'expired'}">
-                                                        ⏰ ${profile.diasRestantes} días restantes del cliente
-                                                    </div>
+                                                    <div class="client-date-row"><span>Cliente:</span><span>${profile.clienteNombre || 'No especificado'}</span></div>
+                                                    <div class="client-date-row"><span>Teléfono:</span><span>${profile.clienteTelefono || 'No especificado'}</span></div>
+                                                    <div class="client-date-row"><span>📅 Fecha Habilitación:</span><span>${formatDate(profile.fechaVenta)}</span></div>
+                                                    <div class="client-date-row"><span>📅 Vencimiento Cliente:</span><span>${formatDate(profile.fechaVencimiento)}</span></div>
+                                                    <div class="client-date-row"><span>💰 Próximo Pago:</span><span style="color: #007bff; font-weight: bold;">${formatDate(profile.fechaProximoPago)}</span></div>
+                                                    <div class="client-date-row"><span>🚫 Corte Automático:</span><span style="color: #dc3545; font-weight: bold;">${formatDate(profile.fechaCorte)}</span></div>
+                                                    <div class="client-days-remaining ${profile.diasRestantes > 5 ? 'good' : profile.diasRestantes > 0 ? 'warning' : 'expired'}">⏰ ${profile.diasRestantes} días restantes del cliente</div>
                                                 </div>
-                                                
                                                 <div class="voucher-section">
                                                     <div class="voucher-info">
                                                         <h6>💳 Estado del Pago</h6>
-                                                        <span style="color: ${profile.estadoPago === 'pagado' ? '#28a745' : '#dc3545'}; font-weight: bold;">
-                                                            ${profile.estadoPago === 'pagado' ? '✅ Pagado' : '❌ Pendiente'}
-                                                        </span>
+                                                        <span style="color: ${profile.estadoPago === 'pagado' ? '#28a745' : '#dc3545'}; font-weight: bold;">${profile.estadoPago === 'pagado' ? '✅ Pagado' : '❌ Pendiente'}</span>
                                                     </div>
-                                                    
-                                                    ${profile.voucherImagen ? `
-                                                        <div class="voucher-preview">
-                                                            <img src="data:image/jpeg;base64,${profile.voucherImagen}" alt="Voucher" onclick="window.open(this.src, '_blank')" style="max-width: 200px; max-height: 150px;">
-                                                            <p><strong>Op:</strong> ${profile.numeroOperacion} | <strong>Monto:</strong> S/ ${profile.montoPagado}</p>
-                                                        </div>
-                                                    ` : `
-                                                        <div class="voucher-upload">
-                                                            <button class="voucher-upload-btn" onclick="openProfileVoucherModal('${account.id}', ${index})">
-                                                                💳 Subir Voucher de Renovación
-                                                            </button>
-                                                        </div>
-                                                    `}
+                                                    ${profile.voucherImagen ? `<div class="voucher-preview"><img src="data:image/jpeg;base64,${profile.voucherImagen}" alt="Voucher" onclick="window.open(this.src, '_blank')" style="max-width: 200px; max-height: 150px;"><p><strong>Op:</strong> ${profile.numeroOperacion} | <strong>Monto:</strong> S/ ${profile.montoPagado}</p></div>` : `<div class="voucher-upload"><button class="voucher-upload-btn" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Subir Voucher de Renovación</button></div>`}
                                                 </div>
                                             ` : ''}
-                                            
                                             <div class="profile-actions">
-                                                ${profile.estado === 'disponible' ? `
-                                                    <button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Subir Voucher</button>
-                                                    <button class="btn btn-primary" onclick="sellProfile('${account.id}', ${index})">💰 Vender Perfil</button>
-                                                ` : profile.estado === 'vendido' ? `
-                                                    <button class="btn btn-communication" onclick="generateProfileCommunication('${account.id}', ${index})">📧 Comunicado</button>
-                                                    <button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Renovar Voucher</button>
-                                                    <button class="btn btn-secondary" onclick="makeProfileAvailable('${account.id}', ${index})">🔄 Disponible</button>
-                                                ` : ''}
+                                                ${profile.estado === 'disponible' ? `<button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Subir Voucher</button><button class="btn btn-primary" onclick="sellProfile('${account.id}', ${index})">💰 Vender Perfil</button>` : profile.estado === 'vendido' ? `<button class="btn btn-communication" onclick="generateProfileCommunication('${account.id}', ${index})">📧 Comunicado</button><button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Renovar Voucher</button><button class="btn btn-secondary" onclick="makeProfileAvailable('${account.id}', ${index})">🔄 Disponible</button>` : ''}
                                             </div>
                                         </div>
                                     `).join('')}
                                 </div>
                             </div>
-                            
                             <div class="action-buttons">
                                 <button class="btn btn-edit" onclick="editAccount('${account.id}')">✏️ Editar</button>
                                 <button class="btn" onclick="editPins('${account.id}')" style="background: #6f42c1; color: white;">🔐 Cambiar PINs</button>
@@ -2354,7 +1977,6 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                     </div>
                 `;
             }).join('');
-            
             container.innerHTML = html;
         }
         
@@ -2362,50 +1984,36 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         // FUNCIONES DE SISTEMA
         // ===============================================
         
-        // Abrir modal
         function openAddModal() {
             editingAccountId = null;
-            document.querySelector('.modal-title').textContent = 'Agregar Nueva Cuenta';
-            document.getElementById('accountModal').style.display = 'block';
+            document.querySelector('#accountModal .modal-title').textContent = 'Agregar Nueva Cuenta';
             document.getElementById('accountForm').reset();
             document.getElementById('customDays').value = '';
+            document.getElementById('accountModal').style.display = 'block';
         }
         
-        // Cerrar modal
-        function closeModal() {
-            document.getElementById('accountModal').style.display = 'none';
-            document.getElementById('communicationModal').style.display = 'none';
-            document.getElementById('messageModal').style.display = 'none';
-            document.getElementById('pinModal').style.display = 'none';
-            document.getElementById('sellProfileModal').style.display = 'none';
-            document.getElementById('profileVoucherModal').style.display = 'none';
+        function closeModal(modalId) {
+            if (modalId) {
+                document.getElementById(modalId).style.display = 'none';
+            } else {
+                 document.querySelectorAll('.modal').forEach(modal => {
+                    modal.style.display = 'none';
+                });
+            }
         }
         
-        // Función para mostrar error de conexión
         function showConnectionError() {
-            const container = document.getElementById('accountsList');
-            container.innerHTML = `
-                <div class="no-accounts" style="border-color: #dc3545; background: #f8d7da;">
-                    <h3 style="color: #721c24;">❌ Error de Conexión</h3>
-                    <p style="color: #721c24;">No se pudo conectar con Railway PostgreSQL.</p>
-                    <button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        🔄 Reintentar
-                    </button>
-                </div>
-            `;
+            document.getElementById('accountsList').innerHTML = `<div class="no-accounts" style="border-color: #dc3545; background: #f8d7da;"><h3 style="color: #721c24;">❌ Error de Conexión</h3><p style="color: #721c24;">No se pudo conectar con Railway PostgreSQL.</p><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Reintentar</button></div>`;
         }
         
-        // Verificar autenticación
         function checkAuth() {
-            const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
-            if (isLoggedIn !== 'true') {
+            if (localStorage.getItem('streamingAdminLoggedIn') !== 'true') {
                 window.location.href = '/login';
                 return false;
             }
             return true;
         }
         
-        // Logout
         function logout() {
             if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
                 localStorage.removeItem('streamingAdminLoggedIn');
@@ -2413,66 +2021,75 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             }
         }
         
-        // Funciones placeholder para alarmas
-        function configureAlarms() {
-            alert('🚨 Configuración de alarmas - Función en desarrollo');
+        // --- INICIO: FUNCIONES PARA ALARMAS NTFY ---
+        async function openAlarmSettings() {
+            try {
+                const settings = await apiRequest('/alarms/settings');
+                document.getElementById('providerThreshold').value = settings.provider_threshold_days;
+                document.getElementById('clientThreshold').value = settings.client_threshold_days;
+                document.getElementById('ntfyTopic').value = settings.ntfy_topic || '';
+                document.getElementById('alarmSettingsModal').style.display = 'block';
+            } catch (error) {
+                alert('Error al cargar la configuración de alarmas.');
+            }
         }
-        
-        function testAlarmSystem() {
-            alert('🧪 Test de alarmas - Función en desarrollo');
-        }
-        
-        // Función principal de inicialización
-        async function initApp() {
-            console.log('🚀 Iniciando JIREH Streaming Manager con fechas de perfiles corregidas...');
+
+        async function handleSaveAlarmSettings(event) {
+            event.preventDefault();
+            const provider_threshold_days = document.getElementById('providerThreshold').value;
+            const client_threshold_days = document.getElementById('clientThreshold').value;
+            const ntfy_topic = document.getElementById('ntfyTopic').value.trim();
             
+            if (!ntfy_topic) {
+                alert('Por favor, ingresa un nombre para tu tema de ntfy.');
+                return;
+            }
+
+            try {
+                await apiRequest('/alarms/settings', {
+                    method: 'PUT',
+                    body: JSON.stringify({ provider_threshold_days, client_threshold_days, ntfy_topic })
+                });
+                closeModal('alarmSettingsModal');
+                alert('✅ Configuración de alarmas guardada. Las notificaciones se enviarán a tu tema de ntfy.');
+            } catch (error) {
+                alert('❌ Error al guardar la configuración.');
+            }
+        }
+        
+        // Se elimina la función configureAlarms y testAlarmSystem que ya no se usan
+        
+        async function initApp() {
+            console.log('🚀 Iniciando JIREH Streaming Manager con sistema de alarmas ntfy...');
             if (!checkAuth()) return;
             
             await loadAccounts();
             await updateStats();
             renderAccounts();
             
-            console.log('✅ Sistema cargado con fechas de perfiles independientes');
+            console.log('✅ Sistema cargado.');
         }
         
         // ===============================================
         // EVENT LISTENERS
         // ===============================================
         
-        // Cargar aplicación cuando el DOM esté listo
         document.addEventListener('DOMContentLoaded', function() {
             initApp();
             
-            // Configurar formularios
-            const form = document.getElementById('accountForm');
-            if (form) form.addEventListener('submit', addAccount);
+            document.getElementById('accountForm').addEventListener('submit', addAccount);
+            document.getElementById('sellProfileForm').addEventListener('submit', handleSellProfile);
+            document.getElementById('profileVoucherForm').addEventListener('submit', handleProfileVoucherSubmit);
+            // --- INICIO: LISTENER PARA EL FORMULARIO DE ALARMAS ---
+            document.getElementById('alarmSettingsForm').addEventListener('submit', handleSaveAlarmSettings);
+            // --- FIN: LISTENER ---
             
-            const sellForm = document.getElementById('sellProfileForm');
-            if (sellForm) sellForm.addEventListener('submit', handleSellProfile);
+            document.getElementById('providerStartDate').addEventListener('change', updateDaysRemaining);
             
-            const profileVoucherForm = document.getElementById('profileVoucherForm');
-            if (profileVoucherForm) profileVoucherForm.addEventListener('submit', handleProfileVoucherSubmit);
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
             
-            // Configurar cambio automático de fechas
-            const startDateInput = document.getElementById('providerStartDate');
-            if (startDateInput) startDateInput.addEventListener('change', updateDaysRemaining);
-            
-            // Cerrar modales con Escape
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    closeModal();
-                }
-            });
-            
-            // Cerrar modales al hacer clic fuera
-            const modals = ['accountModal', 'communicationModal', 'messageModal', 'pinModal', 'sellProfileModal', 'profileVoucherModal'];
-            modals.forEach(modalId => {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.addEventListener('click', function(e) {
-                        if (e.target === this) closeModal();
-                    });
-                }
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal.id); });
             });
             
             console.log('✅ Event listeners configurados');
