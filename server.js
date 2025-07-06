@@ -1,4 +1,4 @@
-// server.js - Sistema completo con fechas automáticas y vouchers
+// server.js - Sistema completo con fechas automáticas de perfiles y vouchers
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -26,14 +26,24 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB máximo
 });
 
-// Función para calcular días restantes
+// Función para calcular días restantes del proveedor
 function calcularDiasRestantes(fechaVencimiento) {
     if (!fechaVencimiento) return 0;
     const hoy = new Date();
     const vencimiento = new Date(fechaVencimiento);
     const diferencia = vencimiento.getTime() - hoy.getTime();
     const dias = Math.ceil(diferencia / (1000 * 3600 * 24));
-    return Math.max(0, dias); // No permitir números negativos
+    return Math.max(0, dias);
+}
+
+// Función para calcular días restantes de un perfil específico
+function calcularDiasRestantesPerfil(fechaVencimientoCliente) {
+    if (!fechaVencimientoCliente) return 0;
+    const hoy = new Date();
+    const vencimiento = new Date(fechaVencimientoCliente);
+    const diferencia = vencimiento.getTime() - hoy.getTime();
+    const dias = Math.ceil(diferencia / (1000 * 3600 * 24));
+    return Math.max(0, dias);
 }
 
 // Función para actualizar estado automáticamente
@@ -41,6 +51,23 @@ function actualizarEstado(diasRestantes) {
     if (diasRestantes > 5) return 'active';
     if (diasRestantes > 0) return 'inactive';
     return 'expired';
+}
+
+// Función para procesar perfiles y calcular días restantes individuales
+function procesarPerfiles(profiles) {
+    if (!profiles || !Array.isArray(profiles)) return [];
+    
+    return profiles.map(profile => {
+        // Si el perfil está vendido, calcular sus días restantes individuales
+        if (profile.estado === 'vendido' && profile.fechaVencimiento) {
+            const diasRestantesCliente = calcularDiasRestantesPerfil(profile.fechaVencimiento);
+            return {
+                ...profile,
+                diasRestantes: diasRestantesCliente
+            };
+        }
+        return profile;
+    });
 }
 
 // Crear tabla si no existe
@@ -170,7 +197,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Obtener todas las cuentas con cálculo automático
+// Obtener todas las cuentas con cálculo automático de días restantes
 app.get('/api/accounts', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -178,19 +205,28 @@ app.get('/api/accounts', async (req, res) => {
             ORDER BY created_at DESC
         `);
         
-        // Actualizar días y estado para cada cuenta basado en fecha_vencimiento_proveedor
+        // Actualizar días y estado para cada cuenta
         const accounts = result.rows.map(account => {
-            const diasRestantes = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
-            const estado = actualizarEstado(diasRestantes);
+            // Días restantes del proveedor (para la cuenta)
+            const diasRestantesProveedor = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
+            const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+            
+            // Procesar perfiles con sus propios días restantes
+            const profiles = typeof account.profiles === 'string' 
+                ? JSON.parse(account.profiles) 
+                : account.profiles || [];
+            
+            const profilesActualizados = procesarPerfiles(profiles);
             
             return {
                 ...account,
-                days_remaining: diasRestantes,
-                status: estado
+                days_remaining: diasRestantesProveedor, // Días del proveedor
+                status: estadoProveedor, // Estado del proveedor
+                profiles: profilesActualizados // Perfiles con días individuales
             };
         });
         
-        console.log(`📊 Enviando ${accounts.length} cuentas`);
+        console.log(`📊 Enviando ${accounts.length} cuentas con fechas actualizadas`);
         res.json(accounts);
     } catch (error) {
         console.error('Error obteniendo cuentas:', error);
@@ -204,19 +240,21 @@ app.post('/api/accounts', async (req, res) => {
         const { 
             id, client_name, client_phone, email, password, 
             type, country, profiles, days_remaining, status,
-            fecha_inicio_proveedor, fecha_vencimiento_proveedor
+            fecha_inicio_proveedor
         } = req.body;
         
-        console.log('📥 Datos recibidos:', {
-            id, client_name, type, 
-            fecha_inicio_proveedor, 
-            fecha_vencimiento_proveedor,
-            days_remaining
+        console.log('📥 Creando nueva cuenta:', {
+            id, client_name, type, fecha_inicio_proveedor
         });
         
-        // Usar las fechas del proveedor
+        // Calcular fecha de vencimiento del proveedor (30 días después del inicio)
         const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
-        const fechaVencimiento = fecha_vencimiento_proveedor ? new Date(fecha_vencimiento_proveedor) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        // Calcular días restantes del proveedor
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
         
         const result = await pool.query(
             `INSERT INTO accounts (
@@ -228,12 +266,12 @@ app.post('/api/accounts', async (req, res) => {
              RETURNING *`,
             [
                 id, client_name, client_phone || '', email, password, type, country, 
-                JSON.stringify(profiles), days_remaining || 30, status || 'active', 
-                fechaInicio, fechaVencimiento, 'activo'
+                JSON.stringify(profiles), diasRestantesProveedor, estadoProveedor, 
+                fechaInicio, fechaVencimientoProveedor, 'activo'
             ]
         );
         
-        console.log('✅ Cuenta creada:', result.rows[0].id);
+        console.log('✅ Cuenta creada con días del proveedor:', result.rows[0].id);
         res.json(result.rows[0]);
     } catch (error) {
         console.error('❌ Error creando cuenta:', error);
@@ -241,7 +279,7 @@ app.post('/api/accounts', async (req, res) => {
     }
 });
 
-// Actualizar cuenta
+// Actualizar cuenta con perfiles y fechas
 app.put('/api/accounts/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -251,10 +289,10 @@ app.put('/api/accounts/:id', async (req, res) => {
             fecha_inicio_proveedor, fecha_vencimiento_proveedor
         } = req.body;
         
-        console.log('📝 Actualizando cuenta:', id, {
-            fecha_inicio_proveedor, 
-            fecha_vencimiento_proveedor
-        });
+        console.log('📝 Actualizando cuenta:', id);
+        
+        // Procesar perfiles para asegurar que tengan fechas correctas
+        const profilesActualizados = procesarPerfiles(profiles);
         
         const result = await pool.query(
             `UPDATE accounts SET 
@@ -264,7 +302,7 @@ app.put('/api/accounts/:id', async (req, res) => {
              WHERE id = $12 RETURNING *`,
             [
                 client_name, client_phone || '', email, password, type, country, 
-                JSON.stringify(profiles), days_remaining, status,
+                JSON.stringify(profilesActualizados), days_remaining, status,
                 fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : null,
                 fecha_vencimiento_proveedor ? new Date(fecha_vencimiento_proveedor) : null,
                 id
@@ -275,10 +313,91 @@ app.put('/api/accounts/:id', async (req, res) => {
             return res.status(404).json({ error: 'Cuenta no encontrada' });
         }
         
-        console.log('✅ Cuenta actualizada:', id);
+        console.log('✅ Cuenta actualizada con fechas de perfiles:', id);
         res.json(result.rows[0]);
     } catch (error) {
         console.error('❌ Error actualizando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+// Subir voucher para perfil específico
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
+    try {
+        const { accountId, profileIndex } = req.params;
+        const { numero_operacion, monto_pagado } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+        
+        // Obtener la cuenta
+        const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
+        if (accountResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        const account = accountResult.rows[0];
+        const profiles = typeof account.profiles === 'string' 
+            ? JSON.parse(account.profiles) 
+            : account.profiles || [];
+        
+        const profileIdx = parseInt(profileIndex);
+        if (profileIdx < 0 || profileIdx >= profiles.length) {
+            return res.status(400).json({ error: 'Índice de perfil inválido' });
+        }
+        
+        const profile = profiles[profileIdx];
+        
+        // Convertir imagen a base64
+        const voucherBase64 = req.file.buffer.toString('base64');
+        
+        // Actualizar perfil con voucher
+        profile.voucherImagen = voucherBase64;
+        profile.numeroOperacion = numero_operacion;
+        profile.montoPagado = parseFloat(monto_pagado);
+        profile.voucherSubido = true;
+        profile.fechaVoucher = new Date().toISOString();
+        
+        // Si el perfil está vendido, es una renovación
+        if (profile.estado === 'vendido') {
+            const fechaVencimientoActual = new Date(profile.fechaVencimiento);
+            const nuevaFechaVencimiento = new Date(fechaVencimientoActual);
+            nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
+            
+            // Actualizar fechas del cliente
+            profile.fechaVencimiento = nuevaFechaVencimiento.toISOString().split('T')[0];
+            
+            const fechaProximoPago = new Date(nuevaFechaVencimiento);
+            fechaProximoPago.setDate(fechaProximoPago.getDate() - 1);
+            profile.fechaProximoPago = fechaProximoPago.toISOString().split('T')[0];
+            
+            profile.fechaCorte = nuevaFechaVencimiento.toISOString().split('T')[0];
+            profile.diasRestantes = calcularDiasRestantesPerfil(profile.fechaVencimiento);
+            profile.estadoPago = 'pagado';
+            profile.fechaUltimaRenovacion = new Date().toISOString().split('T')[0];
+            
+            console.log(`🔄 Perfil renovado: ${profile.name} - ${profile.diasRestantes} días más`);
+        } else {
+            // Perfil disponible, solo confirmar voucher
+            profile.estadoPago = 'confirmado';
+            console.log(`💳 Voucher confirmado para perfil disponible: ${profile.name}`);
+        }
+        
+        // Guardar en base de datos
+        await pool.query(
+            'UPDATE accounts SET profiles = $1 WHERE id = $2',
+            [JSON.stringify(profiles), accountId]
+        );
+        
+        res.json({ 
+            success: true, 
+            message: profile.estado === 'vendido' ? 'Perfil renovado exitosamente' : 'Voucher confirmado',
+            profile: profile
+        });
+        
+    } catch (error) {
+        console.error('❌ Error subiendo voucher:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
@@ -305,7 +424,7 @@ app.get('/api/stats', async (req, res) => {
     try {
         const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
         
-        // Calcular estados en tiempo real basado en fecha_vencimiento_proveedor
+        // Calcular estados en tiempo real
         const accountsResult = await pool.query(`
             SELECT 
                 fecha_vencimiento_proveedor,
@@ -316,12 +435,17 @@ app.get('/api/stats', async (req, res) => {
         let activeCount = 0;
         let expiringCount = 0;
         let totalProfiles = 0;
+        let soldProfiles = 0;
         const today = new Date();
         
         accountsResult.rows.forEach(row => {
-            const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles;
+            const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles || [];
             totalProfiles += profiles.length;
             
+            // Contar perfiles vendidos
+            soldProfiles += profiles.filter(p => p.estado === 'vendido').length;
+            
+            // Estado de la cuenta del proveedor
             if (row.fecha_vencimiento_proveedor) {
                 const vencimiento = new Date(row.fecha_vencimiento_proveedor);
                 const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
@@ -335,7 +459,8 @@ app.get('/api/stats', async (req, res) => {
             total: parseInt(totalResult.rows[0].count),
             active: activeCount,
             profiles: totalProfiles,
-            expiring: expiringCount
+            expiring: expiringCount,
+            sold_profiles: soldProfiles
         });
     } catch (error) {
         console.error('Error obteniendo estadísticas:', error);
@@ -369,6 +494,7 @@ async function startServer() {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
             console.log(`🌐 URL: http://localhost:${PORT}`);
             console.log(`📅 Sistema de fechas del proveedor: ACTIVO`);
+            console.log(`📅 Sistema de fechas de perfiles: ACTIVO`);
             console.log(`💳 Sistema de vouchers: ACTIVO`);
             console.log(`🚨 Sistema de alarmas: ACTIVO`);
         });
