@@ -1500,7 +1500,7 @@
             document.getElementById('sellProfileModal').style.display = 'block';
         }
         
-        // Manejar venta de perfil
+        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL EN VENDER) ##########
         async function handleSellProfile(event) {
             event.preventDefault();
             
@@ -1520,27 +1520,18 @@
                 
                 const profile = account.profiles[currentProfileIndex];
                 
-                // Verificar si tiene voucher subido
                 if (!profile.voucherSubido && !profile.voucherImagen) {
                     alert('⚠️ Debes subir un voucher antes de vender el perfil');
                     return;
                 }
                 
-                // Fechas del CLIENTE (independientes de la cuenta del proveedor)
                 const fechaHabilitacion = new Date(saleDate);
                 const fechaVencimientoCliente = new Date(expiryDate);
-                
-                // Próximo pago: 1 día antes del vencimiento del cliente
                 const fechaProximoPago = new Date(fechaVencimientoCliente);
                 fechaProximoPago.setDate(fechaProximoPago.getDate() - 1);
-                
-                // Fecha de corte: mismo día del vencimiento del cliente
                 const fechaCorte = new Date(fechaVencimientoCliente);
-                
-                // DÍAS RESTANTES DEL PERFIL (no de la cuenta del proveedor)
                 const diasRestantesCliente = calculateProfileDaysRemaining(expiryDate);
                 
-                // Actualizar perfil con fechas del CLIENTE
                 profile.estado = 'vendido';
                 profile.clienteNombre = clienteName;
                 profile.clienteTelefono = clientePhone;
@@ -1552,7 +1543,6 @@
                 profile.diasRestantes = diasRestantesCliente;
                 profile.estadoPago = 'pagado';
                 
-                // Guardar en base de datos
                 await apiRequest(`/accounts/${currentProfileAccountId}`, {
                     method: 'PUT',
                     body: JSON.stringify({
@@ -1563,10 +1553,23 @@
                     })
                 });
                 
+                // 1. Guardar el estado actual de la UI
+                const scrollPosition = window.scrollY;
+                const expandedAccountId = currentProfileAccountId;
+
                 await loadAccounts();
                 await updateStats();
                 renderAccounts();
                 closeModal();
+                
+                // 2. Restaurar el estado de la UI
+                if (expandedAccountId) {
+                    const accordion = document.getElementById(`accordion-${expandedAccountId}`);
+                    if (accordion && !accordion.classList.contains('expanded')) {
+                        toggleAccordion(expandedAccountId);
+                    }
+                }
+                window.scrollTo(0, scrollPosition);
                 
                 alert(`✅ Perfil vendido exitosamente!\n\nCliente: ${clienteName}\nPerfil: ${profile.name}\nDías del Cliente: ${diasRestantesCliente}`);
                 
@@ -1575,8 +1578,9 @@
                 console.error('Error:', error);
             }
         }
-        
-        // Hacer perfil disponible
+        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL EN VENDER) ##########
+
+        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL EN DISPONIBLE) ##########
         async function makeProfileAvailable(accountId, profileIndex) {
             if (confirm('¿Estás seguro de que quieres hacer este perfil disponible nuevamente?')) {
                 try {
@@ -1605,9 +1609,22 @@
                         })
                     });
                     
+                    // 1. Guardar el estado actual de la UI
+                    const scrollPosition = window.scrollY;
+                    const expandedAccountId = accountId;
+
                     await loadAccounts();
                     await updateStats();
                     renderAccounts();
+
+                    // 2. Restaurar el estado de la UI
+                    if (expandedAccountId) {
+                        const accordion = document.getElementById(`accordion-${expandedAccountId}`);
+                        if (accordion && !accordion.classList.contains('expanded')) {
+                            toggleAccordion(expandedAccountId);
+                        }
+                    }
+                    window.scrollTo(0, scrollPosition);
                     
                     alert('✅ Perfil disponible nuevamente');
                     
@@ -1617,6 +1634,7 @@
                 }
             }
         }
+        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL EN DISPONIBLE) ##########
         
         // Abrir modal de voucher para perfil
         function openProfileVoucherModal(accountId, profileIndex) {
@@ -1657,7 +1675,7 @@
             }
         }
         
-        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL) ##########
+        // ########## INICIO DEL CÓDIGO MODIFICADO (SCROLL EN VOUCHER) ##########
         async function handleProfileVoucherSubmit(event) {
             event.preventDefault();
             
@@ -1684,7 +1702,7 @@
                 const result = await uploadProfileVoucher(currentProfileAccountId, currentProfileIndex, formData);
                 
                 if (result.success) {
-                    // 1. Guardar el estado actual de la UI (posición y acordeón abierto)
+                    // 1. Guardar el estado actual de la UI
                     const scrollPosition = window.scrollY;
                     const expandedAccountId = currentProfileAccountId;
                     
@@ -1695,13 +1713,11 @@
                     
                     // 2. Restaurar el estado de la UI
                     if (expandedAccountId) {
-                        // Forzar la apertura del acordeón que estaba abierto
                         const accordion = document.getElementById(`accordion-${expandedAccountId}`);
                         if (accordion && !accordion.classList.contains('expanded')) {
                             toggleAccordion(expandedAccountId);
                         }
                     }
-                    // Restaurar la posición del scroll
                     window.scrollTo(0, scrollPosition);
 
                     if (profile.estado === 'vendido') {
@@ -1716,7 +1732,7 @@
                 console.error('Error:', error);
             }
         }
-        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL) ##########
+        // ########## FIN DEL CÓDIGO MODIFICADO (SCROLL EN VOUCHER) ##########
         
         // Generar comunicado para perfil específico
         function generateProfileCommunication(accountId, profileIndex) {
