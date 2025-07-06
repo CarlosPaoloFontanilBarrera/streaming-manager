@@ -383,9 +383,102 @@
             color: #856404;
         }
         
-        .days-remaining.danger {
+        /* ESTILOS PARA GESTIÓN DE PERFILES */
+        .profiles-management {
+            display: grid;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .profile-card {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .profile-card:hover {
+            border-color: #dc3545;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .profile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .profile-info h5 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #333;
+        }
+        
+        .profile-pin {
+            font-family: monospace;
+            background: #6f42c1;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        
+        .profile-status .status-indicator {
+            font-size: 0.8em;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        
+        .profile-status .status-indicator.disponible {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .profile-status .status-indicator.vendido {
             background: #f8d7da;
             color: #721c24;
+        }
+        
+        .profile-status .status-indicator.renovacion {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .profile-details {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .detail-row span:first-child {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .profile-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .profile-actions .btn {
+            padding: 8px 16px;
+            font-size: 0.8em;
         }
         
         .account-header {
@@ -924,7 +1017,81 @@
             </div>
         </div>
         
-        <!-- Modal para subir voucher -->
+        <!-- Modal para vender perfil -->
+        <div id="sellProfileModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">💰 Vender Perfil</h2>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                </div>
+                
+                <form id="sellProfileForm">
+                    <div class="form-group">
+                        <label for="clienteName">Nombre del Cliente *</label>
+                        <input type="text" id="clienteName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clientePhone">Teléfono del Cliente</label>
+                        <input type="tel" id="clientePhone">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="saleDate">📅 Fecha de Venta *</label>
+                        <input type="date" id="saleDate" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="expiryDate">📅 Fecha de Vencimiento *</label>
+                        <input type="date" id="expiryDate" required>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
+                            Fecha cuando el cliente debe renovar
+                        </small>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">💰 Vender Perfil</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal para voucher de perfil -->
+        <div id="profileVoucherModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">💳 Voucher del Perfil</h2>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                </div>
+                
+                <form id="profileVoucherForm" class="voucher-form">
+                    <div class="form-group">
+                        <label for="profileVoucherFile">Imagen del Voucher *</label>
+                        <input type="file" id="profileVoucherFile" accept="image/*" required onchange="previewProfileVoucher(this)">
+                    </div>
+                    
+                    <div class="voucher-image-preview" id="profileVoucherPreview" style="display: none;">
+                        <img id="profileVoucherImage" src="" alt="Vista previa del voucher">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="profileOperationNumber">Número de Operación *</label>
+                        <input type="text" id="profileOperationNumber" required placeholder="Ej: 123456789">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="profilePaidAmount">Monto Pagado *</label>
+                        <input type="number" id="profilePaidAmount" step="0.01" required placeholder="Ej: 35.50">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">💾 Subir Voucher y Renovar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
         <div id="voucherModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1126,10 +1293,26 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="customDays">Días restantes (opcional)</label>
-                    <input type="number" id="customDays" min="0" max="365" placeholder="Deja vacío para calcular automáticamente">
+                    <label for="providerStartDate">📅 Fecha Inicio (Compra del Proveedor) *</label>
+                    <input type="date" id="providerStartDate" required>
                     <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
-                        Si no especificas, se calculará automáticamente (30 días)
+                        Fecha cuando compraste la cuenta al proveedor
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="providerEndDate">📅 Fecha Fin (Vencimiento Proveedor) *</label>
+                    <input type="date" id="providerEndDate" required>
+                    <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
+                        Fecha cuando se vence tu cuenta del proveedor
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customDays">Días restantes (calculados automáticamente)</label>
+                    <input type="number" id="customDays" readonly style="background: #f8f9fa;">
+                    <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
+                        Se calcula automáticamente basado en las fechas del proveedor
                     </small>
                 </div>
                 
@@ -1157,6 +1340,8 @@
         let allAccounts = []; // Para el sistema de búsqueda
         let filteredAccounts = []; // Cuentas filtradas
         let searchTerm = ''; // Término de búsqueda actual
+        let currentProfileAccountId = null; // Para gestión de perfiles
+        let currentProfileIndex = null; // Índice del perfil actual
         
         // Función para hacer peticiones API
         async function apiRequest(endpoint, options = {}) {
@@ -1569,9 +1754,27 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
             return `${day}/${month}/${year}`;
         }
         
-        // Calcular días restantes (30 días por defecto)
-        function calculateDaysRemaining() {
-            return 30;
+        // Calcular días restantes basado en fechas del calendario
+        function calculateDaysFromDates(startDate, endDate) {
+            if (!startDate || !endDate) return 30; // Default
+            
+            const today = new Date();
+            const end = new Date(endDate);
+            const diffTime = end.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return Math.max(0, diffDays);
+        }
+        
+        // Actualizar días restantes automáticamente
+        function updateDaysRemaining() {
+            const startDate = document.getElementById('providerStartDate').value;
+            const endDate = document.getElementById('providerEndDate').value;
+            
+            if (startDate && endDate) {
+                const days = calculateDaysFromDates(startDate, endDate);
+                document.getElementById('customDays').value = days;
+            }
         }
         
         // Obtener estado de cuenta
@@ -1640,7 +1843,7 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
             }
         }
         
-        // Guardar cuenta en Railway
+                // Guardar cuenta en Railway
         async function addAccount(event) {
             event.preventDefault();
             
@@ -1650,9 +1853,10 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
             const password = document.getElementById('accountPassword').value.trim();
             const type = document.getElementById('accountType').value;
             const country = document.getElementById('accountCountry').value;
-            const customDays = document.getElementById('customDays').value;
+            const providerStartDate = document.getElementById('providerStartDate').value;
+            const providerEndDate = document.getElementById('providerEndDate').value;
             
-            if (!clientName || !email || !password) {
+            if (!clientName || !email || !password || !providerStartDate || !providerEndDate) {
                 alert('Por favor completa todos los campos obligatorios');
                 return;
             }
@@ -1663,18 +1867,13 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
             for (let i = 0; i < profileCount; i++) {
                 profiles.push({
                     name: `Perfil ${i + 1}`,
-                    pin: generatePin()
+                    pin: generatePin(),
+                    estado: 'disponible' // disponible, vendido, renovacion
                 });
             }
             
-            // Calcular días restantes
-            let daysRemaining;
-            if (customDays && customDays > 0) {
-                daysRemaining = parseInt(customDays);
-            } else {
-                daysRemaining = calculateDaysRemaining();
-            }
-            
+            // Calcular días restantes basado en fechas del proveedor
+            const daysRemaining = calculateDaysFromDates(providerStartDate, providerEndDate);
             const status = getAccountStatus(daysRemaining);
             
             const accountData = {
@@ -1687,7 +1886,9 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
                 country,
                 profiles,
                 days_remaining: daysRemaining,
-                status
+                status,
+                fecha_inicio_proveedor: providerStartDate,
+                fecha_vencimiento_proveedor: providerEndDate
             };
             
             try {
@@ -1711,7 +1912,7 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
                 renderAccounts();
                 closeModal();
                 
-                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nCliente: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nPINs generados automáticamente`);
+                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nProveedor: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nVencimiento: ${formatDate(providerEndDate)}`);
                 
             } catch (error) {
                 alert('❌ Error al guardar la cuenta');
@@ -1787,8 +1988,213 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
         }
         
         // ===============================================
-        // FUNCIONES DE MODAL
+        // FUNCIONES DE GESTIÓN DE PERFILES
         // ===============================================
+        
+        // Vender perfil
+        function sellProfile(accountId, profileIndex) {
+            currentProfileAccountId = accountId;
+            currentProfileIndex = profileIndex;
+            
+            // Establecer fecha de hoy por defecto
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('saleDate').value = today;
+            
+            // Establecer fecha de vencimiento por defecto (30 días después)
+            const expiry = new Date();
+            expiry.setDate(expiry.getDate() + 30);
+            document.getElementById('expiryDate').value = expiry.toISOString().split('T')[0];
+            
+            document.getElementById('sellProfileModal').style.display = 'block';
+        }
+        
+        // Manejar venta de perfil
+        async function handleSellProfile(event) {
+            event.preventDefault();
+            
+            const clienteName = document.getElementById('clienteName').value.trim();
+            const clientePhone = document.getElementById('clientePhone').value.trim();
+            const saleDate = document.getElementById('saleDate').value;
+            const expiryDate = document.getElementById('expiryDate').value;
+            
+            if (!clienteName || !saleDate || !expiryDate) {
+                alert('Por favor completa todos los campos obligatorios');
+                return;
+            }
+            
+            try {
+                // Actualizar el perfil
+                const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
+                if (!account) return;
+                
+                const profile = account.profiles[currentProfileIndex];
+                profile.estado = 'vendido';
+                profile.clienteNombre = clienteName;
+                profile.clienteTelefono = clientePhone;
+                profile.fechaVenta = saleDate;
+                profile.fechaVencimiento = expiryDate;
+                profile.diasRestantes = calculateDaysFromDates(saleDate, expiryDate);
+                profile.estadoPago = 'pendiente';
+                
+                // Guardar en base de datos
+                await apiRequest(`/accounts/${currentProfileAccountId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        ...account,
+                        client_name: account.clientName,
+                        client_phone: account.clientPhone,
+                        days_remaining: account.daysRemaining
+                    })
+                });
+                
+                await loadAccounts();
+                renderAccounts();
+                closeModal();
+                
+                alert(`✅ Perfil vendido exitosamente!\n\nCliente: ${clienteName}\nPerfil: ${profile.name}\nVencimiento: ${formatDate(expiryDate)}`);
+                
+            } catch (error) {
+                alert('❌ Error al vender perfil');
+                console.error('Error:', error);
+            }
+        }
+        
+        // Hacer perfil disponible
+        async function makeProfileAvailable(accountId, profileIndex) {
+            if (confirm('¿Estás seguro de que quieres hacer este perfil disponible nuevamente?')) {
+                try {
+                    const account = allAccounts.find(acc => acc.id === accountId);
+                    if (!account) return;
+                    
+                    const profile = account.profiles[profileIndex];
+                    profile.estado = 'disponible';
+                    delete profile.clienteNombre;
+                    delete profile.clienteTelefono;
+                    delete profile.fechaVenta;
+                    delete profile.fechaVencimiento;
+                    delete profile.diasRestantes;
+                    delete profile.estadoPago;
+                    delete profile.voucherImagen;
+                    delete profile.numeroOperacion;
+                    delete profile.montoPagado;
+                    
+                    // Guardar en base de datos
+                    await apiRequest(`/accounts/${accountId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            ...account,
+                            client_name: account.clientName,
+                            client_phone: account.clientPhone,
+                            days_remaining: account.daysRemaining
+                        })
+                    });
+                    
+                    await loadAccounts();
+                    renderAccounts();
+                    
+                    alert('✅ Perfil disponible nuevamente');
+                    
+                } catch (error) {
+                    alert('❌ Error al actualizar perfil');
+                    console.error('Error:', error);
+                }
+            }
+        }
+        
+        // Abrir modal de voucher para perfil
+        function openProfileVoucherModal(accountId, profileIndex) {
+            currentProfileAccountId = accountId;
+            currentProfileIndex = profileIndex;
+            document.getElementById('profileVoucherModal').style.display = 'block';
+        }
+        
+        // Vista previa del voucher de perfil
+        function previewProfileVoucher(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profileVoucherImage').src = e.target.result;
+                    document.getElementById('profileVoucherPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Manejar envío del formulario de voucher de perfil
+        async function handleProfileVoucherSubmit(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('profileVoucherFile');
+            const operationNumber = document.getElementById('profileOperationNumber').value.trim();
+            const paidAmount = document.getElementById('profilePaidAmount').value.trim();
+            
+            if (!fileInput.files[0] || !operationNumber || !paidAmount) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+            
+            try {
+                // Actualizar el perfil con voucher
+                const account = allAccounts.find(acc => acc.id === currentProfileAccountId);
+                if (!account) return;
+                
+                const profile = account.profiles[currentProfileIndex];
+                
+                // Convertir imagen a base64
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const base64 = e.target.result.split(',')[1];
+                    
+                    profile.voucherImagen = base64;
+                    profile.numeroOperacion = operationNumber;
+                    profile.montoPagado = parseFloat(paidAmount);
+                    profile.estadoPago = 'pagado';
+                    
+                    // Extender fecha de vencimiento por 30 días
+                    const currentExpiry = new Date(profile.fechaVencimiento);
+                    const newExpiry = new Date(currentExpiry);
+                    newExpiry.setDate(newExpiry.getDate() + 30);
+                    profile.fechaVencimiento = newExpiry.toISOString().split('T')[0];
+                    profile.diasRestantes = calculateDaysFromDates(new Date().toISOString().split('T')[0], profile.fechaVencimiento);
+                    
+                    // Guardar en base de datos
+                    await apiRequest(`/accounts/${currentProfileAccountId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            ...account,
+                            client_name: account.clientName,
+                            client_phone: account.clientPhone,
+                            days_remaining: account.daysRemaining
+                        })
+                    });
+                    
+                    await loadAccounts();
+                    renderAccounts();
+                    closeModal();
+                    
+                    alert(`✅ Voucher subido y perfil renovado!\n\nPerfil: ${profile.name}\nNueva fecha: ${formatDate(profile.fechaVencimiento)}\n+30 días agregados`);
+                };
+                
+                reader.readAsDataURL(fileInput.files[0]);
+                
+            } catch (error) {
+                alert('❌ Error al subir voucher');
+                console.error('Error:', error);
+            }
+        }
+        
+        // Generar comunicado para perfil específico
+        function generateProfileCommunication(accountId, profileIndex) {
+            const account = allAccounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            const profile = account.profiles[profileIndex];
+            if (!profile || profile.estado !== 'vendido') return;
+            
+            currentAccount = account;
+            generateIndividualCommunication(profileIndex);
+        }
         
         // Abrir modal
         function openAddModal() {
@@ -2339,12 +2745,12 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                         <div class="accordion-content" id="content-${account.id}">
                             <div class="date-info">
                                 <div class="date-card">
-                                    <div class="date-label">📅 Fecha de Venta</div>
-                                    <div class="date-value">${formatDate(account.fechaVenta)}</div>
+                                    <div class="date-label">📅 Inicio Proveedor</div>
+                                    <div class="date-value">${formatDate(account.fechaInicioProveedor)}</div>
                                 </div>
                                 <div class="date-card ${account.daysRemaining <= 5 ? (account.daysRemaining > 0 ? 'expiring' : 'expired') : ''}">
-                                    <div class="date-label">📅 Fecha de Vencimiento</div>
-                                    <div class="date-value">${formatDate(account.fechaVencimiento)}</div>
+                                    <div class="date-label">📅 Vencimiento Proveedor</div>
+                                    <div class="date-value">${formatDate(account.fechaVencimientoProveedor)}</div>
                                 </div>
                             </div>
                             
@@ -2372,34 +2778,93 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                             
                             <div class="voucher-section">
                                 <div class="voucher-info">
-                                    <h4>💳 Estado del Pago</h4>
+                                    <h4>💰 Estado de la Cuenta del Proveedor</h4>
                                     <div class="voucher-status">
-                                        <span style="color: ${account.estadoPago === 'activo' ? '#28a745' : '#dc3545'}; font-weight: bold;">
-                                            ${account.estadoPago === 'activo' ? '✅ Pagado' : '❌ Pendiente'}
+                                        <span style="color: ${account.daysRemaining > 5 ? '#28a745' : account.daysRemaining > 0 ? '#ffc107' : '#dc3545'}; font-weight: bold;">
+                                            ${account.daysRemaining > 5 ? '✅ Vigente' : account.daysRemaining > 0 ? '⚠️ Por Vencer' : '❌ Vencida'}
                                         </span>
+                                        <span style="margin-left: 10px; font-weight: 600;">(${account.daysRemaining} días restantes)</span>
                                     </div>
                                 </div>
-                                
-                                ${account.voucherImagen ? `
-                                    <div class="voucher-preview">
-                                        <img src="data:image/jpeg;base64,${account.voucherImagen}" alt="Voucher de pago" onclick="window.open(this.src, '_blank')">
-                                        <p><strong>Operación:</strong> ${account.numeroOperacion} | <strong>Monto:</strong> S/ ${account.montoPagado}</p>
-                                    </div>
-                                ` : `
-                                    <div class="voucher-upload">
-                                        <p>No hay voucher registrado</p>
-                                        <button class="voucher-upload-btn" onclick="openVoucherModal('${account.id}')">
-                                            💳 Subir Voucher
-                                        </button>
-                                    </div>
-                                `}
                             </div>
                             
                             <div class="profiles-section">
-                                <div class="profiles-header">👥 Perfiles (${account.profiles.length}):</div>
-                                <div class="profiles-grid">
-                                    ${account.profiles.map(profile => `
-                                        <div class="profile-badge">${profile.name}: ${profile.pin}</div>
+                                <div class="profiles-header">👥 Perfiles Disponibles (${account.profiles.length}):</div>
+                                <div class="profiles-management">
+                                    ${account.profiles.map((profile, index) => `
+                                        <div class="profile-card" id="profile-${account.id}-${index}">
+                                            <div class="profile-header">
+                                                <div class="profile-info">
+                                                    <h5>${profile.name}</h5>
+                                                    <span class="profile-pin">PIN: ${profile.pin}</span>
+                                                </div>
+                                                <div class="profile-status">
+                                                    <span class="status-indicator ${profile.estado || 'disponible'}">
+                                                        ${(profile.estado || 'disponible') === 'disponible' ? '🟢 Disponible' : 
+                                                          profile.estado === 'vendido' ? '🔴 Vendido' : '🟡 Renovación'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            ${profile.estado === 'vendido' ? `
+                                                <div class="profile-details">
+                                                    <div class="detail-row">
+                                                        <span>👤 Cliente:</span>
+                                                        <span>${profile.clienteNombre || 'No especificado'}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span>📞 Teléfono:</span>
+                                                        <span>${profile.clienteTelefono || 'No especificado'}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span>📅 Fecha Venta:</span>
+                                                        <span>${formatDate(profile.fechaVenta)}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span>📅 Vencimiento:</span>
+                                                        <span>${formatDate(profile.fechaVencimiento)}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span>⏰ Días restantes:</span>
+                                                        <span style="color: ${profile.diasRestantes > 5 ? '#28a745' : profile.diasRestantes > 0 ? '#ffc107' : '#dc3545'}; font-weight: bold;">
+                                                            ${profile.diasRestantes} días
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="voucher-section">
+                                                    <div class="voucher-info">
+                                                        <h6>💳 Estado del Pago</h6>
+                                                        <span style="color: ${profile.estadoPago === 'pagado' ? '#28a745' : '#dc3545'}; font-weight: bold;">
+                                                            ${profile.estadoPago === 'pagado' ? '✅ Pagado' : '❌ Pendiente'}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    ${profile.voucherImagen ? `
+                                                        <div class="voucher-preview">
+                                                            <img src="data:image/jpeg;base64,${profile.voucherImagen}" alt="Voucher" onclick="window.open(this.src, '_blank')" style="max-width: 200px; max-height: 150px;">
+                                                            <p><strong>Op:</strong> ${profile.numeroOperacion} | <strong>Monto:</strong> S/ ${profile.montoPagado}</p>
+                                                        </div>
+                                                    ` : `
+                                                        <div class="voucher-upload">
+                                                            <button class="voucher-upload-btn" onclick="openProfileVoucherModal('${account.id}', ${index})">
+                                                                💳 Subir Voucher
+                                                            </button>
+                                                        </div>
+                                                    `}
+                                                </div>
+                                            ` : ''}
+                                            
+                                            <div class="profile-actions">
+                                                ${profile.estado === 'disponible' ? `
+                                                    <button class="btn btn-primary" onclick="sellProfile('${account.id}', ${index})">💰 Vender Perfil</button>
+                                                ` : profile.estado === 'vendido' ? `
+                                                    <button class="btn btn-communication" onclick="generateProfileCommunication('${account.id}', ${index})">📧 Comunicado</button>
+                                                    <button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Voucher</button>
+                                                    <button class="btn btn-secondary" onclick="makeProfileAvailable('${account.id}', ${index})">🔄 Disponible</button>
+                                                ` : ''}
+                                            </div>
+                                        </div>
                                     `).join('')}
                                 </div>
                             </div>
@@ -2487,6 +2952,16 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             const voucherForm = document.getElementById('voucherForm');
             voucherForm.addEventListener('submit', handleVoucherSubmit);
             
+            const sellForm = document.getElementById('sellProfileForm');
+            sellForm.addEventListener('submit', handleSellProfile);
+            
+            const profileVoucherForm = document.getElementById('profileVoucherForm');
+            profileVoucherForm.addEventListener('submit', handleProfileVoucherSubmit);
+            
+            // Configurar cambio automático de fechas
+            document.getElementById('providerStartDate').addEventListener('change', updateDaysRemaining);
+            document.getElementById('providerEndDate').addEventListener('change', updateDaysRemaining);
+            
             // Cerrar modales con Escape
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') {
@@ -2511,7 +2986,11 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 if (e.target === this) closeModal();
             });
             
-            document.getElementById('voucherModal').addEventListener('click', function(e) {
+            document.getElementById('sellProfileModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+            
+            document.getElementById('profileVoucherModal').addEventListener('click', function(e) {
                 if (e.target === this) closeModal();
             });
         });
