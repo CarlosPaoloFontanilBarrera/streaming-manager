@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JIREH Streaming Manager - Dashboard</title>
     <style>
-        /* Mantener los estilos CSS existentes */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
@@ -116,7 +115,6 @@
             box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
         }
         
-        /* Agregar todos los estilos del dashboard original aquí */
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -831,6 +829,20 @@
             color: white;
         }
         
+        .search-results-info {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -877,7 +889,7 @@
             <p>Sistema con PostgreSQL en Railway - Fechas Automáticas y Vouchers</p>
         </div>
         
-        <!-- Modales existentes -->
+        <!-- Modales -->
         <div id="communicationModal" class="modal">
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
@@ -1174,7 +1186,7 @@
         };
         
         // ===============================================
-        // FUNCIONES DE FECHAS CORREGIDAS
+        // FUNCIONES DE FECHAS
         // ===============================================
         
         // Función para calcular días restantes de un perfil específico (cliente)
@@ -1183,18 +1195,6 @@
             
             const hoy = new Date();
             const vencimiento = new Date(fechaVencimientoCliente);
-            const diferencia = vencimiento.getTime() - hoy.getTime();
-            const dias = Math.ceil(diferencia / (1000 * 60 * 60 * 24));
-            
-            return Math.max(0, dias);
-        }
-        
-        // Función para calcular días restantes del proveedor
-        function calculateProviderDaysRemaining(fechaVencimientoProveedor) {
-            if (!fechaVencimientoProveedor) return 0;
-            
-            const hoy = new Date();
-            const vencimiento = new Date(fechaVencimientoProveedor);
             const diferencia = vencimiento.getTime() - hoy.getTime();
             const dias = Math.ceil(diferencia / (1000 * 60 * 60 * 24));
             
@@ -1235,10 +1235,268 @@
         }
         
         // ===============================================
-        // FUNCIONES DE GESTIÓN DE PERFILES CORREGIDAS
+        // FUNCIONES AUXILIARES
         // ===============================================
         
-        // Manejar venta de perfil con lógica telefónica CORREGIDA
+        // Generar ID único
+        function generateId() {
+            return Date.now().toString().slice(-6);
+        }
+        
+        // Generar PIN
+        function generatePin() {
+            return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        }
+        
+        // Obtener número de perfiles
+        function getProfileCount(platform) {
+            return platformProfiles[platform] || 5;
+        }
+        
+        // Formatear fecha
+        function formatDate(dateString) {
+            if (!dateString) return 'No especificado';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-PE', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+        
+        // Obtener próxima fecha de pago (1 día antes del vencimiento)
+        function getNextPaymentDate(fechaVencimiento) {
+            if (!fechaVencimiento) return 'No especificado';
+            
+            const vencimiento = new Date(fechaVencimiento);
+            const proximoPago = new Date(vencimiento);
+            proximoPago.setDate(proximoPago.getDate() - 1);
+            
+            return formatDate(proximoPago);
+        }
+        
+        // Obtener fecha de corte automático (mismo día del vencimiento)
+        function getCutoffDate(fechaVencimiento) {
+            if (!fechaVencimiento) return 'No especificado';
+            
+            const vencimiento = new Date(fechaVencimiento);
+            return formatDate(vencimiento);
+        }
+        
+        // ===============================================
+        // FUNCIONES DE CARGA Y GESTIÓN
+        // ===============================================
+        
+        // Cargar cuentas desde Railway
+        async function loadAccounts() {
+            try {
+                const data = await apiRequest('/accounts');
+                
+                allAccounts = data.map(account => ({
+                    ...account,
+                    clientName: account.client_name,
+                    clientPhone: account.client_phone,
+                    daysRemaining: account.days_remaining,
+                    profiles: typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [],
+                    fechaVenta: account.fecha_venta,
+                    fechaVencimiento: account.fecha_vencimiento,
+                    fechaInicioProveedor: account.fecha_inicio_proveedor,
+                    fechaVencimientoProveedor: account.fecha_vencimiento_proveedor,
+                    voucherImagen: account.voucher_imagen,
+                    numeroOperacion: account.numero_operacion,
+                    montoPagado: account.monto_pagado,
+                    estadoPago: account.estado_pago || 'activo'
+                }));
+                
+                // Aplicar filtro actual si existe
+                if (searchTerm) {
+                    filterAccounts(searchTerm);
+                } else {
+                    accounts = [...allAccounts];
+                    filteredAccounts = [...allAccounts];
+                }
+                
+                console.log(`✅ Cargadas ${allAccounts.length} cuentas con fechas de perfiles actualizadas`);
+                
+            } catch (error) {
+                console.error('❌ Error cargando cuentas:', error);
+                allAccounts = [];
+                accounts = [];
+                filteredAccounts = [];
+                showConnectionError();
+            }
+        }
+        
+        // Actualizar estadísticas
+        async function updateStats() {
+            try {
+                const stats = await apiRequest('/stats');
+                
+                document.getElementById('totalAccounts').textContent = stats.total || 0;
+                document.getElementById('activeAccounts').textContent = stats.active || 0;
+                document.getElementById('totalProfiles').textContent = stats.profiles || 0;
+                document.getElementById('expiringAccounts').textContent = stats.expiring || 0;
+                
+                console.log('📊 Estadísticas actualizadas:', stats);
+                
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+                // Usar fallback con las cuentas actuales
+                const accountsToCount = filteredAccounts.length > 0 ? filteredAccounts : allAccounts;
+                const totalAccounts = accountsToCount.length;
+                const activeAccounts = accountsToCount.filter(acc => acc.status === 'active').length;
+                const totalProfiles = accountsToCount.reduce((total, acc) => total + acc.profiles.length, 0);
+                const expiringAccounts = accountsToCount.filter(acc => acc.daysRemaining <= 5 && acc.daysRemaining > 0).length;
+                
+                document.getElementById('totalAccounts').textContent = totalAccounts;
+                document.getElementById('activeAccounts').textContent = activeAccounts;
+                document.getElementById('totalProfiles').textContent = totalProfiles;
+                document.getElementById('expiringAccounts').textContent = expiringAccounts;
+            }
+        }
+        
+        // Guardar cuenta en Railway
+        async function addAccount(event) {
+            event.preventDefault();
+            
+            const clientName = document.getElementById('clientName').value.trim();
+            const clientPhone = document.getElementById('clientPhone').value.trim();
+            const email = document.getElementById('accountEmail').value.trim();
+            const password = document.getElementById('accountPassword').value.trim();
+            const type = document.getElementById('accountType').value;
+            const country = document.getElementById('accountCountry').value;
+            const providerStartDate = document.getElementById('providerStartDate').value;
+            
+            if (!clientName || !email || !password || !providerStartDate) {
+                alert('Por favor completa todos los campos obligatorios');
+                return;
+            }
+            
+            // Generar perfiles
+            const profileCount = getProfileCount(type);
+            const profiles = [];
+            for (let i = 0; i < profileCount; i++) {
+                profiles.push({
+                    name: `Perfil ${i + 1}`,
+                    pin: generatePin(),
+                    estado: 'disponible'
+                });
+            }
+            
+            const accountData = {
+                id: editingAccountId || generateId(),
+                client_name: clientName,
+                client_phone: clientPhone,
+                email,
+                password,
+                type,
+                country,
+                profiles,
+                fecha_inicio_proveedor: providerStartDate
+            };
+            
+            console.log('📤 Enviando datos:', accountData);
+            
+            try {
+                let response;
+                if (editingAccountId) {
+                    response = await apiRequest(`/accounts/${editingAccountId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(accountData)
+                    });
+                } else {
+                    response = await apiRequest('/accounts', {
+                        method: 'POST',
+                        body: JSON.stringify(accountData)
+                    });
+                }
+                
+                console.log('✅ Respuesta del servidor:', response);
+                
+                await loadAccounts();
+                await updateStats();
+                renderAccounts();
+                closeModal();
+                
+                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nProveedor: ${clientName}\nPerfiles: ${profiles.length}\nFechas calculadas automáticamente`);
+                
+            } catch (error) {
+                console.error('❌ Error completo:', error);
+                alert('❌ Error al guardar la cuenta: ' + error.message);
+            }
+        }
+        
+        // Editar cuenta
+        function editAccount(accountId) {
+            const account = allAccounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            editingAccountId = accountId;
+            document.querySelector('.modal-title').textContent = 'Editar Cuenta';
+            
+            // Cargar datos en el formulario
+            document.getElementById('clientName').value = account.clientName;
+            document.getElementById('clientPhone').value = account.clientPhone || '';
+            document.getElementById('accountEmail').value = account.email;
+            document.getElementById('accountPassword').value = account.password;
+            document.getElementById('accountType').value = account.type;
+            document.getElementById('accountCountry').value = account.country;
+            
+            // Cargar fechas del proveedor
+            if (account.fechaInicioProveedor) {
+                const startDate = account.fechaInicioProveedor.includes('T') 
+                    ? account.fechaInicioProveedor.split('T')[0] 
+                    : account.fechaInicioProveedor;
+                document.getElementById('providerStartDate').value = startDate;
+                updateDaysRemaining();
+            }
+            
+            document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        // Eliminar cuenta
+        async function deleteAccount(accountId) {
+            if (confirm('¿Estás seguro de que quieres eliminar esta cuenta?')) {
+                try {
+                    await apiRequest(`/accounts/${accountId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    await loadAccounts();
+                    await updateStats();
+                    renderAccounts();
+                    
+                    alert('✅ Cuenta eliminada exitosamente');
+                    
+                } catch (error) {
+                    alert('❌ Error al eliminar la cuenta');
+                    console.error('Error:', error);
+                }
+            }
+        }
+        
+        // ===============================================
+        // FUNCIONES DE GESTIÓN DE PERFILES
+        // ===============================================
+        
+        // Vender perfil
+        function sellProfile(accountId, profileIndex) {
+            currentProfileAccountId = accountId;
+            currentProfileIndex = profileIndex;
+            
+            // Establecer fecha de hoy por defecto
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('saleDate').value = today;
+            
+            // Establecer fecha de vencimiento por defecto (30 días después)
+            const expiry = new Date();
+            expiry.setDate(expiry.getDate() + 30);
+            document.getElementById('expiryDate').value = expiry.toISOString().split('T')[0];
+            
+            document.getElementById('sellProfileModal').style.display = 'block';
+        }
+        
+        // Manejar venta de perfil
         async function handleSellProfile(event) {
             event.preventDefault();
             
@@ -1264,7 +1522,6 @@
                     return;
                 }
                 
-                // ===== LÓGICA TELEFÓNICA CORREGIDA =====
                 // Fechas del CLIENTE (independientes de la cuenta del proveedor)
                 const fechaHabilitacion = new Date(saleDate);
                 const fechaVencimientoCliente = new Date(expiryDate);
@@ -1285,11 +1542,11 @@
                 profile.clienteTelefono = clientePhone;
                 profile.fechaVenta = saleDate;
                 profile.fechaHabilitacion = saleDate;
-                profile.fechaVencimiento = expiryDate; // Fecha cuando vence el servicio del cliente
+                profile.fechaVencimiento = expiryDate;
                 profile.fechaProximoPago = fechaProximoPago.toISOString().split('T')[0];
                 profile.fechaCorte = fechaCorte.toISOString().split('T')[0];
-                profile.diasRestantes = diasRestantesCliente; // Días que le quedan al CLIENTE
-                profile.estadoPago = 'pagado'; // Ya tiene voucher
+                profile.diasRestantes = diasRestantesCliente;
+                profile.estadoPago = 'pagado';
                 
                 // Guardar en base de datos
                 await apiRequest(`/accounts/${currentProfileAccountId}`, {
@@ -1298,25 +1555,16 @@
                         ...account,
                         client_name: account.clientName,
                         client_phone: account.clientPhone,
-                        days_remaining: account.daysRemaining // Esto sigue siendo de la cuenta del proveedor
+                        days_remaining: account.daysRemaining
                     })
                 });
                 
                 await loadAccounts();
+                await updateStats();
                 renderAccounts();
                 closeModal();
                 
-                alert(`✅ Perfil vendido exitosamente con lógica telefónica!
-
-👤 Cliente: ${clienteName}
-📱 Perfil: ${profile.name}
-📅 Habilitación: ${formatDate(saleDate)}
-📅 Vencimiento Cliente: ${formatDate(expiryDate)}
-💰 Próximo Pago: ${formatDate(profile.fechaProximoPago)}
-🚫 Corte: ${formatDate(profile.fechaCorte)}
-⏰ Días del Cliente: ${diasRestantesCliente} días
-
-ℹ️ Nota: La cuenta del proveedor tiene ${account.daysRemaining} días restantes (independiente)`);
+                alert(`✅ Perfil vendido exitosamente!\n\nCliente: ${clienteName}\nPerfil: ${profile.name}\nDías del Cliente: ${diasRestantesCliente}`);
                 
             } catch (error) {
                 alert('❌ Error al vender perfil');
@@ -1324,7 +1572,88 @@
             }
         }
         
-        // Función para subir voucher de perfil con renovación automática
+        // Hacer perfil disponible
+        async function makeProfileAvailable(accountId, profileIndex) {
+            if (confirm('¿Estás seguro de que quieres hacer este perfil disponible nuevamente?')) {
+                try {
+                    const account = allAccounts.find(acc => acc.id === accountId);
+                    if (!account) return;
+                    
+                    const profile = account.profiles[profileIndex];
+                    profile.estado = 'disponible';
+                    delete profile.clienteNombre;
+                    delete profile.clienteTelefono;
+                    delete profile.fechaVenta;
+                    delete profile.fechaVencimiento;
+                    delete profile.diasRestantes;
+                    delete profile.estadoPago;
+                    delete profile.voucherImagen;
+                    delete profile.numeroOperacion;
+                    delete profile.montoPagado;
+                    
+                    await apiRequest(`/accounts/${accountId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            ...account,
+                            client_name: account.clientName,
+                            client_phone: account.clientPhone,
+                            days_remaining: account.daysRemaining
+                        })
+                    });
+                    
+                    await loadAccounts();
+                    await updateStats();
+                    renderAccounts();
+                    
+                    alert('✅ Perfil disponible nuevamente');
+                    
+                } catch (error) {
+                    alert('❌ Error al actualizar perfil');
+                    console.error('Error:', error);
+                }
+            }
+        }
+        
+        // Abrir modal de voucher para perfil
+        function openProfileVoucherModal(accountId, profileIndex) {
+            currentProfileAccountId = accountId;
+            currentProfileIndex = profileIndex;
+            document.getElementById('profileVoucherModal').style.display = 'block';
+        }
+        
+        // Vista previa del voucher de perfil
+        function previewProfileVoucher(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profileVoucherImage').src = e.target.result;
+                    document.getElementById('profileVoucherPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Subir voucher de perfil
+        async function uploadProfileVoucher(accountId, profileIndex, formData) {
+            try {
+                const response = await fetch(`${API_BASE}/accounts/${accountId}/profile/${profileIndex}/voucher`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error subiendo voucher de perfil:', error);
+                throw error;
+            }
+        }
+        
+        // Manejar envío del formulario de voucher
         async function handleProfileVoucherSubmit(event) {
             event.preventDefault();
             
@@ -1354,21 +1683,14 @@
                 
                 if (result.success) {
                     await loadAccounts();
+                    await updateStats();
                     renderAccounts();
                     closeModal();
                     
                     if (profile.estado === 'vendido') {
-                        alert(`✅ Perfil renovado exitosamente!
-
-📱 Perfil: ${profile.name}
-⏰ Se extendió 30 días más automáticamente
-💳 Voucher guardado correctamente`);
+                        alert(`✅ Perfil renovado exitosamente!\n\n📱 Perfil: ${profile.name}\n⏰ Se extendió 30 días más automáticamente\n💳 Voucher guardado correctamente`);
                     } else {
-                        alert(`✅ Voucher confirmado!
-
-📱 Perfil: ${profile.name}
-💳 Voucher guardado en la base de datos
-📋 Ahora puedes proceder a vender el perfil`);
+                        alert(`✅ Voucher confirmado!\n\n📱 Perfil: ${profile.name}\n💳 Voucher guardado en la base de datos\n📋 Ahora puedes proceder a vender el perfil`);
                     }
                 }
                 
@@ -1378,30 +1700,42 @@
             }
         }
         
-        // Subir voucher de perfil usando la API
-        async function uploadProfileVoucher(accountId, profileIndex, formData) {
-            try {
-                const response = await fetch(`${API_BASE}/accounts/${accountId}/profile/${profileIndex}/voucher`, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                return await response.json();
-            } catch (error) {
-                console.error('Error subiendo voucher de perfil:', error);
-                throw error;
-            }
+        // Generar comunicado para perfil específico
+        function generateProfileCommunication(accountId, profileIndex) {
+            const account = allAccounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            const profile = account.profiles[profileIndex];
+            if (!profile || profile.estado !== 'vendido') return;
+            
+            currentAccount = account;
+            generateIndividualCommunication(profileIndex);
         }
         
         // ===============================================
-        // FUNCIONES DE COMUNICADOS CORREGIDAS
+        // FUNCIONES DE COMUNICADOS
         // ===============================================
         
-        // Generar comunicado individual con fechas correctas
+        // Generar comunicados
+        function generateCommunications(accountId) {
+            const account = allAccounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            currentAccount = account;
+            
+            const profileGrid = document.getElementById('profileGrid');
+            profileGrid.innerHTML = account.profiles.map((profile, index) => `
+                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #dee2e6; cursor: pointer; transition: all 0.3s ease;" onclick="generateIndividualCommunication(${index})">
+                    <div style="font-weight: bold; margin-bottom: 8px; color: #333;">${profile.name}</div>
+                    <div style="font-family: monospace; font-size: 1.2em; color: #dc3545; font-weight: bold;">${profile.pin}</div>
+                    <div style="margin-top: 8px; font-size: 0.8em; color: #666;">Clic para generar</div>
+                </div>
+            `).join('');
+            
+            document.getElementById('communicationModal').style.display = 'block';
+        }
+        
+        // Generar comunicado individual
         function generateIndividualCommunication(profileIndex) {
             if (!currentAccount) return;
             
@@ -1519,8 +1853,238 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             document.getElementById('messageModal').style.display = 'block';
         }
         
+        // Generar todos los comunicados
+        function generateAllCommunications() {
+            if (!currentAccount) return;
+            
+            let allMessages = '';
+            
+            currentAccount.profiles.forEach((profile, index) => {
+                const today = new Date().toLocaleDateString('es-PE');
+                
+                const message = `
+🎬 *JIREH STREAMING*
+📋 *COMUNICADO INDIVIDUAL - ${currentAccount.type.toUpperCase()}*
+👤 *PERFIL: ${profile.name.toUpperCase()}*
+
+Estimado/a Usuario del ${profile.name},
+
+Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
+
+🔐 *DATOS DE ACCESO:*
+📧 Email: ${currentAccount.email}
+🔒 Contraseña: ${currentAccount.password}
+📱 Servicio: ${currentAccount.type}
+🌍 País: ${countryFlags[currentAccount.country]} ${currentAccount.country}
+
+👤 *SU PERFIL Y PIN:*
+📛 Perfil: ${profile.name}
+🔢 PIN: *${profile.pin}*
+
+⚠️ *TÉRMINOS DE USO:*
+• Uso Individual: Solo UN (1) DISPOSITIVO
+• Monitoreo: Se supervisa la actividad
+• Suspensión: 2+ dispositivos = suspensión inmediata
+• Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
+
+💳 *INFORMACIÓN DE PAGOS:*
+⏰ Días Restantes: ${currentAccount.daysRemaining} días
+📅 Fecha de Vencimiento: ${formatDate(currentAccount.fechaVencimientoProveedor)}
+💰 Próximo Pago: ${getNextPaymentDate(currentAccount.fechaVencimientoProveedor)}
+🚫 Corte Automático: ${getCutoffDate(currentAccount.fechaVencimientoProveedor)}
+💰 Yape: 981804056
+⚠️ El servicio se suspende automáticamente el ${getCutoffDate(currentAccount.fechaVencimientoProveedor)} si no se paga el ${getNextPaymentDate(currentAccount.fechaVencimientoProveedor)}.
+
+*JIREH STREAMING - Conserve este comunicado para futuras referencias*
+*ID: ${currentAccount.id} | Fecha: ${today}*
+
+💝 *¡Gracias por preferirnos!* 💝
+
+═══════════════════════════════
+
+                `;
+                
+                allMessages += message;
+            });
+            
+            navigator.clipboard.writeText(allMessages).then(() => {
+                alert(`✅ Se han copiado los ${currentAccount.profiles.length} comunicados al portapapeles.\n\nPuedes pegarlos y enviar cada uno por separado.`);
+            });
+            
+            closeModal();
+        }
+        
+        // Copiar comunicado
+        function copyCommunication() {
+            navigator.clipboard.writeText(currentCommunicationText).then(() => {
+                alert('✅ Comunicado copiado al portapapeles');
+            });
+        }
+        
+        // Enviar por WhatsApp
+        function sendWhatsApp() {
+            const message = encodeURIComponent(currentCommunicationText);
+            const whatsappURL = `https://wa.me/?text=${message}`;
+            window.open(whatsappURL, '_blank');
+        }
+        
         // ===============================================
-        // FUNCIONES DE RENDERIZADO CORREGIDAS
+        // FUNCIONES DE PINS
+        // ===============================================
+        
+        // Editar PINs
+        function editPins(accountId) {
+            const account = allAccounts.find(acc => acc.id === accountId);
+            if (!account) return;
+            
+            editingPinAccountId = accountId;
+            
+            const pinEditGrid = document.getElementById('pinEditGrid');
+            pinEditGrid.innerHTML = account.profiles.map((profile, index) => `
+                <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #dee2e6;">
+                    <div style="flex: 1;">
+                        <strong>${profile.name}</strong>
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="text" 
+                               id="pin_${index}" 
+                               value="${profile.pin}" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1.1em; text-align: center;"
+                               maxlength="4"
+                               placeholder="PIN">
+                    </div>
+                    <div>
+                        <button class="btn" onclick="regeneratePin(${index})" style="background: #17a2b8; color: white; padding: 8px 12px; font-size: 0.8em;">🔄 Nuevo</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('pinModal').style.display = 'block';
+        }
+        
+        // Regenerar PIN individual
+        function regeneratePin(profileIndex) {
+            const newPin = generatePin();
+            document.getElementById(`pin_${profileIndex}`).value = newPin;
+        }
+        
+        // Regenerar todos los PINs
+        function regenerateAllPins() {
+            const account = allAccounts.find(acc => acc.id === editingPinAccountId);
+            if (!account) return;
+            
+            account.profiles.forEach((profile, index) => {
+                const newPin = generatePin();
+                document.getElementById(`pin_${index}`).value = newPin;
+            });
+            
+            alert('🔄 Todos los PINs han sido regenerados');
+        }
+        
+        // Guardar PINs
+        async function savePins() {
+            const account = allAccounts.find(acc => acc.id === editingPinAccountId);
+            if (!account) return;
+            
+            // Actualizar PINs con los valores del formulario
+            account.profiles.forEach((profile, index) => {
+                const newPin = document.getElementById(`pin_${index}`).value.trim();
+                if (newPin && newPin.length === 4) {
+                    profile.pin = newPin;
+                } else {
+                    profile.pin = generatePin();
+                }
+            });
+            
+            try {
+                await apiRequest(`/accounts/${editingPinAccountId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        ...account,
+                        client_name: account.clientName,
+                        client_phone: account.clientPhone,
+                        days_remaining: account.daysRemaining
+                    })
+                });
+                
+                await loadAccounts();
+                renderAccounts();
+                closeModal();
+                
+                alert('✅ PINs actualizados exitosamente');
+                
+            } catch (error) {
+                alert('❌ Error al actualizar PINs');
+                console.error('Error:', error);
+            }
+        }
+        
+        // ===============================================
+        // FUNCIONES DE FILTROS Y BÚSQUEDA
+        // ===============================================
+        
+        // Filtrar cuentas por término de búsqueda
+        function filterAccounts(searchValue) {
+            searchTerm = searchValue.toLowerCase().trim();
+            
+            if (!searchTerm) {
+                accounts = [...allAccounts];
+                filteredAccounts = [...allAccounts];
+            } else {
+                accounts = allAccounts.filter(account => 
+                    account.clientName.toLowerCase().includes(searchTerm) ||
+                    account.email.toLowerCase().includes(searchTerm) ||
+                    account.type.toLowerCase().includes(searchTerm) ||
+                    account.id.toLowerCase().includes(searchTerm) ||
+                    (account.clientPhone && account.clientPhone.toLowerCase().includes(searchTerm))
+                );
+                filteredAccounts = [...accounts];
+            }
+            
+            renderAccounts();
+        }
+        
+        // Limpiar búsqueda
+        function clearSearch() {
+            document.querySelector('.search-box').value = '';
+            searchTerm = '';
+            accounts = [...allAccounts];
+            filteredAccounts = [...allAccounts];
+            renderAccounts();
+        }
+        
+        // Toggle acordeón
+        function toggleAccordion(accountId) {
+            const accordion = document.getElementById(`accordion-${accountId}`);
+            const content = document.getElementById(`content-${accountId}`);
+            const header = document.getElementById(`header-${accountId}`);
+            const toggle = document.getElementById(`toggle-${accountId}`);
+            
+            if (accordion.classList.contains('expanded')) {
+                // Cerrar
+                accordion.classList.remove('expanded');
+                content.classList.remove('expanded');
+                header.classList.remove('active');
+                toggle.textContent = '▼';
+            } else {
+                // Cerrar todos los demás primero
+                document.querySelectorAll('.account-accordion.expanded').forEach(acc => {
+                    const id = acc.id.replace('accordion-', '');
+                    if (id !== accountId) {
+                        toggleAccordion(id);
+                    }
+                });
+                
+                // Abrir este
+                accordion.classList.add('expanded');
+                content.classList.add('expanded');
+                header.classList.add('active');
+                toggle.textContent = '▲';
+            }
+        }
+        
+        // ===============================================
+        // FUNCIONES DE RENDERIZADO
         // ===============================================
         
         // Renderizar cuentas con fechas de perfiles correctas
@@ -1762,99 +2326,41 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         // ===============================================
-        // FUNCIONES AUXILIARES
+        // FUNCIONES DE SISTEMA
         // ===============================================
         
-        // Generar ID único
-        function generateId() {
-            return Date.now().toString().slice(-6);
+        // Abrir modal
+        function openAddModal() {
+            editingAccountId = null;
+            document.querySelector('.modal-title').textContent = 'Agregar Nueva Cuenta';
+            document.getElementById('accountModal').style.display = 'block';
+            document.getElementById('accountForm').reset();
+            document.getElementById('customDays').value = '';
         }
         
-        // Generar PIN
-        function generatePin() {
-            return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        // Cerrar modal
+        function closeModal() {
+            document.getElementById('accountModal').style.display = 'none';
+            document.getElementById('communicationModal').style.display = 'none';
+            document.getElementById('messageModal').style.display = 'none';
+            document.getElementById('pinModal').style.display = 'none';
+            document.getElementById('sellProfileModal').style.display = 'none';
+            document.getElementById('profileVoucherModal').style.display = 'none';
         }
         
-        // Obtener número de perfiles
-        function getProfileCount(platform) {
-            return platformProfiles[platform] || 5;
+        // Función para mostrar error de conexión
+        function showConnectionError() {
+            const container = document.getElementById('accountsList');
+            container.innerHTML = `
+                <div class="no-accounts" style="border-color: #dc3545; background: #f8d7da;">
+                    <h3 style="color: #721c24;">❌ Error de Conexión</h3>
+                    <p style="color: #721c24;">No se pudo conectar con Railway PostgreSQL.</p>
+                    <button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        🔄 Reintentar
+                    </button>
+                </div>
+            `;
         }
-        
-        // Formatear fecha
-        function formatDate(dateString) {
-            if (!dateString) return 'No especificado';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('es-PE', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            });
-        }
-        
-        // Obtener próxima fecha de pago (1 día antes del vencimiento)
-        function getNextPaymentDate(fechaVencimiento) {
-            if (!fechaVencimiento) return 'No especificado';
-            
-            const vencimiento = new Date(fechaVencimiento);
-            const proximoPago = new Date(vencimiento);
-            proximoPago.setDate(proximoPago.getDate() - 1);
-            
-            return formatDate(proximoPago);
-        }
-        
-        // Obtener fecha de corte automático (mismo día del vencimiento)
-        function getCutoffDate(fechaVencimiento) {
-            if (!fechaVencimiento) return 'No especificado';
-            
-            const vencimiento = new Date(fechaVencimiento);
-            return formatDate(vencimiento);
-        }
-        
-        // ===============================================
-        // FUNCIONES DE CARGA Y GESTIÓN
-        // ===============================================
-        
-        // Cargar cuentas desde Railway
-        async function loadAccounts() {
-            try {
-                const data = await apiRequest('/accounts');
-                
-                allAccounts = data.map(account => ({
-                    ...account,
-                    clientName: account.client_name,
-                    clientPhone: account.client_phone,
-                    daysRemaining: account.days_remaining,
-                    profiles: typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles,
-                    fechaVenta: account.fecha_venta,
-                    fechaVencimiento: account.fecha_vencimiento,
-                    fechaInicioProveedor: account.fecha_inicio_proveedor,
-                    fechaVencimientoProveedor: account.fecha_vencimiento_proveedor,
-                    voucherImagen: account.voucher_imagen,
-                    numeroOperacion: account.numero_operacion,
-                    montoPagado: account.monto_pagado,
-                    estadoPago: account.estado_pago || 'activo'
-                }));
-                
-                // Aplicar filtro actual si existe
-                if (searchTerm) {
-                    filterAccounts(searchTerm);
-                } else {
-                    accounts = [...allAccounts];
-                    filteredAccounts = [...allAccounts];
-                }
-                
-                console.log(`✅ Cargadas ${allAccounts.length} cuentas con fechas de perfiles actualizadas`);
-                
-            } catch (error) {
-                console.error('❌ Error cargando cuentas:', error);
-                allAccounts = [];
-                accounts = [];
-                filteredAccounts = [];
-                showConnectionError();
-            }
-        }
-        
-        // Resto de funciones necesarias para completar el sistema...
         
         // Verificar autenticación
         function checkAuth() {
@@ -1864,6 +2370,23 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 return false;
             }
             return true;
+        }
+        
+        // Logout
+        function logout() {
+            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                localStorage.removeItem('streamingAdminLoggedIn');
+                window.location.href = '/login';
+            }
+        }
+        
+        // Funciones placeholder para alarmas
+        function configureAlarms() {
+            alert('🚨 Configuración de alarmas - Función en desarrollo');
+        }
+        
+        function testAlarmSystem() {
+            alert('🧪 Test de alarmas - Función en desarrollo');
         }
         
         // Función principal de inicialización
@@ -1878,6 +2401,10 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             
             console.log('✅ Sistema cargado con fechas de perfiles independientes');
         }
+        
+        // ===============================================
+        // EVENT LISTENERS
+        // ===============================================
         
         // Cargar aplicación cuando el DOM esté listo
         document.addEventListener('DOMContentLoaded', function() {
@@ -1897,35 +2424,28 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             const startDateInput = document.getElementById('providerStartDate');
             if (startDateInput) startDateInput.addEventListener('change', updateDaysRemaining);
             
+            // Cerrar modales con Escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+            
+            // Cerrar modales al hacer clic fuera
+            const modals = ['accountModal', 'communicationModal', 'messageModal', 'pinModal', 'sellProfileModal', 'profileVoucherModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === this) closeModal();
+                    });
+                }
+            });
+            
             console.log('✅ Event listeners configurados');
         });
         
-        // Placeholder para funciones que faltan por implementar
-        function updateStats() { /* Implementar */ }
-        function addAccount() { /* Implementar */ }
-        function editAccount() { /* Implementar */ }
-        function deleteAccount() { /* Implementar */ }
-        function sellProfile() { /* Implementar */ }
-        function makeProfileAvailable() { /* Implementar */ }
-        function openProfileVoucherModal() { /* Implementar */ }
-        function generateProfileCommunication() { /* Implementar */ }
-        function generateCommunications() { /* Implementar */ }
-        function generateAllCommunications() { /* Implementar */ }
-        function copyCommunication() { /* Implementar */ }
-        function sendWhatsApp() { /* Implementar */ }
-        function editPins() { /* Implementar */ }
-        function toggleAccordion() { /* Implementar */ }
-        function filterAccounts() { /* Implementar */ }
-        function clearSearch() { /* Implementar */ }
-        function openAddModal() { /* Implementar */ }
-        function closeModal() { /* Implementar */ }
-        function logout() { /* Implementar */ }
-        function previewProfileVoucher() { /* Implementar */ }
-        function configureAlarms() { /* Implementar */ }
-        function testAlarmSystem() { /* Implementar */ }
-        function showConnectionError() { /* Implementar */ }
-        
-        console.log('🎉 Dashboard con fechas de perfiles corregidas - Completado');
+        console.log('🎉 Dashboard completo con fechas de perfiles corregidas - Implementado');
     </script>
 </body>
 </html>
