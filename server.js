@@ -279,19 +279,28 @@ app.post('/api/accounts', async (req, res) => {
     }
 });
 
+// ########## INICIO DEL CÓDIGO MODIFICADO ##########
 // Actualizar cuenta con perfiles y fechas
 app.put('/api/accounts/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { 
             client_name, client_phone, email, password, 
-            type, country, profiles, days_remaining, status,
-            fecha_inicio_proveedor, fecha_vencimiento_proveedor
+            type, country, profiles, fecha_inicio_proveedor
         } = req.body;
         
         console.log('📝 Actualizando cuenta:', id);
         
-        // Procesar perfiles para asegurar que tengan fechas correctas
+        // --- LÓGICA CORREGIDA ---
+        // Recalcular fechas y estado en el servidor para mayor seguridad
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        // --- FIN DE LA LÓGICA CORREGIDA ---
+        
         const profilesActualizados = procesarPerfiles(profiles);
         
         const result = await pool.query(
@@ -302,9 +311,11 @@ app.put('/api/accounts/:id', async (req, res) => {
              WHERE id = $12 RETURNING *`,
             [
                 client_name, client_phone || '', email, password, type, country, 
-                JSON.stringify(profilesActualizados), days_remaining, status,
-                fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : null,
-                fecha_vencimiento_proveedor ? new Date(fecha_vencimiento_proveedor) : null,
+                JSON.stringify(profilesActualizados), 
+                diasRestantesProveedor, // Usar el valor recalculado
+                estadoProveedor,        // Usar el valor recalculado
+                fechaInicio,            // Usar la fecha procesada
+                fechaVencimientoProveedor, // Usar la fecha procesada
                 id
             ]
         );
@@ -320,6 +331,7 @@ app.put('/api/accounts/:id', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
+// ########## FIN DEL CÓDIGO MODIFICADO ##########
 
 // Subir voucher para perfil específico
 app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
