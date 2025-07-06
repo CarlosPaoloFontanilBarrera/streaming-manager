@@ -1,9 +1,10 @@
-// server.js - Sistema completo con fechas automáticas de perfiles y vouchers
+// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
+const fetch = require('node-fetch'); // Se necesita para enviar notificaciones a ntfy
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -97,6 +98,32 @@ async function initDB() {
             )
         `);
         
+        // --- INICIO: IMPLEMENTACIÓN DE ALARMAS NTFY ---
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS alarm_settings (
+                id SERIAL PRIMARY KEY,
+                provider_threshold_days INTEGER NOT NULL DEFAULT 5,
+                client_threshold_days INTEGER NOT NULL DEFAULT 3,
+                ntfy_topic TEXT
+            )
+        `);
+        const settings = await pool.query('SELECT * FROM alarm_settings');
+        if (settings.rows.length === 0) {
+            await pool.query('INSERT INTO alarm_settings (provider_threshold_days, client_threshold_days) VALUES (5, 3)');
+        } else {
+            const columns = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name='alarm_settings' AND column_name='ntfy_topic'");
+            if (columns.rows.length === 0) {
+                await pool.query("ALTER TABLE alarm_settings ADD COLUMN ntfy_topic TEXT");
+            }
+        }
+        
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS sent_notifications (
+                id SERIAL PRIMARY KEY, item_id TEXT NOT NULL, item_type TEXT NOT NULL, sent_at TIMESTAMP NOT NULL, UNIQUE(item_id, item_type)
+            )
+        `);
+        // --- FIN: IMPLEMENTACIÓN DE ALARMAS NTFY ---
+        
         // Verificar si las columnas nuevas existen, si no, agregarlas
         const columnCheck = await pool.query(`
             SELECT column_name 
@@ -155,6 +182,69 @@ async function initDB() {
         console.error('❌ Error inicializando base de datos:', error);
     }
 }
+
+// --- INICIO: LÓGICA DE ENVÍO DE ALARMAS POR NTFY ---
+async function checkAndSendAlarms() {
+    console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
+
+    try {
+        const settingsRes = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
+        const settings = settingsRes.rows[0];
+
+        if (!settings || !settings.ntfy_topic) {
+            console.log('⚠️ No se ha configurado un tema de ntfy para notificaciones.');
+            return;
+        }
+
+        const accountsRes = await pool.query('SELECT * FROM accounts');
+
+        for (const account of accountsRes.rows) {
+            // Alarma para la cuenta del proveedor
+            const providerDays = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
+            if (providerDays > 0 && providerDays <= settings.provider_threshold_days) {
+                const notificationId = `provider-${account.id}`;
+                const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
+                
+                if (checkRes.rows.length === 0) {
+                    const message = `La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
+                    await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
+                        method: 'POST',
+                        body: message,
+                        headers: { 'Title': '🚨 Alarma de Proveedor', 'Priority': 'high', 'Tags': 'rotating_light' }
+                    });
+                    await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
+                    console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
+                }
+            }
+
+            // Alarmas para perfiles de clientes
+            const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
+            profiles.forEach(async (profile, index) => {
+                if (profile.estado === 'vendido') {
+                    const clientDays = calcularDiasRestantesPerfil(profile.fechaVencimiento);
+                    if (clientDays > 0 && clientDays <= settings.client_threshold_days) {
+                        const notificationId = `client-${account.id}-${index}`;
+                        const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
+
+                        if (checkRes.rows.length === 0) {
+                           const message = `El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
+                           await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
+                                method: 'POST',
+                                body: message,
+                                headers: { 'Title': '🔔 Alarma de Cliente', 'Priority': 'default', 'Tags': 'bell' }
+                           });
+                           await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
+                           console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
+                        }
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error durante la revisión de alarmas:', error);
+    }
+}
+// --- FIN: LÓGICA DE ENVÍO DE ALARMAS ---
 
 // RUTAS API
 // Health check
@@ -279,7 +369,6 @@ app.post('/api/accounts', async (req, res) => {
     }
 });
 
-// ########## INICIO DEL CÓDIGO MODIFICADO ##########
 // Actualizar cuenta con perfiles y fechas
 app.put('/api/accounts/:id', async (req, res) => {
     try {
@@ -291,7 +380,6 @@ app.put('/api/accounts/:id', async (req, res) => {
         
         console.log('📝 Actualizando cuenta:', id);
         
-        // --- LÓGICA CORREGIDA ---
         // Recalcular fechas y estado en el servidor para mayor seguridad
         const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
         const fechaVencimientoProveedor = new Date(fechaInicio);
@@ -299,7 +387,6 @@ app.put('/api/accounts/:id', async (req, res) => {
         
         const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
         const estadoProveedor = actualizarEstado(diasRestantesProveedor);
-        // --- FIN DE LA LÓGICA CORREGIDA ---
         
         const profilesActualizados = procesarPerfiles(profiles);
         
@@ -312,10 +399,10 @@ app.put('/api/accounts/:id', async (req, res) => {
             [
                 client_name, client_phone || '', email, password, type, country, 
                 JSON.stringify(profilesActualizados), 
-                diasRestantesProveedor, // Usar el valor recalculado
-                estadoProveedor,        // Usar el valor recalculado
-                fechaInicio,            // Usar la fecha procesada
-                fechaVencimientoProveedor, // Usar la fecha procesada
+                diasRestantesProveedor, 
+                estadoProveedor,
+                fechaInicio,
+                fechaVencimientoProveedor,
                 id
             ]
         );
@@ -331,7 +418,6 @@ app.put('/api/accounts/:id', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-// ########## FIN DEL CÓDIGO MODIFICADO ##########
 
 // Subir voucher para perfil específico
 app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
@@ -343,7 +429,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single
             return res.status(400).json({ error: 'No se subió ningún archivo' });
         }
         
-        // Obtener la cuenta
         const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
         if (accountResult.rows.length === 0) {
             return res.status(404).json({ error: 'Cuenta no encontrada' });
@@ -361,23 +446,19 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single
         
         const profile = profiles[profileIdx];
         
-        // Convertir imagen a base64
         const voucherBase64 = req.file.buffer.toString('base64');
         
-        // Actualizar perfil con voucher
         profile.voucherImagen = voucherBase64;
         profile.numeroOperacion = numero_operacion;
         profile.montoPagado = parseFloat(monto_pagado);
         profile.voucherSubido = true;
         profile.fechaVoucher = new Date().toISOString();
         
-        // Si el perfil está vendido, es una renovación
         if (profile.estado === 'vendido') {
             const fechaVencimientoActual = new Date(profile.fechaVencimiento);
             const nuevaFechaVencimiento = new Date(fechaVencimientoActual);
             nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
             
-            // Actualizar fechas del cliente
             profile.fechaVencimiento = nuevaFechaVencimiento.toISOString().split('T')[0];
             
             const fechaProximoPago = new Date(nuevaFechaVencimiento);
@@ -391,12 +472,10 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single
             
             console.log(`🔄 Perfil renovado: ${profile.name} - ${profile.diasRestantes} días más`);
         } else {
-            // Perfil disponible, solo confirmar voucher
             profile.estadoPago = 'confirmado';
             console.log(`💳 Voucher confirmado para perfil disponible: ${profile.name}`);
         }
         
-        // Guardar en base de datos
         await pool.query(
             'UPDATE accounts SET profiles = $1 WHERE id = $2',
             [JSON.stringify(profiles), accountId]
@@ -436,7 +515,6 @@ app.get('/api/stats', async (req, res) => {
     try {
         const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
         
-        // Calcular estados en tiempo real
         const accountsResult = await pool.query(`
             SELECT 
                 fecha_vencimiento_proveedor,
@@ -454,10 +532,8 @@ app.get('/api/stats', async (req, res) => {
             const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles || [];
             totalProfiles += profiles.length;
             
-            // Contar perfiles vendidos
             soldProfiles += profiles.filter(p => p.estado === 'vendido').length;
             
-            // Estado de la cuenta del proveedor
             if (row.fecha_vencimiento_proveedor) {
                 const vencimiento = new Date(row.fecha_vencimiento_proveedor);
                 const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
@@ -479,6 +555,30 @@ app.get('/api/stats', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
+
+// --- INICIO: NUEVAS RUTAS PARA CONFIGURAR ALARMAS NTFY ---
+app.get('/api/alarms/settings', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
+        res.json(result.rows[0] || { provider_threshold_days: 5, client_threshold_days: 3, ntfy_topic: '' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error obteniendo configuración de alarmas' });
+    }
+});
+
+app.put('/api/alarms/settings', async (req, res) => {
+    try {
+        const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
+        const result = await pool.query(
+            'UPDATE alarm_settings SET provider_threshold_days = $1, client_threshold_days = $2, ntfy_topic = $3 WHERE id = 1 RETURNING *',
+            [provider_threshold_days, client_threshold_days, ntfy_topic]
+        );
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error actualizando configuración de alarmas' });
+    }
+});
+// --- FIN: NUEVAS RUTAS ---
 
 // Servir archivos estáticos
 app.get('/', (req, res) => {
@@ -505,10 +605,16 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
             console.log(`🌐 URL: http://localhost:${PORT}`);
-            console.log(`📅 Sistema de fechas del proveedor: ACTIVO`);
-            console.log(`📅 Sistema de fechas de perfiles: ACTIVO`);
+            
+            // --- INICIO: INICIAR EL CHEQUEO AUTOMÁTICO DE ALARMAS ---
+            // Revisa las alarmas cada hora.
+            setInterval(checkAndSendAlarms, 3600000); 
+            console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
+            // --- FIN: INICIAR EL CHEQUEO AUTOMÁTICO DE ALARMAS ---
+            
+            // Se eliminan los logs anteriores para mantener la consistencia con la nueva funcionalidad
             console.log(`💳 Sistema de vouchers: ACTIVO`);
-            console.log(`🚨 Sistema de alarmas: ACTIVO`);
+            console.log(`🚨 Sistema de alarmas: ACTIVO (vía ntfy)`);
         });
     } catch (error) {
         console.error('❌ Error iniciando servidor:', error);
