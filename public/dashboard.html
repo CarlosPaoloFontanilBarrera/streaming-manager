@@ -779,6 +779,8 @@
         <div class="controls">
             <input type="text" class="search-box" placeholder="🔍 Buscar cuentas...">
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
+            <button class="btn" onclick="configureAlarms()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
+            <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
         </div>
         
         <div class="stats">
@@ -1066,8 +1068,271 @@
         };
         
         // ===============================================
-        // FUNCIONES BÁSICAS
+        // SISTEMA DE ALARMAS AUTOMÁTICAS
         // ===============================================
+        
+        // Configuración de alarmas
+        const ALARM_CONFIG = {
+            adminPhone: '51981804056', // TU NÚMERO DE WHATSAPP
+            providerAlarmDays: 3, // Días antes de vencimiento del proveedor
+            clientAlarmDays: 2, // Días antes de vencimiento del cliente
+            checkInterval: 60000 // Revisar cada minuto (60000ms)
+        };
+        
+        // Función para enviar mensaje de WhatsApp
+        function sendWhatsAppAlarm(phone, message) {
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappURL = `https://wa.me/${phone}?text=${encodedMessage}`;
+            
+            // Abrir en nueva ventana silenciosa
+            window.open(whatsappURL, '_blank', 'noopener,noreferrer');
+        }
+        
+        // Verificar alarmas del proveedor
+        function checkProviderAlarms() {
+            const today = new Date();
+            const alertDate = new Date(today.getTime() + (ALARM_CONFIG.providerAlarmDays * 24 * 60 * 60 * 1000));
+            
+            accounts.forEach(account => {
+                if (!account.fechaVencimiento) return;
+                
+                const vencimiento = new Date(account.fechaVencimiento);
+                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
+                
+                // Alarma para renovar con el proveedor
+                if (diffDays === ALARM_CONFIG.providerAlarmDays) {
+                    const message = `
+🚨 *ALERTA PROVEEDOR - JIREH STREAMING*
+
+⚠️ La cuenta del proveedor está por vencerse:
+
+📋 *DETALLES:*
+• Cliente: ${account.clientName}
+• Servicio: ${account.type}
+• Email: ${account.email}
+• Vencimiento: ${formatDate(account.fechaVencimiento)}
+• Días restantes: ${diffDays} días
+
+🔄 *ACCIÓN REQUERIDA:*
+• Renovar cuenta con el proveedor URGENTE
+• Contactar proveedor para extensión
+• Verificar pagos pendientes
+
+💰 *INFORMACIÓN:*
+• Yape Proveedor: [TU PROVEEDOR]
+• Monto renovación: [MONTO]
+
+⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Sistema de Alarmas*
+                    `.trim();
+                    
+                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                }
+            });
+        }
+        
+        // Verificar alarmas de clientes
+        function checkClientAlarms() {
+            const today = new Date();
+            
+            accounts.forEach(account => {
+                if (!account.fechaVencimiento) return;
+                
+                const vencimiento = new Date(account.fechaVencimiento);
+                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
+                
+                // Alarma para cobrar al cliente
+                if (diffDays === ALARM_CONFIG.clientAlarmDays) {
+                    const message = `
+💰 *ALERTA COBRO - JIREH STREAMING*
+
+⏰ Cliente próximo a vencer:
+
+👤 *DATOS DEL CLIENTE:*
+• Nombre: ${account.clientName}
+• Teléfono: ${account.clientPhone || 'No especificado'}
+• Servicio: ${account.type}
+• Perfiles: ${account.profiles.length}
+
+📅 *FECHAS IMPORTANTES:*
+• Vencimiento: ${formatDate(account.fechaVencimiento)}
+• Corte automático: ${getCutoffDate(account.fechaVencimiento)}
+• Días restantes: ${diffDays} días
+
+💳 *ACCIÓN REQUERIDA:*
+• Contactar cliente para renovación
+• Enviar comunicado de pago
+• Verificar si ya pagó
+
+📱 *CONTACTO:*
+${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` : '• Sin teléfono registrado'}
+
+⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Sistema de Alarmas*
+                    `.trim();
+                    
+                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                }
+                
+                // Alarma de vencimiento inmediato
+                if (diffDays === 0) {
+                    const message = `
+🚨 *ALERTA VENCIMIENTO HOY - JIREH STREAMING*
+
+⚠️ CUENTA VENCE HOY:
+
+👤 *CLIENTE:*
+• Nombre: ${account.clientName}
+• Teléfono: ${account.clientPhone || 'No especificado'}
+• Servicio: ${account.type}
+
+📅 *ESTADO:*
+• Vence: HOY (${formatDate(account.fechaVencimiento)})
+• Corte: MAÑANA (${getCutoffDate(account.fechaVencimiento)})
+• Estado: ${account.estadoPago === 'activo' ? 'PAGADO ✅' : 'PENDIENTE ❌'}
+
+🔄 *ACCIÓN INMEDIATA:*
+• Verificar si pagó
+• Contactar cliente urgente
+• Suspender servicio si no pagó
+
+⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Sistema de Alarmas*
+                    `.trim();
+                    
+                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                }
+            });
+        }
+        
+        // Verificar alarmas de cuentas vencidas
+        function checkExpiredAlarms() {
+            const today = new Date();
+            
+            accounts.forEach(account => {
+                if (!account.fechaVencimiento) return;
+                
+                const vencimiento = new Date(account.fechaVencimiento);
+                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
+                
+                // Alarma para cuentas vencidas sin pago
+                if (diffDays === -1 && account.estadoPago !== 'activo') {
+                    const message = `
+🔴 *CUENTA VENCIDA - JIREH STREAMING*
+
+⛔ SERVICIO SUSPENDIDO:
+
+👤 *CLIENTE:*
+• Nombre: ${account.clientName}
+• Teléfono: ${account.clientPhone || 'No especificado'}
+• Servicio: ${account.type}
+
+📅 *ESTADO:*
+• Venció: ${formatDate(account.fechaVencimiento)}
+• Días vencido: ${Math.abs(diffDays)} día(s)
+• Estado pago: PENDIENTE ❌
+
+🔄 *ACCIONES REALIZADAS:*
+• Servicio suspendido automáticamente
+• Cliente notificado del corte
+• Esperando pago para reactivar
+
+💰 *PARA REACTIVAR:*
+• Cliente debe pagar y enviar voucher
+• Subir comprobante al sistema
+• Servicio se reactivará automáticamente
+
+⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Sistema de Alarmas*
+                    `.trim();
+                    
+                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                }
+            });
+        }
+        
+        // Función principal de verificación de alarmas
+        function checkAllAlarms() {
+            if (accounts.length === 0) return;
+            
+            try {
+                checkProviderAlarms();
+                checkClientAlarms();
+                checkExpiredAlarms();
+                
+                console.log('✅ Alarmas verificadas:', new Date().toLocaleString('es-PE'));
+            } catch (error) {
+                console.error('❌ Error en sistema de alarmas:', error);
+            }
+        }
+        
+        // Iniciar sistema de alarmas
+        let alarmInterval;
+        
+        function startAlarmSystem() {
+            // Verificar inmediatamente
+            checkAllAlarms();
+            
+            // Configurar verificación periódica
+            alarmInterval = setInterval(checkAllAlarms, ALARM_CONFIG.checkInterval);
+            
+            console.log('🚨 Sistema de alarmas iniciado');
+            console.log(`📱 Enviando a: ${ALARM_CONFIG.adminPhone}`);
+            console.log(`⏰ Verificando cada ${ALARM_CONFIG.checkInterval / 1000} segundos`);
+        }
+        
+        // Detener sistema de alarmas
+        function stopAlarmSystem() {
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                console.log('🛑 Sistema de alarmas detenido');
+            }
+        }
+        
+        // Configurar alarmas (función para el admin)
+        function configureAlarms() {
+            const newPhone = prompt('Ingresa tu número de WhatsApp (con código país, ej: 51981804056):', ALARM_CONFIG.adminPhone);
+            const providerDays = prompt('Días antes de vencimiento del proveedor para alertar:', ALARM_CONFIG.providerAlarmDays);
+            const clientDays = prompt('Días antes de vencimiento del cliente para alertar:', ALARM_CONFIG.clientAlarmDays);
+            
+            if (newPhone) ALARM_CONFIG.adminPhone = newPhone;
+            if (providerDays) ALARM_CONFIG.providerAlarmDays = parseInt(providerDays);
+            if (clientDays) ALARM_CONFIG.clientAlarmDays = parseInt(clientDays);
+            
+            alert(`✅ Configuración actualizada:\n\nTeléfono: ${ALARM_CONFIG.adminPhone}\nAlarma proveedor: ${ALARM_CONFIG.providerAlarmDays} días antes\nAlarma cliente: ${ALARM_CONFIG.clientAlarmDays} días antes`);
+            
+            // Reiniciar sistema con nueva configuración
+            stopAlarmSystem();
+            startAlarmSystem();
+        }
+        
+        // Probar sistema de alarmas
+        function testAlarmSystem() {
+            const testMessage = `
+🧪 *TEST - SISTEMA DE ALARMAS*
+
+✅ El sistema de alarmas está funcionando correctamente.
+
+📱 *CONFIGURACIÓN ACTUAL:*
+• Teléfono: ${ALARM_CONFIG.adminPhone}
+• Alarma proveedor: ${ALARM_CONFIG.providerAlarmDays} días antes
+• Alarma cliente: ${ALARM_CONFIG.clientAlarmDays} días antes
+• Verificación: cada ${ALARM_CONFIG.checkInterval / 1000} segundos
+
+📊 *ESTADO ACTUAL:*
+• Cuentas monitoreadas: ${accounts.length}
+• Fecha/Hora: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Test de Alarmas*
+            `.trim();
+            
+            sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, testMessage);
+            alert('📱 Mensaje de prueba enviado a WhatsApp');
+        }
         
         // Verificar autenticación
         function checkAuth() {
@@ -1089,18 +1354,30 @@
             return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
         }
         
-        // Calcular próxima fecha de pago
-        function getNextPaymentDate() {
-            const today = new Date();
-            const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 5);
+        // Calcular próxima fecha de pago (mismo día del vencimiento)
+        function getNextPaymentDate(fechaVencimiento) {
+            if (!fechaVencimiento) return 'No especificado';
             
-            if (today.getDate() > 5) {
-                nextMonth.setMonth(nextMonth.getMonth() + 1);
-            }
+            const vencimiento = new Date(fechaVencimiento);
             
-            const day = nextMonth.getDate().toString().padStart(2, '0');
-            const month = (nextMonth.getMonth() + 1).toString().padStart(2, '0');
-            const year = nextMonth.getFullYear().toString().slice(-2);
+            const day = vencimiento.getDate().toString().padStart(2, '0');
+            const month = (vencimiento.getMonth() + 1).toString().padStart(2, '0');
+            const year = vencimiento.getFullYear().toString().slice(-2);
+            
+            return `${day}/${month}/${year}`;
+        }
+        
+        // Calcular fecha de corte automático (día siguiente al vencimiento)
+        function getCutoffDate(fechaVencimiento) {
+            if (!fechaVencimiento) return 'No especificado';
+            
+            const vencimiento = new Date(fechaVencimiento);
+            const corte = new Date(vencimiento);
+            corte.setDate(corte.getDate() + 1);
+            
+            const day = corte.getDate().toString().padStart(2, '0');
+            const month = (corte.getMonth() + 1).toString().padStart(2, '0');
+            const year = corte.getFullYear().toString().slice(-2);
             
             return `${day}/${month}/${year}`;
         }
@@ -1486,9 +1763,11 @@
                 <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
                     <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
                     <p><strong>Días Restantes:</strong> ${currentAccount.daysRemaining} días</p>
-                    <p><strong>Próximo Pago:</strong> ${getNextPaymentDate()}</p>
+                    <p><strong>Fecha de Vencimiento:</strong> ${formatDate(currentAccount.fechaVencimiento)}</p>
+                    <p><strong>Próximo Pago:</strong> ${getNextPaymentDate(currentAccount.fechaVencimiento)}</p>
+                    <p><strong>Corte Automático:</strong> ${getCutoffDate(currentAccount.fechaVencimiento)}</p>
                     <p><strong>Yape:</strong> 981804056</p>
-                    <p><strong>⚠️ El servicio se suspende automáticamente si no se paga el día 5.</strong></p>
+                    <p><strong>⚠️ El servicio se suspende automáticamente el ${getCutoffDate(currentAccount.fechaVencimiento)} si no se paga el ${getNextPaymentDate(currentAccount.fechaVencimiento)}.</strong></p>
                 </div>
                 
                 <div style="text-align: center; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
@@ -1531,9 +1810,11 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 
 💳 *INFORMACIÓN DE PAGOS:*
 ⏰ Días Restantes: ${currentAccount.daysRemaining} días
-📅 Próximo Pago: ${getNextPaymentDate()}
+📅 Fecha de Vencimiento: ${formatDate(currentAccount.fechaVencimiento)}
+💰 Próximo Pago: ${getNextPaymentDate(currentAccount.fechaVencimiento)}
+🚫 Corte Automático: ${getCutoffDate(currentAccount.fechaVencimiento)}
 💰 Yape: 981804056
-⚠️ El servicio se suspende automáticamente si no se paga el día 5.
+⚠️ El servicio se suspende automáticamente el ${getCutoffDate(currentAccount.fechaVencimiento)} si no se paga el ${getNextPaymentDate(currentAccount.fechaVencimiento)}.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
 *ID: ${currentAccount.id} | Fecha: ${today}*
@@ -1582,9 +1863,11 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
 
 💳 *INFORMACIÓN DE PAGOS:*
 ⏰ Días Restantes: ${currentAccount.daysRemaining} días
-📅 Próximo Pago: ${getNextPaymentDate()}
+📅 Fecha de Vencimiento: ${formatDate(currentAccount.fechaVencimiento)}
+💰 Próximo Pago: ${getNextPaymentDate(currentAccount.fechaVencimiento)}
+🚫 Corte Automático: ${getCutoffDate(currentAccount.fechaVencimiento)}
 💰 Yape: 981804056
-⚠️ El servicio se suspende automáticamente si no se paga el día 5.
+⚠️ El servicio se suspende automáticamente el ${getCutoffDate(currentAccount.fechaVencimiento)} si no se paga el ${getNextPaymentDate(currentAccount.fechaVencimiento)}.
 
 *JIREH STREAMING - Conserve este comunicado para futuras referencias*
 *ID: ${currentAccount.id} | Fecha: ${today}*
@@ -1857,6 +2140,9 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             await updateStats();
             renderAccounts();
             
+            // Iniciar sistema de alarmas
+            startAlarmSystem();
+            
             console.log('✅ JIREH Streaming Manager con Railway y Vouchers cargado exitosamente');
         }
         
@@ -1904,7 +2190,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             });
         });
         
-        console.log('🎉 JIREH Streaming Manager con Railway y Sistema de Vouchers - Completado');
+        console.log('🎉 JIREH Streaming Manager con Railway, Vouchers y Sistema de Alarmas - Completado');
     </script>
 </body>
 </html>
