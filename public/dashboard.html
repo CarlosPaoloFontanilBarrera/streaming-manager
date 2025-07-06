@@ -1460,25 +1460,20 @@
             window.open(whatsappURL, '_blank', 'noopener,noreferrer');
         }
         
-        // Verificar alarmas del proveedor
+        // Verificar alarmas del proveedor (basado en días restantes de las cuentas)
         function checkProviderAlarms() {
-            const today = new Date();
-            
             allAccounts.forEach(account => {
-                if (!account.fechaVencimientoProveedor) return;
-                
-                const vencimiento = new Date(account.fechaVencimientoProveedor);
-                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
+                const daysRemaining = account.daysRemaining;
                 
                 // Alarma para renovar con el proveedor (3 días antes)
-                if (diffDays === ALARM_CONFIG.providerAlarmDays) {
+                if (daysRemaining === ALARM_CONFIG.providerAlarmDays) {
                     const message = `
 🚨 *ALERTA PROVEEDOR - JIREH STREAMING*
 
 ⚠️ La cuenta del proveedor está por vencerse:
 
 📋 *DETALLES DE LA CUENTA:*
-• Nombre: ${account.clientName}
+• Proveedor: ${account.clientName}
 • Servicio: ${account.type}
 • Email: ${account.email}
 • País: ${countryFlags[account.country]} ${account.country}
@@ -1486,7 +1481,7 @@
 📅 *FECHAS IMPORTANTES:*
 • Fecha Inicio: ${formatDate(account.fechaInicioProveedor)}
 • Vencimiento: ${formatDate(account.fechaVencimientoProveedor)}
-• Días restantes: ${diffDays} días
+• Días restantes: ${daysRemaining} días
 
 👥 *PERFILES DISPONIBLES:*
 • Total perfiles: ${account.profiles.length}
@@ -1511,18 +1506,18 @@
                     sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
                 }
                 
-                // Alarma de vencimiento inmediato del proveedor
-                if (diffDays === 0) {
+                // Alarma de vencimiento inmediato del proveedor (1 día antes)
+                if (daysRemaining === 1) {
                     const message = `
-🚨 *CUENTA DEL PROVEEDOR VENCE HOY - JIREH STREAMING*
+🚨 *CUENTA DEL PROVEEDOR VENCE MAÑANA - JIREH STREAMING*
 
-⚠️ ATENCIÓN: Tu cuenta del proveedor vence HOY
+⚠️ ATENCIÓN: Tu cuenta del proveedor vence MAÑANA
 
 📋 *CUENTA VENCIENDO:*
-• Nombre: ${account.clientName}
+• Proveedor: ${account.clientName}
 • Servicio: ${account.type}
 • Email: ${account.email}
-• Vencimiento: HOY (${formatDate(account.fechaVencimientoProveedor)})
+• Vencimiento: MAÑANA (${formatDate(account.fechaVencimientoProveedor)})
 
 👥 *PERFILES AFECTADOS:*
 • Total: ${account.profiles.length} perfiles
@@ -1534,10 +1529,46 @@
 • Contactar proveedor urgente
 • Evitar suspensión masiva
 
-⚠️ *CONSECUENCIAS:*
+⚠️ *CONSECUENCIAS SI NO RENUEVAS:*
 • Todos los perfiles se suspenderán
 • Clientes perderán acceso
 • Posible pérdida de ingresos
+
+⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Sistema de Alarmas del Proveedor*
+                    `.trim();
+                    
+                    sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, message);
+                }
+                
+                // Alarma de vencimiento HOY
+                if (daysRemaining === 0) {
+                    const message = `
+🚨 *CUENTA DEL PROVEEDOR VENCE HOY - JIREH STREAMING*
+
+⚠️ CRÍTICO: Tu cuenta del proveedor vence HOY
+
+📋 *CUENTA VENCIENDO:*
+• Proveedor: ${account.clientName}
+• Servicio: ${account.type}
+• Email: ${account.email}
+• Vencimiento: HOY (${formatDate(account.fechaVencimientoProveedor)})
+
+👥 *PERFILES AFECTADOS:*
+• Total: ${account.profiles.length} perfiles
+• Vendidos: ${account.profiles.filter(p => p.estado === 'vendido').length}
+• TODOS LOS CLIENTES SERÁN SUSPENDIDOS
+
+🔄 *ACCIÓN CRÍTICA:*
+• Renovar cuenta del proveedor AHORA
+• Contactar proveedor INMEDIATAMENTE
+• Evitar suspensión total del servicio
+
+⚠️ *ESTADO CRÍTICO:*
+• Servicio se suspende al final del día
+• Todos los perfiles quedarán inactivos
+• Clientes perderán acceso completo
 
 ⏰ Mensaje enviado: ${new Date().toLocaleString('es-PE')}
 
@@ -1693,14 +1724,16 @@ ${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTele
         
         // Función principal de verificación de alarmas
         function checkAllAlarms() {
-            if (accounts.length === 0) return;
+            if (allAccounts.length === 0) return;
             
             try {
+                // Solo verificar alarmas del proveedor (basadas en días restantes de cuentas)
                 checkProviderAlarms();
-                checkClientAlarms();
-                checkExpiredAlarms();
                 
-                console.log('✅ Alarmas verificadas:', new Date().toLocaleString('es-PE'));
+                // Verificar alarmas de perfiles vendidos individualmente
+                checkClientAlarms();
+                
+                console.log(`✅ Alarmas verificadas: ${new Date().toLocaleString('es-PE')} | Cuentas: ${allAccounts.length}`);
             } catch (error) {
                 console.error('❌ Error en sistema de alarmas:', error);
             }
@@ -1731,15 +1764,33 @@ ${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTele
         
         // Configurar alarmas (función para el admin)
         function configureAlarms() {
-            const newPhone = prompt('Ingresa tu número de WhatsApp (con código país, ej: 51981804056):', ALARM_CONFIG.adminPhone);
-            const providerDays = prompt('Días antes de vencimiento del proveedor para alertar:', ALARM_CONFIG.providerAlarmDays);
-            const clientDays = prompt('Días antes de vencimiento del cliente para alertar:', ALARM_CONFIG.clientAlarmDays);
+            const currentPhone = ALARM_CONFIG.adminPhone;
+            const currentProviderDays = ALARM_CONFIG.providerAlarmDays;
+            const currentClientDays = ALARM_CONFIG.clientAlarmDays;
             
-            if (newPhone) ALARM_CONFIG.adminPhone = newPhone;
-            if (providerDays) ALARM_CONFIG.providerAlarmDays = parseInt(providerDays);
-            if (clientDays) ALARM_CONFIG.clientAlarmDays = parseInt(clientDays);
+            const newPhone = prompt(`Ingresa tu número de WhatsApp (con código país, ej: 51981804056):`, currentPhone);
+            const providerDays = prompt(`Días antes del vencimiento de TUS CUENTAS del proveedor para alertar:`, currentProviderDays);
+            const clientDays = prompt(`Días antes del vencimiento de PERFILES VENDIDOS para alertar:`, currentClientDays);
             
-            alert(`✅ Configuración actualizada:\n\nTeléfono: ${ALARM_CONFIG.adminPhone}\nAlarma proveedor: ${ALARM_CONFIG.providerAlarmDays} días antes\nAlarma cliente: ${ALARM_CONFIG.clientAlarmDays} días antes`);
+            if (newPhone && newPhone.trim()) ALARM_CONFIG.adminPhone = newPhone.trim();
+            if (providerDays && !isNaN(providerDays)) ALARM_CONFIG.providerAlarmDays = parseInt(providerDays);
+            if (clientDays && !isNaN(clientDays)) ALARM_CONFIG.clientAlarmDays = parseInt(clientDays);
+            
+            alert(`✅ Configuración de alarmas actualizada:
+
+📱 WhatsApp: ${ALARM_CONFIG.adminPhone}
+
+🏢 ALARMAS DE PROVEEDOR:
+• Se activan ${ALARM_CONFIG.providerAlarmDays} días antes del vencimiento
+• Te avisan cuando TUS cuentas del proveedor están por vencer
+• Basadas en los días restantes de cada cuenta
+
+👥 ALARMAS DE CLIENTES:
+• Se activan ${ALARM_CONFIG.clientAlarmDays} días antes del vencimiento
+• Te avisan cuando los perfiles vendidos están por vencer
+• Para que cobres las renovaciones a tiempo
+
+🔄 Revisión: Cada minuto automáticamente`);
             
             // Reiniciar sistema con nueva configuración
             stopAlarmSystem();
@@ -1748,26 +1799,47 @@ ${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTele
         
         // Probar sistema de alarmas
         function testAlarmSystem() {
+            const accountsCount = allAccounts.length;
+            const activeAccounts = allAccounts.filter(acc => acc.daysRemaining > 5).length;
+            const expiringAccounts = allAccounts.filter(acc => acc.daysRemaining <= ALARM_CONFIG.providerAlarmDays && acc.daysRemaining > 0).length;
+            const expiredAccounts = allAccounts.filter(acc => acc.daysRemaining <= 0).length;
+            
             const testMessage = `
-🧪 *TEST - SISTEMA DE ALARMAS*
+🧪 *TEST - SISTEMA DE ALARMAS JIREH*
 
 ✅ El sistema de alarmas está funcionando correctamente.
 
 📱 *CONFIGURACIÓN ACTUAL:*
-• Teléfono: ${ALARM_CONFIG.adminPhone}
+• WhatsApp: ${ALARM_CONFIG.adminPhone}
 • Alarma proveedor: ${ALARM_CONFIG.providerAlarmDays} días antes
-• Alarma cliente: ${ALARM_CONFIG.clientAlarmDays} días antes
+• Alarma clientes: ${ALARM_CONFIG.clientAlarmDays} días antes
 • Verificación: cada ${ALARM_CONFIG.checkInterval / 1000} segundos
 
-📊 *ESTADO ACTUAL:*
-• Cuentas monitoreadas: ${accounts.length}
-• Fecha/Hora: ${new Date().toLocaleString('es-PE')}
+📊 *ESTADO ACTUAL DE CUENTAS:*
+• Total cuentas: ${accountsCount}
+• Cuentas activas: ${activeAccounts}
+• Por vencer: ${expiringAccounts}
+• Vencidas: ${expiredAccounts}
 
-*JIREH STREAMING - Test de Alarmas*
+🔍 *ANÁLISIS POR CUENTA:*
+${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaining} días`).join('\n')}
+
+🚨 *PRÓXIMAS ALARMAS:*
+• Cuentas que recibirán alerta pronto: ${expiringAccounts}
+• Sistema monitoreando automáticamente
+
+⏰ Test realizado: ${new Date().toLocaleString('es-PE')}
+
+*JIREH STREAMING - Test de Sistema de Alarmas*
             `.trim();
             
             sendWhatsAppAlarm(ALARM_CONFIG.adminPhone, testMessage);
-            alert('📱 Mensaje de prueba enviado a WhatsApp');
+            alert(`📱 Mensaje de prueba enviado a WhatsApp
+
+📊 Resumen del test:
+• Cuentas monitoreadas: ${accountsCount}
+• Próximas alarmas: ${expiringAccounts}
+• Sistema funcionando correctamente ✅`);
         }
         
         // Verificar autenticación
@@ -1899,6 +1971,7 @@ ${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTele
                 }
                 
                 console.log(`✅ Cargadas ${allAccounts.length} cuentas desde Railway`);
+                console.log('📋 Ejemplo de cuenta:', allAccounts[0]); // Debug
                 
             } catch (error) {
                 console.error('❌ Error cargando cuentas:', error);
@@ -1957,20 +2030,25 @@ ${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTele
                 fecha_vencimiento_proveedor: providerEndDate
             };
             
+            console.log('📤 Enviando datos:', accountData); // Debug
+            
             try {
+                let response;
                 if (editingAccountId) {
                     // Actualizar cuenta existente
-                    await apiRequest(`/accounts/${editingAccountId}`, {
+                    response = await apiRequest(`/accounts/${editingAccountId}`, {
                         method: 'PUT',
                         body: JSON.stringify(accountData)
                     });
                 } else {
                     // Crear nueva cuenta
-                    await apiRequest('/accounts', {
+                    response = await apiRequest('/accounts', {
                         method: 'POST',
                         body: JSON.stringify(accountData)
                     });
                 }
+                
+                console.log('✅ Respuesta del servidor:', response); // Debug
                 
                 // Recargar datos
                 await loadAccounts();
@@ -1978,11 +2056,11 @@ ${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTele
                 renderAccounts();
                 closeModal();
                 
-                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nProveedor: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nVencimiento: ${formatDate(providerEndDate)}`);
+                alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!\n\nProveedor: ${clientName}\nPerfiles: ${profiles.length}\nDías restantes: ${daysRemaining}\nInicio: ${formatDate(providerStartDate)}\nVencimiento: ${formatDate(providerEndDate)}`);
                 
             } catch (error) {
-                alert('❌ Error al guardar la cuenta');
-                console.error('Error:', error);
+                console.error('❌ Error completo:', error);
+                alert('❌ Error al guardar la cuenta: ' + error.message);
             }
         }
         
@@ -2302,14 +2380,22 @@ ${profile.clienteTelefono ? `• WhatsApp: https://wa.me/51${profile.clienteTele
             
             // Cargar fechas del proveedor
             if (account.fechaInicioProveedor) {
-                document.getElementById('providerStartDate').value = account.fechaInicioProveedor.split('T')[0];
+                const startDate = account.fechaInicioProveedor.includes('T') 
+                    ? account.fechaInicioProveedor.split('T')[0] 
+                    : account.fechaInicioProveedor;
+                document.getElementById('providerStartDate').value = startDate;
             }
             if (account.fechaVencimientoProveedor) {
-                document.getElementById('providerEndDate').value = account.fechaVencimientoProveedor.split('T')[0];
+                const endDate = account.fechaVencimientoProveedor.includes('T') 
+                    ? account.fechaVencimientoProveedor.split('T')[0] 
+                    : account.fechaVencimientoProveedor;
+                document.getElementById('providerEndDate').value = endDate;
             }
             
             // Actualizar días restantes
             updateDaysRemaining();
+            
+            console.log('📝 Editando cuenta:', account); // Debug
             
             document.getElementById('accountModal').style.display = 'block';
         }
