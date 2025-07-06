@@ -1254,15 +1254,22 @@
         }
         
         // Formatear fecha
-        function formatDate(dateString) {
-            if (!dateString) return 'No especificado';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('es-PE', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            });
-        }
+        // ... dentro de public/dashboard.html
+function formatDate(dateString) {
+    if (!dateString) return 'No especificado';
+    
+    // Crear la fecha y ajustarla por la diferencia de zona horaria del navegador
+    const date = new Date(dateString);
+    const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+    const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+
+    return adjustedDate.toLocaleDateString('es-PE', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+        
         
         // Obtener próxima fecha de pago (1 día antes del vencimiento)
         function getNextPaymentDate(fechaVencimiento) {
