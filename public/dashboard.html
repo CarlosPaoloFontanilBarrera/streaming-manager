@@ -177,31 +177,215 @@
             gap: 20px;
         }
         
-        .account-card {
+        /* ESTILOS PARA ACORDEONES DESPLEGABLES */
+        .account-accordion {
             background: white;
             border: 2px solid #e9ecef;
             border-radius: 15px;
-            padding: 30px;
+            margin-bottom: 15px;
             transition: all 0.3s ease;
-            position: relative;
             overflow: hidden;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
         
-        .account-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #dc3545, #fd7e14);
+        .account-accordion:hover {
+            border-color: #dc3545;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
         }
         
-        .account-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        .account-accordion.expanded {
             border-color: #dc3545;
+            box-shadow: 0 10px 30px rgba(220, 53, 69, 0.15);
+        }
+        
+        .accordion-header {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px 30px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            border-bottom: 1px solid transparent;
+        }
+        
+        .accordion-header:hover {
+            background: linear-gradient(135deg, #e9ecef, #dee2e6);
+        }
+        
+        .accordion-header.active {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .accordion-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex: 1;
+        }
+        
+        .accordion-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .accordion-title h3 {
+            font-size: 1.4em;
+            font-weight: 700;
+            margin: 0;
+        }
+        
+        .accordion-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        
+        .accordion-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .accordion-toggle {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            color: inherit;
+        }
+        
+        .accordion-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+        
+        .accordion-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.5s ease;
+        }
+        
+        .accordion-content.expanded {
+            padding: 30px;
+            max-height: 2000px;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .quick-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .quick-btn-edit {
+            background: #007bff;
+            color: white;
+        }
+        
+        .quick-btn-voucher {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .quick-btn-comm {
+            background: #28a745;
+            color: white;
+        }
+        
+        .quick-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .search-results-info {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-indicator.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-indicator.inactive {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-indicator.expired {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .profile-count {
+            background: #6f42c1;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        
+        .days-remaining {
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+        }
+        
+        .days-remaining.good {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .days-remaining.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .days-remaining.danger {
+            background: #f8d7da;
+            color: #721c24;
         }
         
         .account-header {
@@ -777,7 +961,7 @@
         </div>
         
         <div class="controls">
-            <input type="text" class="search-box" placeholder="🔍 Buscar cuentas...">
+            <input type="text" class="search-box" placeholder="🔍 Buscar por nombre, email, tipo de servicio..." onkeyup="filterAccounts(this.value)">
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
             <button class="btn" onclick="configureAlarms()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
             <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
@@ -970,6 +1154,9 @@
         let currentCommunicationText = '';
         let editingPinAccountId = null;
         let currentVoucherAccountId = null;
+        let allAccounts = []; // Para el sistema de búsqueda
+        let filteredAccounts = []; // Cuentas filtradas
+        let searchTerm = ''; // Término de búsqueda actual
         
         // Función para hacer peticiones API
         async function apiRequest(endpoint, options = {}) {
@@ -1420,7 +1607,7 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
                 const data = await apiRequest('/accounts');
                 
                 // Parsear profiles si es string y agregar campos de voucher
-                accounts = data.map(account => ({
+                allAccounts = data.map(account => ({
                     ...account,
                     clientName: account.client_name,
                     clientPhone: account.client_phone,
@@ -1434,11 +1621,21 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
                     estadoPago: account.estado_pago || 'activo'
                 }));
                 
-                console.log(`✅ Cargadas ${accounts.length} cuentas desde Railway`);
+                // Aplicar filtro actual si existe
+                if (searchTerm) {
+                    filterAccounts(searchTerm);
+                } else {
+                    accounts = [...allAccounts];
+                    filteredAccounts = [...allAccounts];
+                }
+                
+                console.log(`✅ Cargadas ${allAccounts.length} cuentas desde Railway`);
                 
             } catch (error) {
                 console.error('❌ Error cargando cuentas:', error);
+                allAccounts = [];
                 accounts = [];
+                filteredAccounts = [];
                 showConnectionError();
             }
         }
@@ -1575,11 +1772,12 @@ ${account.clientPhone ? `• WhatsApp: https://wa.me/51${account.clientPhone}` :
                 
             } catch (error) {
                 console.error('Error cargando estadísticas:', error);
-                // Usar fallback
-                const totalAccounts = accounts.length;
-                const activeAccounts = accounts.filter(acc => acc.status === 'active').length;
-                const totalProfiles = accounts.reduce((total, acc) => total + acc.profiles.length, 0);
-                const expiringAccounts = accounts.filter(acc => acc.daysRemaining <= 5 && acc.daysRemaining > 0).length;
+                // Usar fallback con las cuentas filtradas si hay búsqueda activa
+                const accountsToCount = searchTerm ? filteredAccounts : allAccounts;
+                const totalAccounts = accountsToCount.length;
+                const activeAccounts = accountsToCount.filter(acc => acc.status === 'active').length;
+                const totalProfiles = accountsToCount.reduce((total, acc) => total + acc.profiles.length, 0);
+                const expiringAccounts = accountsToCount.filter(acc => acc.daysRemaining <= 5 && acc.daysRemaining > 0).length;
                 
                 document.getElementById('totalAccounts').textContent = totalAccounts;
                 document.getElementById('activeAccounts').textContent = activeAccounts;
@@ -1995,14 +2193,80 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         // ===============================================
+        // FUNCIONES DE FILTROS Y BÚSQUEDA
+        // ===============================================
+        
+        // Filtrar cuentas por término de búsqueda
+        function filterAccounts(searchValue) {
+            searchTerm = searchValue.toLowerCase().trim();
+            
+            if (!searchTerm) {
+                accounts = [...allAccounts];
+                filteredAccounts = [...allAccounts];
+            } else {
+                accounts = allAccounts.filter(account => 
+                    account.clientName.toLowerCase().includes(searchTerm) ||
+                    account.email.toLowerCase().includes(searchTerm) ||
+                    account.type.toLowerCase().includes(searchTerm) ||
+                    account.id.toLowerCase().includes(searchTerm) ||
+                    (account.clientPhone && account.clientPhone.toLowerCase().includes(searchTerm))
+                );
+                filteredAccounts = [...accounts];
+            }
+            
+            renderAccounts();
+        }
+        
+        // Obtener estadísticas de búsqueda
+        function getSearchStats() {
+            const total = allAccounts.length;
+            const filtered = filteredAccounts.length;
+            const active = filteredAccounts.filter(acc => acc.status === 'active').length;
+            const expiring = filteredAccounts.filter(acc => acc.daysRemaining <= 5 && acc.daysRemaining > 0).length;
+            const expired = filteredAccounts.filter(acc => acc.daysRemaining <= 0).length;
+            
+            return { total, filtered, active, expiring, expired };
+        }
+        
+        // Toggle acordeón
+        function toggleAccordion(accountId) {
+            const accordion = document.getElementById(`accordion-${accountId}`);
+            const content = document.getElementById(`content-${accountId}`);
+            const header = document.getElementById(`header-${accountId}`);
+            const toggle = document.getElementById(`toggle-${accountId}`);
+            
+            if (accordion.classList.contains('expanded')) {
+                // Cerrar
+                accordion.classList.remove('expanded');
+                content.classList.remove('expanded');
+                header.classList.remove('active');
+                toggle.textContent = '▼';
+            } else {
+                // Cerrar todos los demás primero
+                document.querySelectorAll('.account-accordion.expanded').forEach(acc => {
+                    const id = acc.id.replace('accordion-', '');
+                    if (id !== accountId) {
+                        toggleAccordion(id);
+                    }
+                });
+                
+                // Abrir este
+                accordion.classList.add('expanded');
+                content.classList.add('expanded');
+                header.classList.add('active');
+                toggle.textContent = '▲';
+            }
+        }
+        
+        // ===============================================
         // FUNCIONES DE RENDERIZADO
         // ===============================================
         
-        // Renderizar cuentas
+        // Renderizar cuentas con acordeones
         function renderAccounts() {
             const container = document.getElementById('accountsList');
             
-            if (accounts.length === 0) {
+            if (allAccounts.length === 0) {
                 container.innerHTML = `
                     <div class="no-accounts">
                         <h3>📱 No hay cuentas registradas</h3>
@@ -2012,94 +2276,156 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 return;
             }
             
-            container.innerHTML = accounts.map(account => `
-                <div class="account-card">
-                    <div class="account-header">
-                        <div class="account-info">
-                            <h3>👤 ${account.clientName}</h3>
-                            <p>ID: ${account.id} | ${account.type} | ${countryFlags[account.country]} ${account.country}</p>
-                        </div>
-                        <span class="status-badge status-${account.status}">
-                            ${account.status === 'active' ? 'Activo' : account.status === 'inactive' ? 'Por Vencer' : 'Vencido'}
-                        </span>
+            if (filteredAccounts.length === 0) {
+                container.innerHTML = `
+                    <div class="no-results">
+                        <h3>🔍 No se encontraron resultados</h3>
+                        <p>No hay cuentas que coincidan con "${searchTerm}"</p>
+                        <button class="btn btn-primary" onclick="clearSearch()">Limpiar búsqueda</button>
                     </div>
-                    
-                    <div class="date-info">
-                        <div class="date-card">
-                            <div class="date-label">📅 Fecha de Venta</div>
-                            <div class="date-value">${formatDate(account.fechaVenta)}</div>
-                        </div>
-                        <div class="date-card ${account.daysRemaining <= 5 ? (account.daysRemaining > 0 ? 'expiring' : 'expired') : ''}">
-                            <div class="date-label">📅 Fecha de Vencimiento</div>
-                            <div class="date-value">${formatDate(account.fechaVencimiento)}</div>
-                        </div>
+                `;
+                return;
+            }
+            
+            const stats = getSearchStats();
+            
+            let html = '';
+            
+            // Mostrar información de búsqueda si hay filtros
+            if (searchTerm) {
+                html += `
+                    <div class="search-results-info">
+                        <strong>Resultados de búsqueda:</strong> ${stats.filtered} de ${stats.total} cuentas
+                        ${stats.filtered !== stats.total ? `| Término: "${searchTerm}"` : ''}
+                        <button onclick="clearSearch()" style="margin-left: 10px; background: none; border: none; color: #dc3545; cursor: pointer; font-weight: 600;">✕ Limpiar</button>
                     </div>
-                    
-                    <div class="account-details">
-                        <div class="detail-item">
-                            <div class="detail-label">📧 Email</div>
-                            <div class="detail-value">${account.email}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">🔒 Contraseña</div>
-                            <div class="detail-value">${account.password}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="account-details">
-                        <div class="detail-item">
-                            <div class="detail-label">📞 Teléfono</div>
-                            <div class="detail-value">${account.clientPhone || 'No especificado'}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">⏰ Días Restantes</div>
-                            <div class="detail-value" style="color: ${account.daysRemaining > 5 ? '#28a745' : account.daysRemaining > 0 ? '#ffc107' : '#dc3545'}; font-weight: 700;">${account.daysRemaining} días</div>
-                        </div>
-                    </div>
-                    
-                    <div class="voucher-section">
-                        <div class="voucher-info">
-                            <h4>💳 Estado del Pago</h4>
-                            <div class="voucher-status">
-                                <span style="color: ${account.estadoPago === 'activo' ? '#28a745' : '#dc3545'}; font-weight: bold;">
-                                    ${account.estadoPago === 'activo' ? '✅ Pagado' : '❌ Pendiente'}
-                                </span>
+                `;
+            }
+            
+            // Renderizar acordeones
+            html += filteredAccounts.map(account => {
+                const statusClass = account.status === 'active' ? 'active' : account.status === 'inactive' ? 'inactive' : 'expired';
+                const statusText = account.status === 'active' ? 'Activo' : account.status === 'inactive' ? 'Por Vencer' : 'Vencido';
+                
+                const daysClass = account.daysRemaining > 5 ? 'good' : account.daysRemaining > 0 ? 'warning' : 'danger';
+                
+                return `
+                    <div class="account-accordion" id="accordion-${account.id}">
+                        <div class="accordion-header" id="header-${account.id}" onclick="toggleAccordion('${account.id}')">
+                            <div class="accordion-info">
+                                <div class="accordion-title">
+                                    <h3>👤 ${account.clientName}</h3>
+                                    <span class="status-indicator ${statusClass}">
+                                        ${statusText}
+                                    </span>
+                                </div>
+                                <div class="accordion-meta">
+                                    <span>${account.type}</span>
+                                    <span>${countryFlags[account.country]} ${account.country}</span>
+                                    <span class="profile-count">${account.profiles.length} perfiles</span>
+                                    <span class="days-remaining ${daysClass}">${account.daysRemaining} días</span>
+                                </div>
+                            </div>
+                            <div class="accordion-controls">
+                                <div class="quick-actions">
+                                    <button class="quick-btn quick-btn-edit" onclick="event.stopPropagation(); editAccount('${account.id}')" title="Editar">✏️</button>
+                                    <button class="quick-btn quick-btn-voucher" onclick="event.stopPropagation(); openVoucherModal('${account.id}')" title="Voucher">💳</button>
+                                    <button class="quick-btn quick-btn-comm" onclick="event.stopPropagation(); generateCommunications('${account.id}')" title="Comunicados">📧</button>
+                                </div>
+                                <button class="accordion-toggle" id="toggle-${account.id}">▼</button>
                             </div>
                         </div>
                         
-                        ${account.voucherImagen ? `
-                            <div class="voucher-preview">
-                                <img src="data:image/jpeg;base64,${account.voucherImagen}" alt="Voucher de pago" onclick="window.open(this.src, '_blank')">
-                                <p><strong>Operación:</strong> ${account.numeroOperacion} | <strong>Monto:</strong> S/ ${account.montoPagado}</p>
+                        <div class="accordion-content" id="content-${account.id}">
+                            <div class="date-info">
+                                <div class="date-card">
+                                    <div class="date-label">📅 Fecha de Venta</div>
+                                    <div class="date-value">${formatDate(account.fechaVenta)}</div>
+                                </div>
+                                <div class="date-card ${account.daysRemaining <= 5 ? (account.daysRemaining > 0 ? 'expiring' : 'expired') : ''}">
+                                    <div class="date-label">📅 Fecha de Vencimiento</div>
+                                    <div class="date-value">${formatDate(account.fechaVencimiento)}</div>
+                                </div>
                             </div>
-                        ` : `
-                            <div class="voucher-upload">
-                                <p>No hay voucher registrado</p>
-                                <button class="voucher-upload-btn" onclick="openVoucherModal('${account.id}')">
-                                    💳 Subir Voucher
-                                </button>
+                            
+                            <div class="account-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">📧 Email</div>
+                                    <div class="detail-value">${account.email}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">🔒 Contraseña</div>
+                                    <div class="detail-value">${account.password}</div>
+                                </div>
                             </div>
-                        `}
-                    </div>
-                    
-                    <div class="profiles-section">
-                        <div class="profiles-header">👥 Perfiles (${account.profiles.length}):</div>
-                        <div class="profiles-grid">
-                            ${account.profiles.map(profile => `
-                                <div class="profile-badge">${profile.name}: ${profile.pin}</div>
-                            `).join('')}
+                            
+                            <div class="account-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">📞 Teléfono</div>
+                                    <div class="detail-value">${account.clientPhone || 'No especificado'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">🆔 ID de Cuenta</div>
+                                    <div class="detail-value">${account.id}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="voucher-section">
+                                <div class="voucher-info">
+                                    <h4>💳 Estado del Pago</h4>
+                                    <div class="voucher-status">
+                                        <span style="color: ${account.estadoPago === 'activo' ? '#28a745' : '#dc3545'}; font-weight: bold;">
+                                            ${account.estadoPago === 'activo' ? '✅ Pagado' : '❌ Pendiente'}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                ${account.voucherImagen ? `
+                                    <div class="voucher-preview">
+                                        <img src="data:image/jpeg;base64,${account.voucherImagen}" alt="Voucher de pago" onclick="window.open(this.src, '_blank')">
+                                        <p><strong>Operación:</strong> ${account.numeroOperacion} | <strong>Monto:</strong> S/ ${account.montoPagado}</p>
+                                    </div>
+                                ` : `
+                                    <div class="voucher-upload">
+                                        <p>No hay voucher registrado</p>
+                                        <button class="voucher-upload-btn" onclick="openVoucherModal('${account.id}')">
+                                            💳 Subir Voucher
+                                        </button>
+                                    </div>
+                                `}
+                            </div>
+                            
+                            <div class="profiles-section">
+                                <div class="profiles-header">👥 Perfiles (${account.profiles.length}):</div>
+                                <div class="profiles-grid">
+                                    ${account.profiles.map(profile => `
+                                        <div class="profile-badge">${profile.name}: ${profile.pin}</div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button class="btn btn-edit" onclick="editAccount('${account.id}')">✏️ Editar</button>
+                                <button class="btn" onclick="editPins('${account.id}')" style="background: #6f42c1; color: white;">🔐 Cambiar PINs</button>
+                                <button class="btn btn-voucher" onclick="openVoucherModal('${account.id}')">💳 Voucher</button>
+                                <button class="btn btn-communication" onclick="generateCommunications('${account.id}')">📧 Comunicados</button>
+                                <button class="btn btn-delete" onclick="deleteAccount('${account.id}')">🗑️ Eliminar</button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="action-buttons">
-                        <button class="btn btn-edit" onclick="editAccount('${account.id}')">✏️ Editar</button>
-                        <button class="btn" onclick="editPins('${account.id}')" style="background: #6f42c1; color: white;">🔐 Cambiar PINs</button>
-                        <button class="btn btn-voucher" onclick="openVoucherModal('${account.id}')">💳 Voucher</button>
-                        <button class="btn btn-communication" onclick="generateCommunications('${account.id}')">📧 Comunicados</button>
-                        <button class="btn btn-delete" onclick="deleteAccount('${account.id}')">🗑️ Eliminar</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+            
+            container.innerHTML = html;
+        }
+        
+        // Limpiar búsqueda
+        function clearSearch() {
+            document.querySelector('.search-box').value = '';
+            searchTerm = '';
+            accounts = [...allAccounts];
+            filteredAccounts = [...allAccounts];
+            renderAccounts();
         }
         
         // Función para mostrar error de conexión
