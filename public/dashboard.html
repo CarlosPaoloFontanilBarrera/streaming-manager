@@ -2189,12 +2189,20 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
                     profile.montoPagado = parseFloat(paidAmount);
                     profile.estadoPago = 'pagado';
                     
-                    // Extender fecha de vencimiento por 30 días
-                    const currentExpiry = new Date(profile.fechaVencimiento);
-                    const newExpiry = new Date(currentExpiry);
-                    newExpiry.setDate(newExpiry.getDate() + 30);
-                    profile.fechaVencimiento = newExpiry.toISOString().split('T')[0];
-                    profile.diasRestantes = calculateDaysFromDates(new Date().toISOString().split('T')[0], profile.fechaVencimiento);
+                    // Si el perfil está disponible, no extender fecha, solo marcar como con voucher
+                    if (profile.estado === 'disponible') {
+                        // Para perfiles disponibles, solo agregamos el voucher sin cambiar fechas
+                        profile.voucherSubido = true;
+                        alert(`✅ Voucher subido exitosamente!\n\nPerfil: ${profile.name}\nVoucher confirmado\nAhora puedes proceder a vender el perfil`);
+                    } else if (profile.estado === 'vendido') {
+                        // Para perfiles vendidos, extender fecha de vencimiento por 30 días
+                        const currentExpiry = new Date(profile.fechaVencimiento);
+                        const newExpiry = new Date(currentExpiry);
+                        newExpiry.setDate(newExpiry.getDate() + 30);
+                        profile.fechaVencimiento = newExpiry.toISOString().split('T')[0];
+                        profile.diasRestantes = calculateDaysFromDates(new Date().toISOString().split('T')[0], profile.fechaVencimiento);
+                        alert(`✅ Voucher subido y perfil renovado!\n\nPerfil: ${profile.name}\nNueva fecha: ${formatDate(profile.fechaVencimiento)}\n+30 días agregados`);
+                    }
                     
                     // Guardar en base de datos
                     await apiRequest(`/accounts/${currentProfileAccountId}`, {
@@ -2210,8 +2218,6 @@ ${allAccounts.map(acc => `• ${acc.clientName} (${acc.type}): ${acc.daysRemaini
                     await loadAccounts();
                     renderAccounts();
                     closeModal();
-                    
-                    alert(`✅ Voucher subido y perfil renovado!\n\nPerfil: ${profile.name}\nNueva fecha: ${formatDate(profile.fechaVencimiento)}\n+30 días agregados`);
                 };
                 
                 reader.readAsDataURL(fileInput.files[0]);
@@ -2801,6 +2807,24 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                                 </div>
                                             </div>
                                             
+                                            ${profile.estado === 'disponible' ? `
+                                                ${profile.voucherSubido ? `
+                                                    <div class="voucher-section">
+                                                        <div class="voucher-info">
+                                                            <h6>💳 Voucher Confirmado</h6>
+                                                            <span style="color: #28a745; font-weight: bold;">
+                                                                ✅ Voucher subido correctamente
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        <div class="voucher-preview">
+                                                            <img src="data:image/jpeg;base64,${profile.voucherImagen}" alt="Voucher" onclick="window.open(this.src, '_blank')" style="max-width: 200px; max-height: 150px;">
+                                                            <p><strong>Op:</strong> ${profile.numeroOperacion} | <strong>Monto:</strong> S/ ${profile.montoPagado}</p>
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
+                                            ` : ''}
+                                            
                                             ${profile.estado === 'vendido' ? `
                                                 <div class="profile-details">
                                                     <div class="detail-row">
@@ -2852,10 +2876,11 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                             
                                             <div class="profile-actions">
                                                 ${profile.estado === 'disponible' ? `
+                                                    <button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Subir Voucher</button>
                                                     <button class="btn btn-primary" onclick="sellProfile('${account.id}', ${index})">💰 Vender Perfil</button>
                                                 ` : profile.estado === 'vendido' ? `
                                                     <button class="btn btn-communication" onclick="generateProfileCommunication('${account.id}', ${index})">📧 Comunicado</button>
-                                                    <button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Voucher</button>
+                                                    <button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Renovar Voucher</button>
                                                     <button class="btn btn-secondary" onclick="makeProfileAvailable('${account.id}', ${index})">🔄 Disponible</button>
                                                 ` : ''}
                                             </div>
