@@ -1,4 +1,4 @@
-// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS
+// server.js - Sistema completo con fechas automáticas de perfiles y vouchers
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -140,12 +140,14 @@ async function checkAndSendAlarms() {
                 const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
                 
                 if (checkRes.rows.length === 0) {
-                    const message = `La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
+                    // ########## INICIO DEL CÓDIGO MODIFICADO ##########
+                    const message = `🚨 La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
                     await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                         method: 'POST',
                         body: message,
-                        headers: { 'Title': '🚨 Alarma de Proveedor', 'Priority': 'high', 'Tags': 'rotating_light' }
+                        headers: { 'Title': 'Alarma de Proveedor', 'Priority': 'high', 'Tags': 'rotating_light' }
                     });
+                    // ########## FIN DEL CÓDIGO MODIFICADO ##########
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                 }
             }
@@ -159,12 +161,14 @@ async function checkAndSendAlarms() {
                         const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
 
                         if (checkRes.rows.length === 0) {
-                           const message = `El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
+                           // ########## INICIO DEL CÓDIGO MODIFICADO ##########
+                           const message = `🔔 El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
                            await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                                 method: 'POST',
                                 body: message,
-                                headers: { 'Title': '🔔 Alarma de Cliente', 'Priority': 'default', 'Tags': 'bell' }
+                                headers: { 'Title': 'Alarma de Cliente', 'Priority': 'default', 'Tags': 'bell' }
                            });
+                           // ########## FIN DEL CÓDIGO MODIFICADO ##########
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                         }
                     }
@@ -338,7 +342,6 @@ app.put('/api/alarms/settings', async (req, res) => {
     }
 });
 
-// ########## INICIO DEL CÓDIGO AÑADIDO ##########
 app.post('/api/alarms/test', async (req, res) => {
     console.log('⚡️ Disparando prueba de alarmas manualmente...');
     try {
@@ -349,7 +352,6 @@ app.post('/api/alarms/test', async (req, res) => {
         res.status(500).json({ success: false, message: 'Error al iniciar la prueba de alarmas.' });
     }
 });
-// ########## FIN DEL CÓDIGO AÑADIDO ##########
 
 // Servir archivos estáticos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -376,3 +378,4 @@ process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', 
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
 startServer();
+
