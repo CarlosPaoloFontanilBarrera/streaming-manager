@@ -118,7 +118,6 @@ async function initDB() {
     }
 }
 
-// ########## INICIO DEL CÓDIGO MODIFICADO ##########
 // LÓGICA DE ENVÍO DE ALARMAS POR NTFY
 async function checkAndSendAlarms() {
     console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
@@ -153,7 +152,8 @@ async function checkAndSendAlarms() {
             }
 
             const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
-            profiles.forEach(async (profile, index) => {
+            // ########## INICIO DEL CÓDIGO MODIFICADO ##########
+            for (const [index, profile] of profiles.entries()) {
                 if (profile.estado === 'vendido') {
                     const clientDays = calcularDiasRestantesPerfil(profile.fechaVencimiento);
                     if (clientDays > 0 && clientDays <= settings.client_threshold_days) {
@@ -172,13 +172,13 @@ async function checkAndSendAlarms() {
                         }
                     }
                 }
-            });
+            }
+            // ########## FIN DEL CÓDIGO MODIFICADO ##########
         }
     } catch (error) {
         console.error('❌ Error durante la revisión de alarmas:', error);
     }
 }
-// ########## FIN DEL CÓDIGO MODIFICADO ##########
 
 // RUTAS API
 app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
@@ -378,5 +378,3 @@ process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', 
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
 startServer();
-
-
