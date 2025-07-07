@@ -1207,21 +1207,28 @@
             return Math.max(0, dias);
         }
         
+        // ########## INICIO DEL CÓDIGO MODIFICADO ##########
         function calculateDaysFromDates(startDate, endDate) {
             if (!startDate || !endDate) return 30;
+            
             const today = new Date();
-            const end = new Date(endDate);
+            today.setHours(0, 0, 0, 0); 
+
+            const end = new Date(endDate + 'T00:00:00'); 
+
             const diffTime = end.getTime() - today.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            
             return Math.max(0, diffDays);
         }
         
         function calculateExpiryDate(startDate) {
-            const start = new Date(startDate);
+            const start = new Date(startDate + 'T00:00:00'); 
             const expiry = new Date(start);
             expiry.setDate(expiry.getDate() + 30);
             return expiry.toISOString().split('T')[0];
         }
+        // ########## FIN DEL CÓDIGO MODIFICADO ##########
         
         function updateDaysRemaining() {
             const startDate = document.getElementById('providerStartDate').value;
@@ -1356,7 +1363,7 @@
                 await loadAccounts();
                 await updateStats();
                 renderAccounts();
-                closeModal();
+                closeModal('accountModal');
                 alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!`);
             } catch (error) {
                 alert('❌ Error al guardar la cuenta: ' + error.message);
