@@ -140,7 +140,7 @@ async function checkAndSendAlarms() {
                 const notificationId = `provider-${account.id}`;
                 const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
                 
-                if (checkRes.rows.length === 0) {
+                //if (checkRes.rows.length === 0) {
                     const message = `🚨 La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
                     await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                         method: 'POST',
@@ -163,7 +163,7 @@ async function checkAndSendAlarms() {
                         const notificationId = `client-${account.id}-${index}`;
                         const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
 
-                        if (checkRes.rows.length === 0) {
+                        //if (checkRes.rows.length === 0) {
                            const message = `🔔 El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
                            await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                                 method: 'POST',
