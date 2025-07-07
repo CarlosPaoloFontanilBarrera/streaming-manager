@@ -27,35 +27,28 @@ const upload = multer({
 });
 
 // ########## INICIO DEL CÓDIGO MODIFICADO ##########
-// Función para calcular días restantes del proveedor
+// Función para calcular días restantes (timezone-safe)
 function calcularDiasRestantes(fechaVencimiento) {
     if (!fechaVencimiento) return 0;
-    const hoy = new Date();
-    // NORMALIZAR: Ignorar la hora actual para un cálculo preciso
-    hoy.setHours(0, 0, 0, 0); 
-    
-    const vencimiento = new Date(fechaVencimiento);
-    vencimiento.setHours(0, 0, 0, 0);
 
-    const diferencia = vencimiento.getTime() - hoy.getTime();
-    // Usar Math.round para un redondeo más preciso entre días completos
-    const dias = Math.round(diferencia / (1000 * 3600 * 24));
+    // Crear fechas en UTC para ignorar la zona horaria del servidor y del cliente
+    const hoy = new Date();
+    const hoyUTC = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
+
+    const vencimiento = new Date(fechaVencimiento);
+    const vencimientoUTC = Date.UTC(vencimiento.getUTCFullYear(), vencimiento.getUTCMonth(), vencimiento.getUTCDate());
+
+    const diferenciaMilisegundos = vencimientoUTC - hoyUTC;
+    
+    // Calcular los días a partir de la diferencia de milisegundos
+    const dias = Math.ceil(diferenciaMilisegundos / (1000 * 60 * 60 * 24));
+    
     return Math.max(0, dias);
 }
 
-// Función para calcular días restantes de un perfil específico
+// La función para perfiles ahora puede usar la misma lógica robusta
 function calcularDiasRestantesPerfil(fechaVencimientoCliente) {
-    if (!fechaVencimientoCliente) return 0;
-    const hoy = new Date();
-    // NORMALIZAR: Ignorar la hora actual
-    hoy.setHours(0, 0, 0, 0);
-    
-    const vencimiento = new Date(fechaVencimientoCliente);
-    vencimiento.setHours(0, 0, 0, 0);
-
-    const diferencia = vencimiento.getTime() - hoy.getTime();
-    const dias = Math.round(diferencia / (1000 * 3600 * 24));
-    return Math.max(0, dias);
+    return calcularDiasRestantes(fechaVencimientoCliente);
 }
 // ########## FIN DEL CÓDIGO MODIFICADO ##########
 
