@@ -1020,6 +1020,7 @@
             <input type="text" class="search-box" placeholder="🔍 Buscar por nombre, email, tipo de servicio..." onkeyup="filterAccounts(this.value)">
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
             <button class="btn" onclick="openAlarmSettings()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
+            <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
         </div>
         
         <div class="stats">
@@ -2048,8 +2049,18 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             }
         }
         
-        function testAlarmSystem() {
-            alert('🧪 Test de alarmas - Función en desarrollo');
+        async function testAlarmSystem() {
+            if (!confirm('Esto forzará una revisión de todas las alarmas y enviará notificaciones si alguna cumple los criterios. ¿Continuar?')) {
+                return;
+            }
+            try {
+                alert('Iniciando prueba de alarmas. El servidor está revisando...');
+                const result = await apiRequest('/alarms/test', { method: 'POST' });
+                alert(`✅ ${result.message}`);
+            } catch (error) {
+                alert('❌ Error al ejecutar la prueba de alarmas.');
+                console.error('Error en test de alarmas:', error);
+            }
         }
         
         async function initApp() {
