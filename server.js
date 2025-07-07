@@ -1,4 +1,4 @@
-// server.js - Sistema completo con fechas automáticas de perfiles y vouchers
+// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -76,25 +76,7 @@ async function initDB() {
     try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS accounts (
-                id TEXT PRIMARY KEY,
-                client_name TEXT NOT NULL,
-                client_phone TEXT DEFAULT '',
-                email TEXT NOT NULL,
-                password TEXT NOT NULL,
-                type TEXT NOT NULL,
-                country TEXT NOT NULL DEFAULT 'PE',
-                profiles JSONB NOT NULL DEFAULT '[]',
-                days_remaining INTEGER NOT NULL DEFAULT 30,
-                status TEXT NOT NULL DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT NOW(),
-                fecha_venta TIMESTAMP DEFAULT NOW(),
-                fecha_vencimiento TIMESTAMP,
-                fecha_inicio_proveedor TIMESTAMP,
-                fecha_vencimiento_proveedor TIMESTAMP,
-                voucher_imagen TEXT,
-                numero_operacion TEXT,
-                monto_pagado DECIMAL(10,2),
-                estado_pago TEXT DEFAULT 'activo'
+                id TEXT PRIMARY KEY, client_name TEXT NOT NULL, client_phone TEXT DEFAULT '', email TEXT NOT NULL, password TEXT NOT NULL, type TEXT NOT NULL, country TEXT NOT NULL DEFAULT 'PE', profiles JSONB NOT NULL DEFAULT '[]', days_remaining INTEGER NOT NULL DEFAULT 30, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMP DEFAULT NOW(), fecha_venta TIMESTAMP DEFAULT NOW(), fecha_vencimiento TIMESTAMP, fecha_inicio_proveedor TIMESTAMP, fecha_vencimiento_proveedor TIMESTAMP, voucher_imagen TEXT, numero_operacion TEXT, monto_pagado DECIMAL(10,2), estado_pago TEXT DEFAULT 'activo'
             )
         `);
         
@@ -124,18 +106,11 @@ async function initDB() {
         
         await pool.query(`
             CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
+                id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW()
             )
         `);
         
-        await pool.query(`
-            INSERT INTO admin_users (username, password) 
-            VALUES ('paolof', 'elpoderosodeizrael777xD!') 
-            ON CONFLICT (username) DO NOTHING
-        `);
+        await pool.query(`INSERT INTO admin_users (username, password) VALUES ('paolof', 'elpoderosodeizrael777xD!') ON CONFLICT (username) DO NOTHING`);
         
         console.log('✅ Base de datos inicializada correctamente');
     } catch (error) {
@@ -341,7 +316,6 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
-// ########## INICIO DEL CÓDIGO AÑADIDO ##########
 app.get('/api/alarms/settings', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
@@ -361,6 +335,18 @@ app.put('/api/alarms/settings', async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error actualizando configuración de alarmas' });
+    }
+});
+
+// ########## INICIO DEL CÓDIGO AÑADIDO ##########
+app.post('/api/alarms/test', async (req, res) => {
+    console.log('⚡️ Disparando prueba de alarmas manualmente...');
+    try {
+        await checkAndSendAlarms();
+        res.json({ success: true, message: 'Prueba de alarmas iniciada. Revisa tu celular en unos momentos.' });
+    } catch (error) {
+        console.error('❌ Error en la prueba manual de alarmas:', error);
+        res.status(500).json({ success: false, message: 'Error al iniciar la prueba de alarmas.' });
     }
 });
 // ########## FIN DEL CÓDIGO AÑADIDO ##########
