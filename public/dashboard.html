@@ -857,21 +857,21 @@
         }
 
         /* NUEVOS ESTILOS PARA EL MODAL DE CONSULTA DE CORREOS */
-        #emailCheckerModal .modal-content {
+        #micuentaMeCheckerModal .modal-content {
             max-width: 700px;
         }
-        #emailCheckerForm .form-group input[type="email"] {
+        #micuentaMeCheckerForm .form-group input[type="text"] { /* Ajustado para texto */
             padding-right: 110px; /* Espacio para el botón */
         }
-        #emailCheckerForm .mail-box {
+        #micuentaMeCheckerForm .mail-box {
             position: relative;
             display: flex;
             align-items: center;
         }
-        #emailCheckerForm .mail-box input {
+        #micuentaMeCheckerForm .mail-box input {
             flex-grow: 1;
         }
-        #emailCheckerForm .mail-box button {
+        #micuentaMeCheckerForm .mail-box button {
             position: absolute;
             right: 0;
             height: 100%;
@@ -884,10 +884,10 @@
             font-weight: 600;
             transition: background 0.3s ease;
         }
-        #emailCheckerForm .mail-box button:hover {
+        #micuentaMeCheckerForm .mail-box button:hover {
             background: linear-gradient(45deg, #0056b3, #004085);
         }
-        #emailCheckerResult {
+        #micuentaMeCheckerResult {
             margin-top: 20px;
             padding: 15px;
             border-radius: 8px;
@@ -898,7 +898,7 @@
             color: #333;
             overflow-x: auto; /* Para mensajes muy largos */
         }
-        #emailCheckerResult .message-item {
+        #micuentaMeCheckerResult .message-item {
             background: white;
             border: 1px solid #e9ecef;
             border-radius: 8px;
@@ -906,27 +906,27 @@
             margin-bottom: 10px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
-        #emailCheckerResult .message-item h5 {
+        #micuentaMeCheckerResult .message-item h5 {
             margin: 0 0 5px 0;
             color: #dc3545;
             font-size: 1em;
         }
-        #emailCheckerResult .message-item p {
+        #micuentaMeCheckerResult .message-item p {
             margin: 0;
             font-size: 0.9em;
             word-wrap: break-word; /* Para que el texto se ajuste */
             white-space: pre-wrap; /* Para preservar saltos de línea */
         }
-        #emailCheckerResult .message-item strong {
+        #micuentaMeCheckerResult .message-item strong {
             color: #495057;
         }
-        #emailCheckerLoader {
+        #micuentaMeCheckerLoader {
             display: none;
             text-align: center;
             margin-top: 20px;
             color: #007bff;
         }
-        #emailCheckerLoader .spinner {
+        #micuentaMeCheckerLoader .spinner {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #007bff;
             border-radius: 50%;
@@ -1026,9 +1026,9 @@
                     <div id="pinEditGrid" style="display: grid; gap: 15px;">
                     </div>
                     <div style="text-align: center; margin-top: 20px;">
-                        <button class="btn btn-secondary" onclick="closeModal('pinModal')">Cancelar</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('pinModal')">Cancelar</button>
                         <button type="submit" class="btn btn-primary" onclick="savePins()">💾 Guardar PINs</button>
-                        <button class="btn" onclick="regenerateAllPins()" style="background: #6f42c1; color: white;">🔄 Regenerar Todos</button>
+                        <button type="button" class="btn" onclick="regenerateAllPins()" style="background: #6f42c1; color: white;">🔄 Regenerar Todos</button>
                     </div>
                 </div>
             </div>
@@ -1103,7 +1103,7 @@
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
             <button class="btn" onclick="openAlarmSettings()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
             <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
-            <button class="btn" onclick="openEmailCheckerModal()" style="background: #17a2b8; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🔍 Consultar Correos</button> </div>
+            <button class="btn" onclick="openMicuentaMeCheckerModal()" style="background: #007bff; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🔑 Obtener Códigos</button> </div>
         
         <div class="stats">
             <div class="stat-card">
@@ -1211,30 +1211,34 @@
         </div>
     </div>
 
-    <div id="emailCheckerModal" class="modal">
+    <div id="micuentaMeCheckerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">🔍 Consultar Correos de APP Streaming</h2>
-                <button class="close-btn" onclick="closeModal('emailCheckerModal')">&times;</button>
+                <h2 class="modal-title">🔑 Obtener Códigos de micuenta.me</h2>
+                <button class="close-btn" onclick="closeModal('micuentaMeCheckerModal')">&times;</button>
             </div>
-            <form id="emailCheckerForm">
+            <form id="micuentaMeCheckerForm">
                 <div class="form-group">
-                    <label for="consultEmail">Email a consultar:</label>
-                    <div class="mail-box">
-                        <input type="email" id="consultEmail" required placeholder="ejemplo@dominio.com">
-                        <button type="submit">Verificar</button>
-                    </div>
+                    <label for="micuentaMeCode">Código (parámetro 'code' de la URL):</label>
+                    <input type="text" id="micuentaMeCode" required placeholder="Ej: 1620574">
+                </div>
+                <div class="form-group">
+                    <label for="micuentaMePdv">PDV (parámetro 'pdv' de la URL):</label>
+                    <input type="text" id="micuentaMePdv" required placeholder="Ej: Jirehstreaming7!">
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Obtener Código</button>
                 </div>
             </form>
-            <div id="emailCheckerLoader">
+            <div id="micuentaMeCheckerLoader">
                 <div class="spinner"></div>
-                <p>Consultando mensajes...</p>
+                <p>Consultando código y fecha...</p>
             </div>
-            <div id="emailCheckerResult">
-                <p>Ingrese un correo y haga clic en Verificar para ver los mensajes.</p>
+            <div id="micuentaMeCheckerResult">
+                <p>Ingrese los parámetros y haga clic en Obtener Código.</p>
             </div>
             <div class="btn-group">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('emailCheckerModal')">Cerrar</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('micuentaMeCheckerModal')">Cerrar</button>
             </div>
         </div>
     </div>
@@ -1890,7 +1894,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                         <input type="text" id="pin_${index}" value="${profile.pin}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1.1em; text-align: center;" maxlength="4" placeholder="PIN">
                     </div>
                     <div>
-                        <button class="btn" onclick="regeneratePin(${index})" style="background: #17a2b8; color: white; padding: 8px 12px; font-size: 0.8em;">🔄 Nuevo</button>
+                        <button type="button" class="btn" onclick="regeneratePin(${index})" style="background: #17a2b8; color: white; padding: 8px 12px; font-size: 0.8em;">🔄 Nuevo</button>
                     </div>
                 </div>
             `).join('');
@@ -2209,22 +2213,24 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             }
         }
 
-        // --- FUNCIONES PARA EL NUEVO MODAL DE CONSULTA DE CORREOS ---
-        function openEmailCheckerModal() {
-            document.getElementById('emailCheckerModal').style.display = 'block';
-            document.getElementById('consultEmail').value = ''; // Limpiar el campo
-            document.getElementById('emailCheckerResult').innerHTML = '<p>Ingrese un correo y haga clic en Verificar para ver los mensajes.</p>'; // Limpiar resultados
-            document.getElementById('emailCheckerLoader').style.display = 'none'; // Ocultar loader
+        // --- FUNCIONES PARA EL NUEVO MODAL DE MICUENTA.ME ---
+        function openMicuentaMeCheckerModal() {
+            document.getElementById('micuentaMeCheckerModal').style.display = 'block';
+            document.getElementById('micuentaMeCode').value = ''; // Limpiar el campo
+            document.getElementById('micuentaMePdv').value = ''; // Limpiar el campo
+            document.getElementById('micuentaMeCheckerResult').innerHTML = '<p>Ingrese los parámetros y haga clic en Obtener Código.</p>'; // Limpiar resultados
+            document.getElementById('micuentaMeCheckerLoader').style.display = 'none'; // Ocultar loader
         }
 
-        async function handleEmailCheckerFormSubmit(event) {
+        async function handleMicuentaMeCheckerFormSubmit(event) {
             event.preventDefault();
-            const email = document.getElementById('consultEmail').value.trim();
-            const resultDiv = document.getElementById('emailCheckerResult');
-            const loaderDiv = document.getElementById('emailCheckerLoader');
+            const code = document.getElementById('micuentaMeCode').value.trim();
+            const pdv = document.getElementById('micuentaMePdv').value.trim();
+            const resultDiv = document.getElementById('micuentaMeCheckerResult');
+            const loaderDiv = document.getElementById('micuentaMeCheckerLoader');
 
-            if (!email) {
-                resultDiv.innerHTML = '<p style="color: #dc3545;">Por favor, ingrese un correo electrónico.</p>';
+            if (!code || !pdv) {
+                resultDiv.innerHTML = '<p style="color: #dc3545;">Por favor, ingrese ambos parámetros (Código y PDV).</p>';
                 return;
             }
 
@@ -2232,13 +2238,13 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             resultDiv.innerHTML = ''; // Limpiar resultados anteriores
 
             try {
-                // Llama a su propia API que a su vez consulta bumbleegad.com
-                const response = await fetch(`${API_BASE}/check-bumbleegad-email`, {
+                // Llama a su propia API que a su vez consulta micuenta.me
+                const response = await fetch(`${API_BASE}/check-micuenta-me-code`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json', // Su propia API espera JSON
                     },
-                    body: JSON.stringify({ email: email })
+                    body: JSON.stringify({ code: code, pdv: pdv })
                 });
 
                 if (!response.ok) {
@@ -2246,21 +2252,25 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                     throw new Error(`Error en la solicitud: ${response.status}, ${errorData.message || response.statusText}`);
                 }
 
-                const data = await response.json(); // La respuesta ya es el JSON de bumbleegad.com
+                const data = await response.json(); // La respuesta ya es el JSON de micuenta.me
 
                 if (data.success) {
-                    if (data.data && data.data.message) {
-                        // El mensaje de bumbleegad.com puede contener HTML
-                        resultDiv.innerHTML = '<p style="font-weight: bold; margin-bottom: 10px;">Mensajes encontrados:</p>' + data.data.message;
+                    // micuenta.me devuelve un objeto con 'html', 'code', 'url', 'date'
+                    if (data.html) {
+                        // Mostrar fecha del correo si está disponible
+                        let dateInfo = data.date ? `<p style="font-weight: bold; margin-bottom: 10px;">Fecha del correo: ${data.date}</p>` : '';
+                        resultDiv.innerHTML = dateInfo + `<div style="border: 1px solid #e9ecef; padding: 15px; border-radius: 8px;">` + data.html + `</div>`;
+                    } else if (data.message) { // En caso de que haya un mensaje de éxito pero no HTML
+                        resultDiv.innerHTML = `<p style="font-weight: bold;">${data.message}</p>`;
                     } else {
-                        resultDiv.innerHTML = '<p>No se encontraron mensajes para este correo.</p>';
+                        resultDiv.innerHTML = `<p style="font-weight: bold;">Operación exitosa, pero no se encontró contenido HTML.</p>`;
                     }
                 } else {
-                    resultDiv.innerHTML = `<p style="color: #dc3545; font-weight: bold;">Error al verificar: ${data.data.message || 'Error desconocido.'}</p>`;
+                    resultDiv.innerHTML = `<p style="color: #dc3545; font-weight: bold;">Error al obtener código: ${data.message || 'Error desconocido.'}</p>`;
                 }
 
             } catch (error) {
-                console.error('Error al consultar email de bumbleegad:', error);
+                console.error('Error al consultar código de micuenta.me:', error);
                 resultDiv.innerHTML = `<p style="color: #dc3545; font-weight: bold;">Error de conexión: ${error.message}</p>`;
             } finally {
                 loaderDiv.style.display = 'none';
@@ -2299,8 +2309,8 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal.id); });
             });
 
-            // NUEVO EVENT LISTENER PARA EL MODAL DE CONSULTA DE CORREOS
-            document.getElementById('emailCheckerForm').addEventListener('submit', handleEmailCheckerFormSubmit);
+            // NUEVO EVENT LISTENER PARA EL MODAL DE MICUENTA.ME
+            document.getElementById('micuentaMeCheckerForm').addEventListener('submit', handleMicuentaMeCheckerFormSubmit);
             
             console.log('✅ Event listeners configurados');
         });
