@@ -138,9 +138,10 @@ async function checkAndSendAlarms() {
             const providerDays = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
             if (providerDays > 0 && providerDays <= settings.provider_threshold_days) {
                 const notificationId = `provider-${account.id}`;
-                // Las siguientes líneas se comentan/eliminan para forzar el envío durante la prueba y corregir el SyntaxError
-                // const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
-                // if (checkRes.rows.length === 0) { 
+                const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
+                
+                // --- CAMBIOS REVERTIDOS AQUÍ ---
+                if (checkRes.rows.length === 0) { // Volvemos a habilitar la verificación
                     const message = `🚨 La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
                     await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                         method: 'POST',
@@ -149,9 +150,11 @@ async function checkAndSendAlarms() {
                     });
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                     console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
-                // } else {
-                //     console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
-                // }
+                } else {
+                    // Mantenemos el log de depuración si lo desea
+                    console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
+                }
+                // -----------------------------
             }
 
             const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
@@ -160,10 +163,10 @@ async function checkAndSendAlarms() {
                     const clientDays = calcularDiasRestantesPerfil(profile.fechaVencimiento);
                     if (clientDays > 0 && clientDays <= settings.client_threshold_days) {
                         const notificationId = `client-${account.id}-${index}`;
-                        // Las siguientes líneas se comentan/eliminan para forzar el envío durante la prueba y corregir el SyntaxError
-                        // const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
+                        const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
 
-                        // if (checkRes.rows.length === 0) {
+                        // --- CAMBIOS REVERTIDOS AQUÍ ---
+                        if (checkRes.rows.length === 0) { // Volvemos a habilitar la verificación
                            const message = `🔔 El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
                            await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                                 method: 'POST',
@@ -172,9 +175,11 @@ async function checkAndSendAlarms() {
                            });
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                            console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
-                        // } else {
-                        //     console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
-                        // }
+                        } else {
+                            // Mantenemos el log de depuración si lo desea
+                            console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
+                        }
+                        // -----------------------------
                     }
                 }
             }
