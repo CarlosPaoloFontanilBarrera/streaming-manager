@@ -140,8 +140,7 @@ async function checkAndSendAlarms() {
                 const notificationId = `provider-${account.id}`;
                 const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
                 
-                // --- CAMBIOS REVERTIDOS AQUÍ ---
-                if (checkRes.rows.length === 0) { // Volvemos a habilitar la verificación
+                if (checkRes.rows.length === 0) {
                     const message = `🚨 La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
                     await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                         method: 'POST',
@@ -151,10 +150,9 @@ async function checkAndSendAlarms() {
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                     console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
                 } else {
-                    // Mantenemos el log de depuración si lo desea
+                    // LÍNEA DE DEPURACIÓN AÑADIDA
                     console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                 }
-                // -----------------------------
             }
 
             const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
@@ -165,8 +163,7 @@ async function checkAndSendAlarms() {
                         const notificationId = `client-${account.id}-${index}`;
                         const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
 
-                        // --- CAMBIOS REVERTIDOS AQUÍ ---
-                        if (checkRes.rows.length === 0) { // Volvemos a habilitar la verificación
+                        if (checkRes.rows.length === 0) {
                            const message = `🔔 El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
                            await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
                                 method: 'POST',
@@ -176,10 +173,9 @@ async function checkAndSendAlarms() {
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                            console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
                         } else {
-                            // Mantenemos el log de depuración si lo desea
+                            // LÍNEA DE DEPURACIÓN AÑADIDA
                             console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                         }
-                        // -----------------------------
                     }
                 }
             }
@@ -362,6 +358,42 @@ app.post('/api/alarms/test', async (req, res) => {
         res.status(500).json({ success: false, message: 'Error al iniciar la prueba de alarmas.' });
     }
 });
+
+// NUEVA RUTA API PARA CONSULTAR BUMBLEEGAD.COM
+app.post('/api/check-bumbleegad-email', async (req, res) => {
+    try {
+        const { email } = req.body; // Recibe el email del frontend de su dashboard
+
+        const response = await fetch('https://bumbleegad.com/wp-admin/admin-ajax.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=email_checker&email=' + encodeURIComponent(email)
+        });
+
+        // Reenviar el estado HTTP de bumbleegad.com si no es 2xx
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error al consultar bumbleegad.com:', response.status, errorText);
+            // Intenta reenviar el JSON si existe, de lo contrario un mensaje de error genérico
+            try {
+                const errorJson = JSON.parse(errorText);
+                return res.status(response.status).json(errorJson);
+            } catch (e) {
+                return res.status(response.status).json({ success: false, message: 'Error al consultar el servicio externo: ' + errorText });
+            }
+        }
+
+        const data = await response.json();
+        res.json(data); // Reenviar la respuesta JSON de bumbleegad.com al frontend de su dashboard
+
+    } catch (error) {
+        console.error('Error en la ruta /api/check-bumbleegad-email:', error);
+        res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la solicitud externa.' });
+    }
+});
+
 
 // Servir archivos estáticos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
