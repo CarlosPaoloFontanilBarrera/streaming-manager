@@ -1108,10 +1108,10 @@
                     </small>
                 </div>
                 <div class="form-group">
-                    <label for="providerEndDate">📅 Fecha Fin (Calculada Automáticamente)</label>
-                    <input type="date" id="providerEndDate" readonly style="background: #f8f9fa; color: #495057; font-weight: bold;">
-                    <small style="color: #28a745; font-size: 0.8em; margin-top: 5px; display: block; font-weight: 600;">
-                        ✅ Se calcula automáticamente: Fecha Inicio + 30 días
+                    <label for="providerEndDate">📅 Fecha Fin (Automática o Manual para Pruebas)</label>
+                    <input type="date" id="providerEndDate">
+                    <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
+                       Normalmente se calcula sola. Modifícala solo para forzar una alarma de prueba.
                     </small>
                 </div>
                 <div class="form-group">
@@ -1320,6 +1320,7 @@
         
         async function addAccount(event) {
             event.preventDefault();
+            
             const clientName = document.getElementById('clientName').value.trim();
             const clientPhone = document.getElementById('clientPhone').value.trim();
             const email = document.getElementById('accountEmail').value.trim();
@@ -1327,39 +1328,70 @@
             const type = document.getElementById('accountType').value;
             const country = document.getElementById('accountCountry').value;
             const providerStartDate = document.getElementById('providerStartDate').value;
+            const providerEndDate = document.getElementById('providerEndDate').value;
+            
             if (!clientName || !email || !password || !providerStartDate) {
                 alert('Por favor completa todos los campos obligatorios');
                 return;
             }
-            const profileCount = getProfileCount(type);
-            const profiles = Array.from({ length: profileCount }, (_, i) => ({
-                name: `Perfil ${i + 1}`,
-                pin: generatePin(),
-                estado: 'disponible'
-            }));
+            
+            let profiles = [];
+            if (!editingAccountId) {
+                const profileCount = getProfileCount(type);
+                profiles = Array.from({ length: profileCount }, (_, i) => ({
+                    name: `Perfil ${i + 1}`,
+                    pin: generatePin(),
+                    estado: 'disponible'
+                }));
+            } else {
+                const current = allAccounts.find(acc => acc.id === editingAccountId);
+                profiles = current.profiles;
+            }
+            
             const accountData = {
                 id: editingAccountId || generateId(),
                 client_name: clientName,
                 client_phone: clientPhone,
-                email, password, type, country, profiles,
-                fecha_inicio_proveedor: providerStartDate
+                email,
+                password,
+                type,
+                country,
+                profiles,
+                fecha_inicio_proveedor: providerStartDate,
+                fecha_vencimiento_proveedor: providerEndDate || null
             };
+            
+            console.log('📤 Enviando datos:', accountData);
+            
             try {
+                let response;
                 if (editingAccountId) {
-                    await apiRequest(`/accounts/${editingAccountId}`, { method: 'PUT', body: JSON.stringify(accountData) });
+                    response = await apiRequest(`/accounts/${editingAccountId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(accountData)
+                    });
                 } else {
-                    await apiRequest('/accounts', { method: 'POST', body: JSON.stringify(accountData) });
+                    response = await apiRequest('/accounts', {
+                        method: 'POST',
+                        body: JSON.stringify(accountData)
+                    });
                 }
+                
+                console.log('✅ Respuesta del servidor:', response);
+                
                 await loadAccounts();
                 await updateStats();
                 renderAccounts();
                 closeModal('accountModal');
+                
                 alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!`);
+                
             } catch (error) {
+                console.error('❌ Error completo:', error);
                 alert('❌ Error al guardar la cuenta: ' + error.message);
             }
         }
-        
+
         function editAccount(accountId) {
             const account = allAccounts.find(acc => acc.id === accountId);
             if (!account) return;
@@ -1375,6 +1407,9 @@
                 const startDate = account.fecha_inicio_proveedor.split('T')[0];
                 document.getElementById('providerStartDate').value = startDate;
                 updateDaysRemaining();
+            }
+            if (account.fecha_vencimiento_proveedor) {
+                 document.getElementById('providerEndDate').value = account.fecha_vencimiento_proveedor.split('T')[0];
             }
             document.getElementById('accountModal').style.display = 'block';
         }
