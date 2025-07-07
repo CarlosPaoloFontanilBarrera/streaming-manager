@@ -864,6 +864,41 @@
             <p>Sistema con PostgreSQL en Railway - Fechas Automáticas y Vouchers</p>
         </div>
         
+        <!-- INICIO: MODAL PARA ALARMAS NTFY -->
+        <div id="alarmSettingsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">🚨 Configurar Notificaciones de Alarma</h2>
+                    <button class="close-btn" onclick="closeModal('alarmSettingsModal')">&times;</button>
+                </div>
+                <form id="alarmSettingsForm">
+                    <div class="form-group">
+                        <label for="providerThreshold">Avisar para Cuentas de Proveedor (días antes)</label>
+                        <input type="number" id="providerThreshold" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="clientThreshold">Avisar para Perfiles de Clientes (días antes)</label>
+                        <input type="number" id="clientThreshold" required min="1">
+                    </div>
+                    <hr style="margin: 20px 0; border: 1px solid #f1f1f1;">
+                    <div class="form-group">
+                        <label for="ntfyTopic">Tu Tema Privado de ntfy</label>
+                        <input type="text" id="ntfyTopic" required placeholder="Ej: alarmas-jireh-paolo-2024">
+                        <small style="color: #666; font-size: 0.8em; margin-top: 5px; display: block;">
+                            1. Descarga la app "ntfy" en tu teléfono. <br>
+                            2. Suscríbete a un tema con un nombre único y secreto. <br>
+                            3. Escribe ese mismo nombre aquí.
+                        </small>
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('alarmSettingsModal')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">💾 Guardar Configuración</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- FIN: MODAL PARA ALARMAS NTFY -->
+
         <div id="communicationModal" class="modal">
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
@@ -986,9 +1021,8 @@
         <div class="controls">
             <input type="text" class="search-box" placeholder="🔍 Buscar por nombre, email, tipo de servicio..." onkeyup="filterAccounts(this.value)">
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
-            <!-- BOTÓN DE ALARMAS MODIFICADO -->
             <button class="btn" onclick="openAlarmSettings()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
-            <!-- Se elimina el botón de Test que ya no es necesario -->
+            <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
         </div>
         
         <div class="stats">
@@ -1694,6 +1728,12 @@
         // ===============================================
         
         // ########## INICIO DEL CÓDIGO MODIFICADO ##########
+        function actualizarEstado(diasRestantes) {
+            if (diasRestantes > 5) return 'active';
+            if (diasRestantes > 0) return 'inactive';
+            return 'expired';
+        }
+
         function renderAccounts() {
             const container = document.getElementById('accountsList');
             if (allAccounts.length === 0) {
