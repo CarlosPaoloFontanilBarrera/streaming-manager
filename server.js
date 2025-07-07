@@ -359,38 +359,32 @@ app.post('/api/alarms/test', async (req, res) => {
     }
 });
 
-// NUEVA RUTA API PARA CONSULTAR BUMBLEEGAD.COM
-app.post('/api/check-bumbleegad-email', async (req, res) => {
+// NUEVA RUTA API PARA CONSULTAR MICUENTA.ME
+app.post('/api/check-micuenta-me-code', async (req, res) => {
     try {
-        const { email } = req.body; // Recibe el email del frontend de su dashboard
+        const { code, pdv } = req.body; // Recibe code y pdv del frontend de su dashboard
 
-        const response = await fetch('https://bumbleegad.com/wp-admin/admin-ajax.php', {
+        const response = await fetch('https://micuenta.me/e/redeem', { // URL del endpoint de micuenta.me
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: 'action=email_checker&email=' + encodeURIComponent(email)
+            body: JSON.stringify({ code: code, pdv: pdv }) // Envía code y pdv como JSON
         });
 
-        // Reenviar el estado HTTP de bumbleegad.com si no es 2xx
+        // Reenviar el estado HTTP de micuenta.me si no es 2xx
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error al consultar bumbleegad.com:', response.status, errorText);
-            // Intenta reenviar el JSON si existe, de lo contrario un mensaje de error genérico
-            try {
-                const errorJson = JSON.parse(errorText);
-                return res.status(response.status).json(errorJson);
-            } catch (e) {
-                return res.status(response.status).json({ success: false, message: 'Error al consultar el servicio externo: ' + errorText });
-            }
+            const errorData = await response.json().catch(() => ({ message: 'Error desconocido del proxy de micuenta.me.' }));
+            console.error('Error al consultar micuenta.me:', response.status, errorData.message);
+            return res.status(response.status).json(errorData); // Reenviar el error del servicio externo
         }
 
         const data = await response.json();
-        res.json(data); // Reenviar la respuesta JSON de bumbleegad.com al frontend de su dashboard
+        res.json(data); // Reenviar la respuesta JSON de micuenta.me al frontend de su dashboard
 
     } catch (error) {
-        console.error('Error en la ruta /api/check-bumbleegad-email:', error);
-        res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la solicitud externa.' });
+        console.error('Error en la ruta /api/check-micuenta-me-code:', error);
+        res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la solicitud externa a micuenta.me.' });
     }
 });
 
