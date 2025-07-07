@@ -153,7 +153,7 @@ async function checkAndSendAlarms() {
             }
 
             const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
-            profiles.forEach(async (profile, index) => {
+            for (const [index, profile] of profiles.entries()) {
                 if (profile.estado === 'vendido') {
                     const clientDays = calcularDiasRestantesPerfil(profile.fechaVencimiento);
                     if (clientDays > 0 && clientDays <= settings.client_threshold_days) {
@@ -172,7 +172,7 @@ async function checkAndSendAlarms() {
                         }
                     }
                 }
-            });
+            }
         }
     } catch (error) {
         console.error('❌ Error durante la revisión de alarmas:', error);
