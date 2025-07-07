@@ -1,10 +1,9 @@
-// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS
+// server.js - Sistema completo con fechas automáticas de perfiles y vouchers
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
-const fetch = require('node-fetch'); // Se necesita para enviar notificaciones a ntfy
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,13 +26,20 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB máximo
 });
 
+// ########## INICIO DEL CÓDIGO MODIFICADO ##########
 // Función para calcular días restantes del proveedor
 function calcularDiasRestantes(fechaVencimiento) {
     if (!fechaVencimiento) return 0;
     const hoy = new Date();
+    // NORMALIZAR: Ignorar la hora actual para un cálculo preciso
+    hoy.setHours(0, 0, 0, 0); 
+    
     const vencimiento = new Date(fechaVencimiento);
+    vencimiento.setHours(0, 0, 0, 0);
+
     const diferencia = vencimiento.getTime() - hoy.getTime();
-    const dias = Math.ceil(diferencia / (1000 * 3600 * 24));
+    // Usar Math.round para un redondeo más preciso entre días completos
+    const dias = Math.round(diferencia / (1000 * 3600 * 24));
     return Math.max(0, dias);
 }
 
@@ -41,11 +47,17 @@ function calcularDiasRestantes(fechaVencimiento) {
 function calcularDiasRestantesPerfil(fechaVencimientoCliente) {
     if (!fechaVencimientoCliente) return 0;
     const hoy = new Date();
+    // NORMALIZAR: Ignorar la hora actual
+    hoy.setHours(0, 0, 0, 0);
+    
     const vencimiento = new Date(fechaVencimientoCliente);
+    vencimiento.setHours(0, 0, 0, 0);
+
     const diferencia = vencimiento.getTime() - hoy.getTime();
-    const dias = Math.ceil(diferencia / (1000 * 3600 * 24));
+    const dias = Math.round(diferencia / (1000 * 3600 * 24));
     return Math.max(0, dias);
 }
+// ########## FIN DEL CÓDIGO MODIFICADO ##########
 
 // Función para actualizar estado automáticamente
 function actualizarEstado(diasRestantes) {
@@ -97,32 +109,6 @@ async function initDB() {
                 estado_pago TEXT DEFAULT 'activo'
             )
         `);
-        
-        // --- INICIO: IMPLEMENTACIÓN DE ALARMAS NTFY ---
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS alarm_settings (
-                id SERIAL PRIMARY KEY,
-                provider_threshold_days INTEGER NOT NULL DEFAULT 5,
-                client_threshold_days INTEGER NOT NULL DEFAULT 3,
-                ntfy_topic TEXT
-            )
-        `);
-        const settings = await pool.query('SELECT * FROM alarm_settings');
-        if (settings.rows.length === 0) {
-            await pool.query('INSERT INTO alarm_settings (provider_threshold_days, client_threshold_days) VALUES (5, 3)');
-        } else {
-            const columns = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name='alarm_settings' AND column_name='ntfy_topic'");
-            if (columns.rows.length === 0) {
-                await pool.query("ALTER TABLE alarm_settings ADD COLUMN ntfy_topic TEXT");
-            }
-        }
-        
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS sent_notifications (
-                id SERIAL PRIMARY KEY, item_id TEXT NOT NULL, item_type TEXT NOT NULL, sent_at TIMESTAMP NOT NULL, UNIQUE(item_id, item_type)
-            )
-        `);
-        // --- FIN: IMPLEMENTACIÓN DE ALARMAS NTFY ---
         
         // Verificar si las columnas nuevas existen, si no, agregarlas
         const columnCheck = await pool.query(`
@@ -182,69 +168,6 @@ async function initDB() {
         console.error('❌ Error inicializando base de datos:', error);
     }
 }
-
-// --- INICIO: LÓGICA DE ENVÍO DE ALARMAS POR NTFY ---
-async function checkAndSendAlarms() {
-    console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
-
-    try {
-        const settingsRes = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
-        const settings = settingsRes.rows[0];
-
-        if (!settings || !settings.ntfy_topic) {
-            console.log('⚠️ No se ha configurado un tema de ntfy para notificaciones.');
-            return;
-        }
-
-        const accountsRes = await pool.query('SELECT * FROM accounts');
-
-        for (const account of accountsRes.rows) {
-            // Alarma para la cuenta del proveedor
-            const providerDays = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
-            if (providerDays > 0 && providerDays <= settings.provider_threshold_days) {
-                const notificationId = `provider-${account.id}`;
-                const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
-                
-                if (checkRes.rows.length === 0) {
-                    const message = `La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
-                    await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
-                        method: 'POST',
-                        body: message,
-                        headers: { 'Title': '🚨 Alarma de Proveedor', 'Priority': 'high', 'Tags': 'rotating_light' }
-                    });
-                    await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
-                    console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
-                }
-            }
-
-            // Alarmas para perfiles de clientes
-            const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
-            profiles.forEach(async (profile, index) => {
-                if (profile.estado === 'vendido') {
-                    const clientDays = calcularDiasRestantesPerfil(profile.fechaVencimiento);
-                    if (clientDays > 0 && clientDays <= settings.client_threshold_days) {
-                        const notificationId = `client-${account.id}-${index}`;
-                        const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
-
-                        if (checkRes.rows.length === 0) {
-                           const message = `El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
-                           await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
-                                method: 'POST',
-                                body: message,
-                                headers: { 'Title': '🔔 Alarma de Cliente', 'Priority': 'default', 'Tags': 'bell' }
-                           });
-                           await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
-                           console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
-                        }
-                    }
-                }
-            });
-        }
-    } catch (error) {
-        console.error('❌ Error durante la revisión de alarmas:', error);
-    }
-}
-// --- FIN: LÓGICA DE ENVÍO DE ALARMAS ---
 
 // RUTAS API
 // Health check
@@ -556,30 +479,6 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
-// --- INICIO: NUEVAS RUTAS PARA CONFIGURAR ALARMAS NTFY ---
-app.get('/api/alarms/settings', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
-        res.json(result.rows[0] || { provider_threshold_days: 5, client_threshold_days: 3, ntfy_topic: '' });
-    } catch (error) {
-        res.status(500).json({ error: 'Error obteniendo configuración de alarmas' });
-    }
-});
-
-app.put('/api/alarms/settings', async (req, res) => {
-    try {
-        const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
-        const result = await pool.query(
-            'UPDATE alarm_settings SET provider_threshold_days = $1, client_threshold_days = $2, ntfy_topic = $3 WHERE id = 1 RETURNING *',
-            [provider_threshold_days, client_threshold_days, ntfy_topic]
-        );
-        res.json(result.rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: 'Error actualizando configuración de alarmas' });
-    }
-});
-// --- FIN: NUEVAS RUTAS ---
-
 // Servir archivos estáticos
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -605,16 +504,10 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
             console.log(`🌐 URL: http://localhost:${PORT}`);
-            
-            // --- INICIO: INICIAR EL CHEQUEO AUTOMÁTICO DE ALARMAS ---
-            // Revisa las alarmas cada hora.
-            setInterval(checkAndSendAlarms, 3600000); 
-            console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
-            // --- FIN: INICIAR EL CHEQUEO AUTOMÁTICO DE ALARMAS ---
-            
-            // Se eliminan los logs anteriores para mantener la consistencia con la nueva funcionalidad
+            console.log(`📅 Sistema de fechas del proveedor: ACTIVO`);
+            console.log(`📅 Sistema de fechas de perfiles: ACTIVO`);
             console.log(`💳 Sistema de vouchers: ACTIVO`);
-            console.log(`🚨 Sistema de alarmas: ACTIVO (vía ntfy)`);
+            console.log(`🚨 Sistema de alarmas: ACTIVO`);
         });
     } catch (error) {
         console.error('❌ Error iniciando servidor:', error);
@@ -631,3 +524,4 @@ process.on('uncaughtException', (err) => {
 });
 
 startServer();
+
