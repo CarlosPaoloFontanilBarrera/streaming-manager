@@ -864,7 +864,6 @@
             <p>Sistema con PostgreSQL en Railway - Fechas Automáticas y Vouchers</p>
         </div>
         
-        <!-- INICIO: MODAL PARA ALARMAS NTFY -->
         <div id="alarmSettingsModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -897,7 +896,6 @@
                 </form>
             </div>
         </div>
-        <!-- FIN: MODAL PARA ALARMAS NTFY -->
 
         <div id="communicationModal" class="modal">
             <div class="modal-content" style="max-width: 800px;">
@@ -1022,7 +1020,6 @@
             <input type="text" class="search-box" placeholder="🔍 Buscar por nombre, email, tipo de servicio..." onkeyup="filterAccounts(this.value)">
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
             <button class="btn" onclick="openAlarmSettings()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
-            <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
         </div>
         
         <div class="stats">
@@ -1208,15 +1205,11 @@
         
         function calculateDaysFromDates(startDate, endDate) {
             if (!endDate) return 0;
-            
             const today = new Date();
             today.setHours(0, 0, 0, 0); 
-
             const end = new Date(endDate.split('T')[0] + 'T00:00:00'); 
-
             const diffTime = end.getTime() - today.getTime();
             const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-            
             return Math.max(0, diffDays);
         }
         
@@ -1359,7 +1352,7 @@
                 await loadAccounts();
                 await updateStats();
                 renderAccounts();
-                closeModal();
+                closeModal('accountModal');
                 alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!`);
             } catch (error) {
                 alert('❌ Error al guardar la cuenta: ' + error.message);
@@ -1371,14 +1364,14 @@
             if (!account) return;
             editingAccountId = accountId;
             document.querySelector('#accountModal .modal-title').textContent = 'Editar Cuenta';
-            document.getElementById('clientName').value = account.clientName;
-            document.getElementById('clientPhone').value = account.clientPhone || '';
+            document.getElementById('clientName').value = account.client_name;
+            document.getElementById('clientPhone').value = account.client_phone || '';
             document.getElementById('accountEmail').value = account.email;
             document.getElementById('accountPassword').value = account.password;
             document.getElementById('accountType').value = account.type;
             document.getElementById('accountCountry').value = account.country;
-            if (account.fechaInicioProveedor) {
-                const startDate = account.fechaInicioProveedor.split('T')[0];
+            if (account.fecha_inicio_proveedor) {
+                const startDate = account.fecha_inicio_proveedor.split('T')[0];
                 document.getElementById('providerStartDate').value = startDate;
                 updateDaysRemaining();
             }
@@ -1809,11 +1802,11 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 filteredAccounts = [...allAccounts];
             } else {
                 accounts = allAccounts.filter(account => 
-                    account.clientName.toLowerCase().includes(searchTerm) ||
+                    account.client_name.toLowerCase().includes(searchTerm) ||
                     account.email.toLowerCase().includes(searchTerm) ||
                     account.type.toLowerCase().includes(searchTerm) ||
                     account.id.toLowerCase().includes(searchTerm) ||
-                    (account.clientPhone && account.clientPhone.toLowerCase().includes(searchTerm))
+                    (account.client_phone && account.client_phone.toLowerCase().includes(searchTerm))
                 );
                 filteredAccounts = [...accounts];
             }
@@ -2055,7 +2048,9 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             }
         }
         
-        // Se elimina la función configureAlarms y testAlarmSystem que ya no se usan
+        function testAlarmSystem() {
+            alert('🧪 Test de alarmas - Función en desarrollo');
+        }
         
         async function initApp() {
             console.log('🚀 Iniciando JIREH Streaming Manager con sistema de alarmas ntfy...');
