@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JIREH Streaming Manager - Dashboard</title>
     <style>
+        /* Estilos existentes */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
@@ -854,6 +855,87 @@
             .account-details, .date-info { grid-template-columns: 1fr; }
             .action-buttons { flex-direction: column; }
         }
+
+        /* NUEVOS ESTILOS PARA EL MODAL DE CONSULTA DE CORREOS */
+        #emailCheckerModal .modal-content {
+            max-width: 700px;
+        }
+        #emailCheckerForm .form-group input[type="email"] {
+            padding-right: 110px; /* Espacio para el botón */
+        }
+        #emailCheckerForm .mail-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        #emailCheckerForm .mail-box input {
+            flex-grow: 1;
+        }
+        #emailCheckerForm .mail-box button {
+            position: absolute;
+            right: 0;
+            height: 100%;
+            padding: 0 15px;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+        #emailCheckerForm .mail-box button:hover {
+            background: linear-gradient(45deg, #0056b3, #004085);
+        }
+        #emailCheckerResult {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            min-height: 50px;
+            font-size: 0.95em;
+            color: #333;
+            overflow-x: auto; /* Para mensajes muy largos */
+        }
+        #emailCheckerResult .message-item {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        #emailCheckerResult .message-item h5 {
+            margin: 0 0 5px 0;
+            color: #dc3545;
+            font-size: 1em;
+        }
+        #emailCheckerResult .message-item p {
+            margin: 0;
+            font-size: 0.9em;
+            word-wrap: break-word; /* Para que el texto se ajuste */
+            white-space: pre-wrap; /* Para preservar saltos de línea */
+        }
+        #emailCheckerResult .message-item strong {
+            color: #495057;
+        }
+        #emailCheckerLoader {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            color: #007bff;
+        }
+        #emailCheckerLoader .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        /* Fin de nuevos estilos */
     </style>
 </head>
 <body>
@@ -945,7 +1027,7 @@
                     </div>
                     <div style="text-align: center; margin-top: 20px;">
                         <button class="btn btn-secondary" onclick="closeModal('pinModal')">Cancelar</button>
-                        <button class="btn btn-primary" onclick="savePins()">💾 Guardar PINs</button>
+                        <button type="submit" class="btn btn-primary" onclick="savePins()">💾 Guardar PINs</button>
                         <button class="btn" onclick="regenerateAllPins()" style="background: #6f42c1; color: white;">🔄 Regenerar Todos</button>
                     </div>
                 </div>
@@ -1021,7 +1103,7 @@
             <button class="add-btn" onclick="openAddModal()">➕ Agregar Cuenta</button>
             <button class="btn" onclick="openAlarmSettings()" style="background: #ff6b35; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🚨 Configurar Alarmas</button>
             <button class="btn" onclick="testAlarmSystem()" style="background: #6f42c1; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🧪 Test Alarmas</button>
-        </div>
+            <button class="btn" onclick="openEmailCheckerModal()" style="background: #17a2b8; color: white; padding: 15px 20px; border-radius: 10px; font-weight: 700;">🔍 Consultar Correos</button> </div>
         
         <div class="stats">
             <div class="stat-card">
@@ -1129,6 +1211,33 @@
         </div>
     </div>
 
+    <div id="emailCheckerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">🔍 Consultar Correos de APP Streaming</h2>
+                <button class="close-btn" onclick="closeModal('emailCheckerModal')">&times;</button>
+            </div>
+            <form id="emailCheckerForm">
+                <div class="form-group">
+                    <label for="consultEmail">Email a consultar:</label>
+                    <div class="mail-box">
+                        <input type="email" id="consultEmail" required placeholder="ejemplo@dominio.com">
+                        <button type="submit">Verificar</button>
+                    </div>
+                </div>
+            </form>
+            <div id="emailCheckerLoader">
+                <div class="spinner"></div>
+                <p>Consultando mensajes...</p>
+            </div>
+            <div id="emailCheckerResult">
+                <p>Ingrese un correo y haga clic en Verificar para ver los mensajes.</p>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('emailCheckerModal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
     <script>
         // ===============================================
         // CONFIGURACIÓN API PARA RAILWAY
@@ -1159,7 +1268,9 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    // Si la respuesta no es OK, intentar leer el error del servidor
+                    const errorData = await response.json().catch(() => ({ message: 'Error desconocido del servidor.' }));
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.message || response.statusText}`);
                 }
                 
                 return await response.json();
@@ -2097,6 +2208,65 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 console.error('Error en test de alarmas:', error);
             }
         }
+
+        // --- FUNCIONES PARA EL NUEVO MODAL DE CONSULTA DE CORREOS ---
+        function openEmailCheckerModal() {
+            document.getElementById('emailCheckerModal').style.display = 'block';
+            document.getElementById('consultEmail').value = ''; // Limpiar el campo
+            document.getElementById('emailCheckerResult').innerHTML = '<p>Ingrese un correo y haga clic en Verificar para ver los mensajes.</p>'; // Limpiar resultados
+            document.getElementById('emailCheckerLoader').style.display = 'none'; // Ocultar loader
+        }
+
+        async function handleEmailCheckerFormSubmit(event) {
+            event.preventDefault();
+            const email = document.getElementById('consultEmail').value.trim();
+            const resultDiv = document.getElementById('emailCheckerResult');
+            const loaderDiv = document.getElementById('emailCheckerLoader');
+
+            if (!email) {
+                resultDiv.innerHTML = '<p style="color: #dc3545;">Por favor, ingrese un correo electrónico.</p>';
+                return;
+            }
+
+            loaderDiv.style.display = 'block';
+            resultDiv.innerHTML = ''; // Limpiar resultados anteriores
+
+            try {
+                // Llama a su propia API que a su vez consulta bumbleegad.com
+                const response = await fetch(`${API_BASE}/check-bumbleegad-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json', // Su propia API espera JSON
+                    },
+                    body: JSON.stringify({ email: email })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Error desconocido del proxy.' }));
+                    throw new Error(`Error en la solicitud: ${response.status}, ${errorData.message || response.statusText}`);
+                }
+
+                const data = await response.json(); // La respuesta ya es el JSON de bumbleegad.com
+
+                if (data.success) {
+                    if (data.data && data.data.message) {
+                        // El mensaje de bumbleegad.com puede contener HTML
+                        resultDiv.innerHTML = '<p style="font-weight: bold; margin-bottom: 10px;">Mensajes encontrados:</p>' + data.data.message;
+                    } else {
+                        resultDiv.innerHTML = '<p>No se encontraron mensajes para este correo.</p>';
+                    }
+                } else {
+                    resultDiv.innerHTML = `<p style="color: #dc3545; font-weight: bold;">Error al verificar: ${data.data.message || 'Error desconocido.'}</p>`;
+                }
+
+            } catch (error) {
+                console.error('Error al consultar email de bumbleegad:', error);
+                resultDiv.innerHTML = `<p style="color: #dc3545; font-weight: bold;">Error de conexión: ${error.message}</p>`;
+            } finally {
+                loaderDiv.style.display = 'none';
+            }
+        }
+        // --- FIN FUNCIONES NUEVO MODAL ---
         
         async function initApp() {
             console.log('🚀 Iniciando JIREH Streaming Manager con sistema de alarmas ntfy...');
@@ -2128,6 +2298,9 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
             document.querySelectorAll('.modal').forEach(modal => {
                 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal.id); });
             });
+
+            // NUEVO EVENT LISTENER PARA EL MODAL DE CONSULTA DE CORREOS
+            document.getElementById('emailCheckerForm').addEventListener('submit', handleEmailCheckerFormSubmit);
             
             console.log('✅ Event listeners configurados');
         });
