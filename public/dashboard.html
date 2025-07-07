@@ -903,7 +903,7 @@
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
                     <h2 class="modal-title">📧 Comunicados por Perfil</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('communicationModal')">&times;</button>
                 </div>
                 <div id="profileSelection" style="padding: 20px;">
                     <p style="margin-bottom: 20px; text-align: center; color: #666;">
@@ -922,7 +922,7 @@
             <div class="modal-content" style="max-width: 700px;">
                 <div class="modal-header">
                     <h2 class="modal-title">📱 Comunicado Individual</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('messageModal')">&times;</button>
                 </div>
                 <div id="communicationContent" style="background: #f8f9fa; padding: 20px; border-radius: 10px; font-family: Arial, sans-serif; line-height: 1.6; max-height: 400px; overflow-y: auto;">
                 </div>
@@ -937,7 +937,7 @@
             <div class="modal-content" style="max-width: 600px;">
                 <div class="modal-header">
                     <h2 class="modal-title">🔐 Cambiar PINs de Perfiles</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('pinModal')">&times;</button>
                 </div>
                 <div style="padding: 20px;">
                     <p style="margin-bottom: 20px; color: #666; text-align: center;">
@@ -946,7 +946,7 @@
                     <div id="pinEditGrid" style="display: grid; gap: 15px;">
                     </div>
                     <div style="text-align: center; margin-top: 20px;">
-                        <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button class="btn btn-secondary" onclick="closeModal('pinModal')">Cancelar</button>
                         <button class="btn btn-primary" onclick="savePins()">💾 Guardar PINs</button>
                         <button class="btn" onclick="regenerateAllPins()" style="background: #6f42c1; color: white;">🔄 Regenerar Todos</button>
                     </div>
@@ -958,7 +958,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title">💰 Vender Perfil</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('sellProfileModal')">&times;</button>
                 </div>
                 <form id="sellProfileForm">
                     <div class="form-group">
@@ -981,7 +981,7 @@
                         </small>
                     </div>
                     <div class="btn-group">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('sellProfileModal')">Cancelar</button>
                         <button type="submit" class="btn btn-primary">💰 Vender Perfil</button>
                     </div>
                 </form>
@@ -992,7 +992,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title">💳 Voucher del Perfil</h2>
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                    <button class="close-btn" onclick="closeModal('profileVoucherModal')">&times;</button>
                 </div>
                 <form id="profileVoucherForm">
                     <div class="form-group">
@@ -1011,7 +1011,7 @@
                         <input type="number" id="profilePaidAmount" step="0.01" required placeholder="Ej: 35.50">
                     </div>
                     <div class="btn-group">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('profileVoucherModal')">Cancelar</button>
                         <button type="submit" class="btn btn-primary">💾 Subir Voucher y Renovar</button>
                     </div>
                 </form>
@@ -1206,14 +1206,12 @@
             return Math.max(0, dias);
         }
         
-        // ########## INICIO DEL CÓDIGO MODIFICADO ##########
         function calculateDaysFromDates(startDate, endDate) {
             if (!endDate) return 0;
             
             const today = new Date();
             today.setHours(0, 0, 0, 0); 
 
-            // Forzar la interpretación de la fecha como local, no UTC
             const end = new Date(endDate.split('T')[0] + 'T00:00:00'); 
 
             const diffTime = end.getTime() - today.getTime();
@@ -1223,13 +1221,11 @@
         }
         
         function calculateExpiryDate(startDate) {
-            // Forzar la interpretación de la fecha como local, no UTC
             const start = new Date(startDate + 'T00:00:00'); 
             const expiry = new Date(start);
             expiry.setDate(expiry.getDate() + 30);
             return expiry.toISOString().split('T')[0];
         }
-        // ########## FIN DEL CÓDIGO MODIFICADO ##########
         
         function updateDaysRemaining() {
             const startDate = document.getElementById('providerStartDate').value;
@@ -1294,7 +1290,6 @@
                     ...account,
                     clientName: account.client_name,
                     clientPhone: account.client_phone,
-                    // El cálculo de days_remaining se hará en el renderizado
                     profiles: typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [],
                     fechaVenta: account.fecha_venta,
                     fechaVencimiento: account.fecha_vencimiento,
@@ -1364,7 +1359,7 @@
                 await loadAccounts();
                 await updateStats();
                 renderAccounts();
-                closeModal('accountModal');
+                closeModal();
                 alert(`✅ Cuenta ${editingAccountId ? 'actualizada' : 'creada'} exitosamente!`);
             } catch (error) {
                 alert('❌ Error al guardar la cuenta: ' + error.message);
@@ -1614,11 +1609,98 @@
             const profile = currentAccount.profiles[profileIndex];
             if (!profile) return;
             const today = new Date().toLocaleDateString('es-PE');
-            const diasMostrar = profile.estado === 'vendido' ? profile.diasRestantes : currentAccount.daysRemaining;
-            const fechaVencimientoMostrar = profile.estado === 'vendido' ? profile.fechaVencimiento : currentAccount.fechaVencimientoProveedor;
+            const diasMostrar = profile.estado === 'vendido' ? calculateProfileDaysRemaining(profile.fechaVencimiento) : calculateDaysFromDates(null, currentAccount.fecha_vencimiento_proveedor);
+            const fechaVencimientoMostrar = profile.estado === 'vendido' ? profile.fechaVencimiento : currentAccount.fecha_vencimiento_proveedor;
             const clienteNombre = profile.clienteNombre || `Usuario del ${profile.name}`;
-            const communicationHTML = `...`; // Contenido del comunicado (truncado por brevedad)
-            currentCommunicationText = `...`; // Contenido para WhatsApp (truncado por brevedad)
+            const communicationHTML = `
+                <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #dc3545, #c82333); color: white; border-radius: 8px;">
+                    <h2 style="margin: 0; font-size: 1.5em;">🎬 JIREH STREAMING</h2>
+                    <p style="margin: 5px 0 0 0; opacity: 0.9;">Comunicado Individual - ${currentAccount.type}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <p style="font-size: 1.1em; margin-bottom: 10px;"><strong>Estimado/a ${clienteNombre},</strong></p>
+                    <p>Su acceso a <strong>${currentAccount.type}</strong> ha sido configurado exitosamente.</p>
+                </div>
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #007bff;">
+                    <h3 style="color: #007bff; margin-top: 0;">🔐 SUS DATOS DE ACCESO</h3>
+                    <p><strong>Email:</strong> ${currentAccount.email}</p>
+                    <p><strong>Contraseña:</strong> ${currentAccount.password}</p>
+                    <p><strong>Servicio:</strong> ${currentAccount.type}</p>
+                    <p><strong>País:</strong> ${countryFlags[currentAccount.country]} ${currentAccount.country}</p>
+                </div>
+                <div style="background: #f0fff0; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
+                    <h3 style="color: #28a745; margin-top: 0;">👤 SU PERFIL Y PIN</h3>
+                    <div style="text-align: center; background: white; padding: 15px; border-radius: 8px; border: 2px solid #28a745;">
+                        <div style="font-size: 1.3em; font-weight: bold; margin-bottom: 10px;">${profile.name}</div>
+                        <div style="font-family: monospace; font-size: 2em; color: #dc3545; font-weight: bold; background: #f8f9fa; padding: 10px; border-radius: 5px;">${profile.pin}</div>
+                    </div>
+                </div>
+                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                    <h3 style="color: #856404; margin-top: 0;">⚠️ TÉRMINOS DE USO</h3>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li><strong>Uso Individual:</strong> Solo UN (1) DISPOSITIVO</li>
+                        <li><strong>Monitoreo:</strong> Se supervisa la actividad</li>
+                        <li><strong>Suspensión:</strong> 2+ dispositivos = suspensión inmediata</li>
+                        <li><strong>Perfil:</strong> Use solo "${profile.name}" con PIN "${profile.pin}"</li>
+                    </ul>
+                </div>
+                <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
+                    <h3 style="color: #155724; margin-top: 0;">💳 INFORMACIÓN DE PAGOS</h3>
+                    <p><strong>Días Restantes:</strong> ${diasMostrar} días</p>
+                    <p><strong>Fecha de Vencimiento:</strong> ${formatDate(fechaVencimientoMostrar)}</p>
+                    <p><strong>Próximo Pago:</strong> ${profile.estado === 'vendido' ? formatDate(profile.fechaProximoPago) : getNextPaymentDate(fechaVencimientoMostrar)}</p>
+                    <p><strong>Corte Automático:</strong> ${profile.estado === 'vendido' ? formatDate(profile.fechaCorte) : getCutoffDate(fechaVencimientoMostrar)}</p>
+                    <p><strong>Yape:</strong> 981804056</p>
+                    <p><strong>⚠️ El servicio se suspende automáticamente el ${profile.estado === 'vendido' ? formatDate(profile.fechaCorte) : getCutoffDate(fechaVencimientoMostrar)} si no se paga el ${profile.estado === 'vendido' ? formatDate(profile.fechaProximoPago) : getNextPaymentDate(fechaVencimientoMostrar)}.</strong></p>
+                </div>
+                <div style="text-align: center; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <p style="margin: 0; color: #666; font-size: 0.9em;">
+                        <strong>JIREH STREAMING</strong> - <strong>Fecha:</strong> ${today} | <strong>ID:</strong> ${currentAccount.id}<br>
+                        <em>Conserve este comunicado para futuras referencias</em>
+                    </p>
+                </div>
+                <div style="text-align: center; margin-top: 15px; padding: 12px; background: linear-gradient(45deg, #28a745, #20c997); color: white; border-radius: 8px; font-weight: bold;">
+                    💝 ¡Gracias por preferirnos! 💝
+                </div>
+            `;
+            currentCommunicationText = `
+🎬 *JIREH STREAMING*
+📋 *COMUNICADO INDIVIDUAL - ${currentAccount.type.toUpperCase()}*
+👤 *PERFIL: ${profile.name.toUpperCase()}*
+
+Estimado/a ${clienteNombre},
+
+Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
+
+🔐 *DATOS DE ACCESO:*
+📧 Email: ${currentAccount.email}
+🔒 Contraseña: ${currentAccount.password}
+📱 Servicio: ${currentAccount.type}
+🌍 País: ${countryFlags[currentAccount.country]} ${currentAccount.country}
+
+👤 *SU PERFIL Y PIN:*
+📛 Perfil: ${profile.name}
+🔢 PIN: *${profile.pin}*
+
+⚠️ *TÉRMINOS DE USO:*
+• Uso Individual: Solo UN (1) DISPOSITIVO
+• Monitoreo: Se supervisa la actividad
+• Suspensión: 2+ dispositivos = suspensión inmediata
+• Perfil: Use solo "${profile.name}" con PIN "${profile.pin}"
+
+💳 *INFORMACIÓN DE PAGOS:*
+⏰ Días Restantes: ${diasMostrar} días
+📅 Fecha de Vencimiento: ${formatDate(fechaVencimientoMostrar)}
+💰 Próximo Pago: ${profile.estado === 'vendido' ? formatDate(profile.fechaProximoPago) : getNextPaymentDate(fechaVencimientoMostrar)}
+🚫 Corte Automático: ${profile.estado === 'vendido' ? formatDate(profile.fechaCorte) : getCutoffDate(fechaVencimientoMostrar)}
+💰 Yape: 981804056
+⚠️ El servicio se suspende automáticamente el ${profile.estado === 'vendido' ? formatDate(profile.fechaCorte) : getCutoffDate(fechaVencimientoMostrar)} si no se paga el ${profile.estado === 'vendido' ? formatDate(profile.fechaProximoPago) : getNextPaymentDate(fechaVencimientoMostrar)}.
+
+*JIREH STREAMING - Conserve este comunicado para futuras referencias*
+*ID: ${currentAccount.id} | Fecha: ${today}*
+
+💝 *¡Gracias por preferirnos!* 💝
+            `.trim();
             document.getElementById('communicationContent').innerHTML = communicationHTML;
             document.getElementById('communicationModal').style.display = 'none';
             document.getElementById('messageModal').style.display = 'block';
@@ -1627,21 +1709,27 @@
         function generateAllCommunications() {
             if (!currentAccount) return;
             let allMessages = '';
-            currentAccount.profiles.forEach((profile) => {
-                // Lógica para generar mensaje para cada perfil
-                allMessages += `...`; // Mensaje truncado
+            currentAccount.profiles.forEach((profile, index) => {
+                const today = new Date().toLocaleDateString('es-PE');
+                const message = `...`; // Truncado
+                allMessages += message;
             });
-            navigator.clipboard.writeText(allMessages).then(() => alert('✅ Comunicados copiados.'));
+            navigator.clipboard.writeText(allMessages).then(() => {
+                alert(`✅ Se han copiado los ${currentAccount.profiles.length} comunicados al portapapeles.\n\nPuedes pegarlos y enviar cada uno por separado.`);
+            });
             closeModal('communicationModal');
         }
         
         function copyCommunication() {
-            navigator.clipboard.writeText(currentCommunicationText).then(() => alert('✅ Comunicado copiado.'));
+            navigator.clipboard.writeText(currentCommunicationText).then(() => {
+                alert('✅ Comunicado copiado al portapapeles');
+            });
         }
         
         function sendWhatsApp() {
             const message = encodeURIComponent(currentCommunicationText);
-            window.open(`https://wa.me/?text=${message}`, '_blank');
+            const whatsappURL = `https://wa.me/?text=${message}`;
+            window.open(whatsappURL, '_blank');
         }
         
         // ===============================================
@@ -1653,18 +1741,34 @@
             if (!account) return;
             editingPinAccountId = accountId;
             const pinEditGrid = document.getElementById('pinEditGrid');
-            pinEditGrid.innerHTML = account.profiles.map((profile, index) => `...`).join(''); // Truncado
+            pinEditGrid.innerHTML = account.profiles.map((profile, index) => `
+                <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #dee2e6;">
+                    <div style="flex: 1;">
+                        <strong>${profile.name}</strong>
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="text" id="pin_${index}" value="${profile.pin}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1.1em; text-align: center;" maxlength="4" placeholder="PIN">
+                    </div>
+                    <div>
+                        <button class="btn" onclick="regeneratePin(${index})" style="background: #17a2b8; color: white; padding: 8px 12px; font-size: 0.8em;">🔄 Nuevo</button>
+                    </div>
+                </div>
+            `).join('');
             document.getElementById('pinModal').style.display = 'block';
         }
         
         function regeneratePin(profileIndex) {
-            document.getElementById(`pin_${profileIndex}`).value = generatePin();
+            const newPin = generatePin();
+            document.getElementById(`pin_${profileIndex}`).value = newPin;
         }
         
         function regenerateAllPins() {
             const account = allAccounts.find(acc => acc.id === editingPinAccountId);
             if (!account) return;
-            account.profiles.forEach((_, index) => regeneratePin(index));
+            account.profiles.forEach((profile, index) => {
+                const newPin = generatePin();
+                document.getElementById(`pin_${index}`).value = newPin;
+            });
             alert('🔄 Todos los PINs han sido regenerados');
         }
         
@@ -1673,7 +1777,11 @@
             if (!account) return;
             account.profiles.forEach((profile, index) => {
                 const newPin = document.getElementById(`pin_${index}`).value.trim();
-                profile.pin = (newPin && newPin.length === 4) ? newPin : generatePin();
+                if (newPin && newPin.length === 4) {
+                    profile.pin = newPin;
+                } else {
+                    profile.pin = generatePin();
+                }
             });
             try {
                 await apiRequest(`/accounts/${editingPinAccountId}`, {
@@ -1683,9 +1791,10 @@
                 await loadAccounts();
                 renderAccounts();
                 closeModal('pinModal');
-                alert('✅ PINs actualizados');
+                alert('✅ PINs actualizados exitosamente');
             } catch (error) {
                 alert('❌ Error al actualizar PINs');
+                console.error('Error:', error);
             }
         }
         
@@ -1695,19 +1804,26 @@
         
         function filterAccounts(searchValue) {
             searchTerm = searchValue.toLowerCase().trim();
-            filteredAccounts = allAccounts.filter(account => 
-                account.clientName.toLowerCase().includes(searchTerm) ||
-                account.email.toLowerCase().includes(searchTerm) ||
-                account.type.toLowerCase().includes(searchTerm) ||
-                account.id.toLowerCase().includes(searchTerm) ||
-                (account.clientPhone && account.clientPhone.includes(searchTerm))
-            );
+            if (!searchTerm) {
+                accounts = [...allAccounts];
+                filteredAccounts = [...allAccounts];
+            } else {
+                accounts = allAccounts.filter(account => 
+                    account.clientName.toLowerCase().includes(searchTerm) ||
+                    account.email.toLowerCase().includes(searchTerm) ||
+                    account.type.toLowerCase().includes(searchTerm) ||
+                    account.id.toLowerCase().includes(searchTerm) ||
+                    (account.clientPhone && account.clientPhone.toLowerCase().includes(searchTerm))
+                );
+                filteredAccounts = [...accounts];
+            }
             renderAccounts();
         }
         
         function clearSearch() {
             document.querySelector('.search-box').value = '';
             searchTerm = '';
+            accounts = [...allAccounts];
             filteredAccounts = [...allAccounts];
             renderAccounts();
         }
@@ -1727,7 +1843,6 @@
         // FUNCIONES DE RENDERIZADO
         // ===============================================
         
-        // ########## INICIO DEL CÓDIGO MODIFICADO ##########
         function actualizarEstado(diasRestantes) {
             if (diasRestantes > 5) return 'active';
             if (diasRestantes > 0) return 'inactive';
@@ -1829,6 +1944,13 @@
                                         </span>
                                     </div>
                                 </div>
+                                ${profile.estado === 'disponible' ? `
+                                    ${profile.voucherSubido ? `
+                                        <div class="voucher-section">
+                                            <div class="voucher-info"><h6>💳 Voucher Confirmado</h6><span style="color: #28a745; font-weight: bold;">✅ Voucher subido correctamente</span></div>
+                                            ${profile.voucherImagen ? `<div class="voucher-preview"><img src="data:image/jpeg;base64,${profile.voucherImagen}" alt="Voucher" onclick="window.open(this.src, '_blank')" style="max-width: 200px; max-height: 150px;"><p><strong>Op:</strong> ${profile.numeroOperacion} | <strong>Monto:</strong> S/ ${profile.montoPagado}</p></div>` : ''}
+                                        </div>` : ''}
+                                ` : ''}
                                 ${profile.estado === 'vendido' ? `
                                     <div class="profile-client-dates">
                                         <h6>👤 Información del Cliente</h6>
@@ -1856,7 +1978,6 @@
                 </div>
             `;
         }
-        // ########## FIN DEL CÓDIGO MODIFICADO ##########
         
         // ===============================================
         // FUNCIONES DE SISTEMA
@@ -1899,7 +2020,6 @@
             }
         }
         
-        // --- INICIO: FUNCIONES PARA ALARMAS NTFY ---
         async function openAlarmSettings() {
             try {
                 const settings = await apiRequest('/alarms/settings');
@@ -1958,9 +2078,7 @@
             document.getElementById('accountForm').addEventListener('submit', addAccount);
             document.getElementById('sellProfileForm').addEventListener('submit', handleSellProfile);
             document.getElementById('profileVoucherForm').addEventListener('submit', handleProfileVoucherSubmit);
-            // --- INICIO: LISTENER PARA EL FORMULARIO DE ALARMAS ---
             document.getElementById('alarmSettingsForm').addEventListener('submit', handleSaveAlarmSettings);
-            // --- FIN: LISTENER ---
             
             document.getElementById('providerStartDate').addEventListener('change', updateDaysRemaining);
             
