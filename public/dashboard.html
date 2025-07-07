@@ -1056,7 +1056,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title">Agregar Nueva Cuenta</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
+                <button class="close-btn" onclick="closeModal('accountModal')">&times;</button>
             </div>
             <form id="accountForm">
                 <div class="form-group">
@@ -1122,7 +1122,7 @@
                     </small>
                 </div>
                 <div class="btn-group">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('accountModal')">Cancelar</button>
                     <button type="submit" class="btn btn-primary">💾 Guardar Cuenta</button>
                 </div>
             </form>
@@ -2101,3 +2101,4 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
     </script>
 </body>
 </html>
+
