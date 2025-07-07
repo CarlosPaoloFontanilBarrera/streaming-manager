@@ -856,36 +856,14 @@
             .action-buttons { flex-direction: column; }
         }
 
-        /* NUEVOS ESTILOS PARA EL MODAL DE CONSULTA DE CORREOS */
+        /* NUEVOS ESTILOS PARA EL MODAL DE CONSULTA DE CODIGOS MICUENTA.ME */
         #micuentaMeCheckerModal .modal-content {
             max-width: 700px;
         }
-        #micuentaMeCheckerForm .form-group input[type="text"] { /* Ajustado para texto */
-            padding-right: 110px; /* Espacio para el botón */
-        }
-        #micuentaMeCheckerForm .mail-box {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        #micuentaMeCheckerForm .mail-box input {
-            flex-grow: 1;
-        }
-        #micuentaMeCheckerForm .mail-box button {
-            position: absolute;
-            right: 0;
-            height: 100%;
-            padding: 0 15px;
-            background: linear-gradient(45deg, #007bff, #0056b3);
-            color: white;
-            border: none;
-            border-radius: 0 8px 8px 0;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background 0.3s ease;
-        }
-        #micuentaMeCheckerForm .mail-box button:hover {
-            background: linear-gradient(45deg, #0056b3, #004085);
+        #micuentaMeCheckerForm .form-group input[type="text"],
+        #micuentaMeCheckerForm .form-group input[type="password"] { /* Añadido para password si se usa */
+            width: 100%; /* Ajuste para que ocupe todo el ancho */
+            box-sizing: border-box; /* Para que padding no aumente el ancho total */
         }
         #micuentaMeCheckerResult {
             margin-top: 20px;
@@ -936,6 +914,22 @@
             margin: 0 auto 10px;
         }
         /* Fin de nuevos estilos */
+        /* Estilo para el checkbox de recordar credenciales */
+        .remember-micuentame {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #666;
+            margin-top: -10px; /* Ajuste el margen superior para que esté cerca de los inputs */
+            margin-bottom: 20px; /* Espacio debajo del checkbox */
+            justify-content: flex-start;
+        }
+        .remember-micuentame input[type="checkbox"] {
+            margin: 0;
+            transform: scale(1.2);
+            accent-color: #007bff; /* Color del acento para el checkbox */
+        }
     </style>
 </head>
 <body>
@@ -992,7 +986,7 @@
                     <div id="profileGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
                     </div>
                     <div style="text-align: center;">
-                        <button class="btn btn-primary" onclick="generateAllCommunications()">📧 Generar Todos los Comunicados</button>
+                        <button type="button" class="btn btn-primary" onclick="generateAllCommunications()">📧 Generar Todos los Comunicados</button>
                     </div>
                 </div>
             </div>
@@ -1007,8 +1001,8 @@
                 <div id="communicationContent" style="background: #f8f9fa; padding: 20px; border-radius: 10px; font-family: Arial, sans-serif; line-height: 1.6; max-height: 400px; overflow-y: auto;">
                 </div>
                 <div style="text-align: center; margin-top: 20px;">
-                    <button class="btn btn-primary" onclick="copyCommunication()">📋 Copiar Mensaje</button>
-                    <button class="btn" onclick="sendWhatsApp()" style="background: #25d366; color: white;">📱 Enviar por WhatsApp</button>
+                    <button type="button" class="btn btn-primary" onclick="copyCommunication()">📋 Copiar Mensaje</button>
+                    <button type="button" class="btn" onclick="sendWhatsApp()" style="background: #25d366; color: white;">📱 Enviar por WhatsApp</button>
                 </div>
             </div>
         </div>
@@ -1225,6 +1219,9 @@
                 <div class="form-group">
                     <label for="micuentaMePdv">PDV (parámetro 'pdv' de la URL):</label>
                     <input type="text" id="micuentaMePdv" required placeholder="Ej: Jirehstreaming7!">
+                </div>
+                <div class="remember-micuentame"> <input type="checkbox" id="rememberMicuentaMeCredentials">
+                    <label for="rememberMicuentaMeCredentials">Recordar Código y PDV</label>
                 </div>
                 <div class="btn-group">
                     <button type="submit" class="btn btn-primary">Obtener Código</button>
@@ -1589,6 +1586,7 @@
                 profile.fechaCorte = fechaVencimientoCliente.toISOString().split('T')[0];
                 profile.diasRestantes = calculateProfileDaysRemaining(expiryDate);
                 profile.estadoPago = 'pagado';
+                profile.fechaUltimaRenovacion = new Date().toISOString().split('T')[0];
                 await apiRequest(`/accounts/${currentProfileAccountId}`, {
                     method: 'PUT',
                     body: JSON.stringify({ ...account, client_name: account.clientName, client_phone: account.clientPhone, days_remaining: account.days_remaining })
@@ -2000,12 +1998,12 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 return;
             }
             if (filteredAccounts.length === 0) {
-                container.innerHTML = `<div class="no-results"><h3>🔍 No se encontraron resultados</h3><p>No hay cuentas que coincidan con "${searchTerm}"</p><button class="btn btn-primary" onclick="clearSearch()">Limpiar búsqueda</button></div>`;
+                container.innerHTML = `<div class="no-results"><h3>🔍 No se encontraron resultados</h3><p>No hay cuentas que coincidan con "${searchTerm}"</p><button type="button" class="btn btn-primary" onclick="clearSearch()">Limpiar búsqueda</button></div>`;
                 return;
             }
             let html = '';
             if (searchTerm) {
-                html += `<div class="search-results-info"><strong>Resultados de búsqueda:</strong> ${filteredAccounts.length} de ${allAccounts.length} cuentas | Término: "${searchTerm}"<button onclick="clearSearch()" style="margin-left: 10px; background: none; border: none; color: #dc3545; cursor: pointer; font-weight: 600;">✕ Limpiar</button></div>`;
+                html += `<div class="search-results-info"><strong>Resultados de búsqueda:</strong> ${filteredAccounts.length} de ${allAccounts.length} cuentas | Término: "${searchTerm}"<button type="button" onclick="clearSearch()" style="margin-left: 10px; background: none; border: none; color: #dc3545; cursor: pointer; font-weight: 600;">✕ Limpiar</button></div>`;
             }
             html += filteredAccounts.map(account => {
                 const diasRestantes = calculateDaysFromDates(null, account.fecha_vencimiento_proveedor);
@@ -2030,10 +2028,10 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                             </div>
                             <div class="accordion-controls">
                                 <div class="quick-actions">
-                                    <button class="quick-btn quick-btn-edit" onclick="event.stopPropagation(); editAccount('${account.id}')" title="Editar">✏️</button>
-                                    <button class="quick-btn quick-btn-comm" onclick="event.stopPropagation(); generateCommunications('${account.id}')" title="Comunicados">📧</button>
+                                    <button type="button" class="quick-btn quick-btn-edit" onclick="event.stopPropagation(); editAccount('${account.id}')" title="Editar">✏️</button>
+                                    <button type="button" class="quick-btn quick-btn-comm" onclick="event.stopPropagation(); generateCommunications('${account.id}')" title="Comunicados">📧</button>
                                 </div>
-                                <button class="accordion-toggle" id="toggle-${account.id}">▼</button>
+                                <button type="button" class="accordion-toggle" id="toggle-${account.id}">▼</button>
                             </div>
                         </div>
                         <div class="accordion-content" id="content-${account.id}">
@@ -2108,17 +2106,17 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                                     </div>
                                 ` : ''}
                                 <div class="profile-actions">
-                                    ${profile.estado === 'disponible' ? `<button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Subir Voucher</button><button class="btn btn-primary" onclick="sellProfile('${account.id}', ${index})">💰 Vender Perfil</button>` : `<button class="btn btn-communication" onclick="generateProfileCommunication('${account.id}', ${index})">📧 Comunicado</button><button class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Renovar Voucher</button><button class="btn btn-secondary" onclick="makeProfileAvailable('${account.id}', ${index})">🔄 Disponible</button>`}
+                                    ${profile.estado === 'disponible' ? `<button type="button" class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Subir Voucher</button><button type="button" class="btn btn-primary" onclick="sellProfile('${account.id}', ${index})">💰 Vender Perfil</button>` : `<button type="button" class="btn btn-communication" onclick="generateProfileCommunication('${account.id}', ${index})">📧 Comunicado</button><button type="button" class="btn btn-voucher" onclick="openProfileVoucherModal('${account.id}', ${index})">💳 Renovar Voucher</button><button type="button" class="btn btn-secondary" onclick="makeProfileAvailable('${account.id}', ${index})">🔄 Disponible</button>`}
                                 </div>
                             </div>
                         `}).join('')}
                     </div>
                 </div>
                 <div class="action-buttons">
-                    <button class="btn btn-edit" onclick="editAccount('${account.id}')">✏️ Editar</button>
-                    <button class="btn" onclick="editPins('${account.id}')" style="background: #6f42c1; color: white;">🔐 Cambiar PINs</button>
-                    <button class="btn btn-communication" onclick="generateCommunications('${account.id}')">📧 Comunicados</button>
-                    <button class="btn btn-delete" onclick="deleteAccount('${account.id}')">🗑️ Eliminar</button>
+                    <button type="button" class="btn btn-edit" onclick="editAccount('${account.id}')">✏️ Editar</button>
+                    <button type="button" class="btn" onclick="editPins('${account.id}')" style="background: #6f42c1; color: white;">🔐 Cambiar PINs</button>
+                    <button type="button" class="btn btn-communication" onclick="generateCommunications('${account.id}')">📧 Comunicados</button>
+                    <button type="button" class="btn btn-delete" onclick="deleteAccount('${account.id}')">🗑️ Eliminar</button>
                 </div>
             `;
         }
@@ -2146,7 +2144,7 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
         
         function showConnectionError() {
-            document.getElementById('accountsList').innerHTML = `<div class="no-accounts" style="border-color: #dc3545; background: #f8d7da;"><h3 style="color: #721c24;">❌ Error de Conexión</h3><p style="color: #721c24;">No se pudo conectar con Railway PostgreSQL.</p><button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Reintentar</button></div>`;
+            document.getElementById('accountsList').innerHTML = `<div class="no-accounts" style="border-color: #dc3545; background: #f8d7da;"><h3 style="color: #721c24;">❌ Error de Conexión</h3><p style="color: #721c24;">No se pudo conectar con Railway PostgreSQL.</p><button type="button" onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Reintentar</button></div>`;
         }
         
         function checkAuth() {
@@ -2214,18 +2212,44 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
         }
 
         // --- FUNCIONES PARA EL NUEVO MODAL DE MICUENTA.ME ---
+        function loadMicuentaMeCredentials() {
+            const savedMicuentaMe = localStorage.getItem('micuentaMeCredentials');
+            if (savedMicuentaMe) {
+                try {
+                    const { code, pdv, remember } = JSON.parse(savedMicuentaMe);
+                    document.getElementById('micuentaMeCode').value = code || '';
+                    document.getElementById('micuentaMePdv').value = pdv || '';
+                    document.getElementById('rememberMicuentaMeCredentials').checked = remember === true; // Asegura que sea booleano
+                } catch (error) {
+                    console.log('Error cargando credenciales de micuenta.me guardadas');
+                }
+            }
+        }
+
+        function saveMicuentaMeCredentials(code, pdv, rememberMe) {
+            if (rememberMe) {
+                localStorage.setItem('micuentaMeCredentials', JSON.stringify({
+                    code,
+                    pdv,
+                    remember: true
+                }));
+            } else {
+                localStorage.removeItem('micuentaMeCredentials');
+            }
+        }
+
         function openMicuentaMeCheckerModal() {
             document.getElementById('micuentaMeCheckerModal').style.display = 'block';
-            document.getElementById('micuentaMeCode').value = ''; // Limpiar el campo
-            document.getElementById('micuentaMePdv').value = ''; // Limpiar el campo
             document.getElementById('micuentaMeCheckerResult').innerHTML = '<p>Ingrese los parámetros y haga clic en Obtener Código.</p>'; // Limpiar resultados
             document.getElementById('micuentaMeCheckerLoader').style.display = 'none'; // Ocultar loader
+            loadMicuentaMeCredentials(); // Cargar credenciales al abrir
         }
 
         async function handleMicuentaMeCheckerFormSubmit(event) {
             event.preventDefault();
             const code = document.getElementById('micuentaMeCode').value.trim();
             const pdv = document.getElementById('micuentaMePdv').value.trim();
+            const rememberMe = document.getElementById('rememberMicuentaMeCredentials').checked;
             const resultDiv = document.getElementById('micuentaMeCheckerResult');
             const loaderDiv = document.getElementById('micuentaMeCheckerLoader');
 
@@ -2255,7 +2279,10 @@ Su acceso a ${currentAccount.type} ha sido configurado exitosamente.
                 const data = await response.json(); // La respuesta ya es el JSON de micuenta.me
 
                 if (data.success) {
-                    // micuenta.me devuelve un objeto con 'html', 'code', 'url', 'date'
+                    // Guardar credenciales si rememberMe está marcado
+                    saveMicuentaMeCredentials(code, pdv, rememberMe);
+
+                    // micuenta.me devuelve un objeto con 'html', 'code', 'url', 'date', etc.
                     if (data.html) {
                         // Mostrar fecha del correo si está disponible
                         let dateInfo = data.date ? `<p style="font-weight: bold; margin-bottom: 10px;">Fecha del correo: ${data.date}</p>` : '';
