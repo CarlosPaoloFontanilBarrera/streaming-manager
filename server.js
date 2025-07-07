@@ -149,6 +149,9 @@ async function checkAndSendAlarms() {
                     });
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                     console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
+                } else {
+                    // LÍNEA DE DEPURACIÓN AÑADIDA
+                    console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                 }
             }
 
@@ -169,6 +172,9 @@ async function checkAndSendAlarms() {
                            });
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                            console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
+                        } else {
+                            // LÍNEA DE DEPURACIÓN AÑADIDA
+                            console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                         }
                     }
                 }
