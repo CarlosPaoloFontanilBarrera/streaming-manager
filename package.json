@@ -34,7 +34,9 @@
     "express",
     "railway",
     "vouchers",
-    "fechas-automaticas"
+    "fechas-automaticas",
+    "security",
+    "rate-limiting"
   ],
   "author": "Paolo F",
   "license": "MIT"
