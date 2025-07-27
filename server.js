@@ -6,7 +6,6 @@ const path = require('path');
 const multer = require('multer');
 const fetch = require('node-fetch');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { body, validationResult, param } = require('express-validator');
@@ -15,7 +14,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Variables de entorno para seguridad
-const JWT_SECRET = process.env.JWT_SECRET || 'tu_jwt_secret_super_seguro_aqui_cambiar_en_produccion';
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'paolof';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'elpoderosodeizrael777xD!';
@@ -35,19 +33,15 @@ app.use(helmet({
 
 // Rate limiting
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // límite de 100 requests por ventana por IP
-    message: { error: 'Demasiadas solicitudes desde esta IP, intenta nuevamente en 15 minutos.' },
-    standardHeaders: true,
-    legacyHeaders: false,
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: 'Demasiadas solicitudes desde esta IP, intenta nuevamente en 15 minutos.' }
 });
 
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 5, // límite de 5 intentos de login por ventana por IP
-    message: { error: 'Demasiados intentos de login, intenta nuevamente en 15 minutos.' },
-    standardHeaders: true,
-    legacyHeaders: false,
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { error: 'Demasiados intentos de login, intenta nuevamente en 15 minutos.' }
 });
 
 app.use(generalLimiter);
@@ -57,15 +51,13 @@ app.use(cors({
     origin: process.env.NODE_ENV === 'production' 
         ? ['https://streaming-manager-production.up.railway.app']
         : ['http://localhost:3000', 'http://127.0.0.1:3000'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    credentials: true
 }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de PostgreSQL con pool seguro
+// Configuración de PostgreSQL
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
@@ -79,11 +71,10 @@ const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
     limits: { 
-        fileSize: 5 * 1024 * 1024, // 5MB máximo
+        fileSize: 5 * 1024 * 1024,
         files: 1
     },
     fileFilter: (req, file, cb) => {
-        // Validar tipos de archivo permitidos
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
@@ -93,29 +84,32 @@ const upload = multer({
     }
 });
 
+// Store para sesiones simples (en memoria)
+const activeSessions = new Map();
+
 // Función para logging de seguridad
 function logSecurityEvent(event, ip, details = '') {
     console.log(`🔒 [SECURITY] ${new Date().toISOString()} - ${event} - IP: ${ip} - ${details}`);
 }
 
-// Middleware de autenticación JWT
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-        logSecurityEvent('UNAUTHORIZED_ACCESS_ATTEMPT', req.ip, 'No token provided');
-        return res.status(401).json({ error: 'Token de acceso requerido' });
+// Middleware de autenticación simple
+function authenticateSession(req, res, next) {
+    const sessionId = req.headers['x-session-id'];
+    
+    if (!sessionId || !activeSessions.has(sessionId)) {
+        logSecurityEvent('UNAUTHORIZED_ACCESS_ATTEMPT', req.ip, 'No session or invalid session');
+        return res.status(401).json({ error: 'Sesión requerida o inválida' });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            logSecurityEvent('INVALID_TOKEN', req.ip, err.message);
-            return res.status(403).json({ error: 'Token inválido o expirado' });
-        }
-        req.user = user;
-        next();
-    });
+    const session = activeSessions.get(sessionId);
+    if (session.expiresAt < Date.now()) {
+        activeSessions.delete(sessionId);
+        logSecurityEvent('SESSION_EXPIRED', req.ip, sessionId);
+        return res.status(401).json({ error: 'Sesión expirada' });
+    }
+
+    req.user = session.user;
+    next();
 }
 
 // Validadores de entrada
@@ -134,20 +128,15 @@ const validateLoginData = [
     body('password').notEmpty().isLength({ min: 1, max: 100 })
 ];
 
-// Función para calcular días restantes (timezone-safe)
+// Función para calcular días restantes
 function calcularDiasRestantes(fechaVencimiento) {
     if (!fechaVencimiento) return 0;
-
     const hoy = new Date();
     const hoyUTC = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
-
     const vencimiento = new Date(fechaVencimiento);
     const vencimientoUTC = Date.UTC(vencimiento.getUTCFullYear(), vencimiento.getUTCMonth(), vencimiento.getUTCDate());
-
     const diferenciaMilisegundos = vencimientoUTC - hoyUTC;
-    
     const dias = Math.ceil(diferenciaMilisegundos / (1000 * 60 * 60 * 24));
-    
     return Math.max(0, dias);
 }
 
@@ -155,30 +144,24 @@ function calcularDiasRestantesPerfil(fechaVencimientoCliente) {
     return calcularDiasRestantes(fechaVencimientoCliente);
 }
 
-// Función para actualizar estado automáticamente
 function actualizarEstado(diasRestantes) {
     if (diasRestantes > 5) return 'active';
     if (diasRestantes > 0) return 'inactive';
     return 'expired';
 }
 
-// Función para procesar perfiles y calcular días restantes individuales
 function procesarPerfiles(profiles) {
     if (!profiles || !Array.isArray(profiles)) return [];
-    
     return profiles.map(profile => {
         if (profile.estado === 'vendido' && profile.fechaVencimiento) {
             const diasRestantesCliente = calcularDiasRestantesPerfil(profile.fechaVencimiento);
-            return {
-                ...profile,
-                diasRestantes: diasRestantesCliente
-            };
+            return { ...profile, diasRestantes: diasRestantesCliente };
         }
         return profile;
     });
 }
 
-// Crear tabla si no existe con mejoras de seguridad
+// Crear tabla si no existe
 async function initDB() {
     try {
         await pool.query(`
@@ -211,9 +194,7 @@ async function initDB() {
                 id SERIAL PRIMARY KEY,
                 provider_threshold_days INTEGER NOT NULL DEFAULT 5,
                 client_threshold_days INTEGER NOT NULL DEFAULT 3,
-                ntfy_topic TEXT,
-                created_at TIMESTAMP DEFAULT NOW(),
-                updated_at TIMESTAMP DEFAULT NOW()
+                ntfy_topic TEXT
             )
         `);
 
@@ -233,7 +214,6 @@ async function initDB() {
                 item_id TEXT NOT NULL, 
                 item_type TEXT NOT NULL, 
                 sent_at TIMESTAMP NOT NULL, 
-                created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(item_id, item_type)
             )
         `);
@@ -276,10 +256,9 @@ async function initDB() {
     }
 }
 
-// Lógica de envío de alarmas por NTFY (sin cambios de seguridad necesarios)
+// Lógica de envío de alarmas por NTFY
 async function checkAndSendAlarms() {
     console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
-
     try {
         const settingsRes = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
         const settings = settingsRes.rows[0];
@@ -306,8 +285,6 @@ async function checkAndSendAlarms() {
                     });
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                     console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
-                } else {
-                    console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                 }
             }
 
@@ -328,8 +305,6 @@ async function checkAndSendAlarms() {
                            });
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                            console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
-                        } else {
-                            console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                         }
                     }
                 }
@@ -340,9 +315,9 @@ async function checkAndSendAlarms() {
     }
 }
 
-// RUTAS API SEGURAS
+// RUTAS API
 
-// Health check (sin autenticación)
+// Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
@@ -379,12 +354,11 @@ app.post('/api/login', authLimiter, validateLoginData, async (req, res) => {
         const isValidPassword = await bcrypt.compare(password, user.password_hash);
         
         if (!isValidPassword) {
-            // Incrementar intentos fallidos
             const newFailedAttempts = (user.failed_attempts || 0) + 1;
             let lockedUntil = null;
             
             if (newFailedAttempts >= 5) {
-                lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // Bloquear por 15 minutos
+                lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
             }
             
             await pool.query(
@@ -396,24 +370,27 @@ app.post('/api/login', authLimiter, validateLoginData, async (req, res) => {
             return res.status(401).json({ success: false, message: 'Credenciales inválidas' });
         }
 
-        // Login exitoso - resetear contadores y generar JWT
+        // Login exitoso
         await pool.query(
             'UPDATE admin_users SET failed_attempts = 0, locked_until = NULL, last_login = NOW() WHERE id = $1',
             [user.id]
         );
 
-        const token = jwt.sign(
-            { id: user.id, username: user.username },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
+        // Crear sesión simple
+        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const expiresAt = Date.now() + (24 * 60 * 60 * 1000);
+        
+        activeSessions.set(sessionId, {
+            user: { id: user.id, username: user.username },
+            expiresAt: expiresAt
+        });
 
         logSecurityEvent('LOGIN_SUCCESS', req.ip, `Usuario: ${username}`);
         
         res.json({ 
             success: true, 
             message: 'Login exitoso',
-            token: token,
+            sessionId: sessionId,
             expiresIn: '24h'
         });
     } catch (error) {
@@ -423,11 +400,11 @@ app.post('/api/login', authLimiter, validateLoginData, async (req, res) => {
     }
 });
 
-// Todas las rutas siguientes requieren autenticación
-app.use('/api/accounts', authenticateToken);
-app.use('/api/stats', authenticateToken);
-app.use('/api/alarms', authenticateToken);
-app.use('/api/check-micuenta-me-code', authenticateToken);
+// Rutas protegidas
+app.use('/api/accounts', authenticateSession);
+app.use('/api/stats', authenticateSession);
+app.use('/api/alarms', authenticateSession);
+app.use('/api/check-micuenta-me-code', authenticateSession);
 
 // Obtener cuentas
 app.get('/api/accounts', async (req, res) => {
@@ -445,15 +422,11 @@ app.post('/api/accounts', validateAccountData, async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Datos de entrada inválidos', 
-                details: errors.array() 
-            });
+            return res.status(400).json({ error: 'Datos de entrada inválidos', details: errors.array() });
         }
 
         const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
         
-        // Verificar si ya existe una cuenta con el mismo ID
         const existingAccount = await pool.query('SELECT id FROM accounts WHERE id = $1', [id]);
         if (existingAccount.rows.length > 0) {
             return res.status(409).json({ error: 'Ya existe una cuenta con este ID' });
@@ -484,10 +457,7 @@ app.put('/api/accounts/:id', param('id').notEmpty().trim().escape(), validateAcc
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Datos de entrada inválidos', 
-                details: errors.array() 
-            });
+            return res.status(400).json({ error: 'Datos de entrada inválidos', details: errors.array() });
         }
 
         const { id } = req.params;
@@ -522,19 +492,9 @@ app.put('/api/accounts/:id', param('id').notEmpty().trim().escape(), validateAcc
 app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', 
     param('accountId').notEmpty().trim().escape(),
     param('profileIndex').isInt({ min: 0 }),
-    body('numero_operacion').optional().trim().escape(),
-    body('monto_pagado').optional().isFloat({ min: 0 }),
     upload.single('voucher'), 
     async (req, res) => {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Datos de entrada inválidos', 
-                details: errors.array() 
-            });
-        }
-
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
         
@@ -593,14 +553,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher',
 // Eliminar cuenta
 app.delete('/api/accounts/:id', param('id').notEmpty().trim().escape(), async (req, res) => {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Datos de entrada inválidos', 
-                details: errors.array() 
-            });
-        }
-
         const { id } = req.params;
         const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
         
@@ -670,15 +622,12 @@ app.put('/api/alarms/settings', [
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Datos de entrada inválidos', 
-                details: errors.array() 
-            });
+            return res.status(400).json({ error: 'Datos de entrada inválidos', details: errors.array() });
         }
 
         const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
         const result = await pool.query(
-            'UPDATE alarm_settings SET provider_threshold_days = $1, client_threshold_days = $2, ntfy_topic = $3, updated_at = NOW() WHERE id = 1 RETURNING *',
+            'UPDATE alarm_settings SET provider_threshold_days = $1, client_threshold_days = $2, ntfy_topic = $3 WHERE id = 1 RETURNING *',
             [provider_threshold_days, client_threshold_days, ntfy_topic]
         );
         
@@ -703,7 +652,7 @@ app.post('/api/alarms/test', async (req, res) => {
     }
 });
 
-// Consulta a micuenta.me con validación mejorada
+// Consulta a micuenta.me
 app.post('/api/check-micuenta-me-code', [
     body('code').notEmpty().trim().isLength({ min: 1, max: 50 }).escape(),
     body('pdv').optional().trim().isLength({ max: 50 }).escape()
@@ -711,10 +660,7 @@ app.post('/api/check-micuenta-me-code', [
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Datos de entrada inválidos', 
-                details: errors.array() 
-            });
+            return res.status(400).json({ error: 'Datos de entrada inválidos', details: errors.array() });
         }
 
         const { code, pdv } = req.body;
@@ -726,7 +672,7 @@ app.post('/api/check-micuenta-me-code', [
                 'User-Agent': 'JIREH-Streaming-Manager/2.1.0'
             },
             body: JSON.stringify({ code: code, pdv: pdv }),
-            timeout: 10000 // 10 segundos de timeout
+            timeout: 10000
         });
 
         if (!response.ok) {
@@ -746,19 +692,6 @@ app.post('/api/check-micuenta-me-code', [
     }
 });
 
-// Ruta para obtener logs de seguridad (solo para debugging)
-app.get('/api/security/logs', async (req, res) => {
-    try {
-        const result = await pool.query(
-            'SELECT event_type, ip_address, details, created_at FROM security_logs ORDER BY created_at DESC LIMIT 100'
-        );
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Error obteniendo logs de seguridad:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
 // Middleware para manejo de errores
 app.use((error, req, res, next) => {
     console.error('Error no manejado:', error);
@@ -773,7 +706,7 @@ app.use((error, req, res, next) => {
     res.status(500).json({ error: 'Error interno del servidor' });
 });
 
-// Servir archivos estáticos (sin cambios)
+// Servir archivos estáticos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
@@ -822,10 +755,10 @@ async function startServer() {
 
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager SEGURO corriendo en puerto ${PORT}`);
-            console.log(`🔒 Seguridad mejorada: JWT, Rate Limiting, Bcrypt, Helmet activados`);
+            console.log(`🔒 Seguridad mejorada: Rate Limiting, Bcrypt, Helmet, Validación activados`);
             
             // Iniciar sistema de alarmas
-            setInterval(checkAndSendAlarms, 3600000); // Cada hora
+            setInterval(checkAndSendAlarms, 3600000);
             console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
             
             // Log del inicio del servidor
