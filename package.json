@@ -1,22 +1,36 @@
 {
   "name": "jireh-streaming-manager",
   "version": "2.0.0",
-  "description": "Sistema profesional de gestión multi-plataforma de streaming con vouchers",
+  "description": "Sistema profesional de gestión multi-plataforma de streaming con vouchers y seguridad mejorada",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "echo 'Build completed'"
+    "build": "echo 'Build completed'",
+    "test": "echo 'No tests specified yet'",
+    "security-audit": "npm audit",
+    "update-deps": "npm update"
   },
   "dependencies": {
     "express": "^4.18.2",
     "pg": "^8.11.3",
     "cors": "^2.8.5",
     "multer": "^1.4.5-lts.1",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.7",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "validator": "^13.11.0",
+    "express-validator": "^7.0.1",
+    "express-slow-down": "^2.0.1",
+    "compression": "^1.7.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "eslint": "^8.55.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-security": "^1.7.1"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -30,9 +44,49 @@
     "express",
     "railway",
     "vouchers",
-    "fechas-automaticas"
+    "fechas-automaticas",
+    "security",
+    "jwt",
+    "bcrypt",
+    "rate-limiting"
   ],
   "author": "Paolo F",
-  "license": "MIT"
-}
-
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/jireh-streaming-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/jireh-streaming-manager/issues"
+  },
+  "homepage": "https://streaming-manager-production.up.railway.app",
+  "security": {
+    "advisories": {
+      "report": true
+    }
+  },
+  "eslintConfig": {
+    "extends": [
+      "standard",
+      "plugin:security/recommended"
+    ],
+    "env": {
+      "node": true,
+      "es2022": true
+    },
+    "rules": {
+      "security/detect-object-injection": "warn",
+      "security/detect-non-literal-regexp": "warn",
+      "security/detect-unsafe-regex": "error"
+    }
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "node_modules/",
+      "public/",
+      "*.log"
+    ],
+    "env": {
+      "NODE_ENV": "development"
+    }
+  }
