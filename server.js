@@ -447,6 +447,178 @@ app.get('/api/accounts', async (req, res) => {
     }
 });
 
+app.post('/api/accounts', validateAccount, handleValidationErrors, async (req, res) => {
+    try {
+        const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
+        
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        
+        const result = await pool.query(
+            `INSERT INTO accounts (id, client_name, client_phone, email, password, type, country, profiles, days_remaining, status, fecha_inicio_proveedor, fecha_vencimiento_proveedor, estado_pago, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()) RETURNING *`,
+            [id, client_name, client_phone || '', email, password, type, country, JSON.stringify(profiles), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, 'activo']
+        );
+        
+        logger.success(`Cuenta creada: ${id} para ${client_name}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error creando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+app.put('/api/accounts/:id', validateAccount, handleValidationErrors, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
+        
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        const profilesActualizados = procesarPerfiles(profiles);
+        
+        const result = await pool.query(
+            `UPDATE accounts SET client_name = $1, client_phone = $2, email = $3, password = $4, type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
+             WHERE id = $12 RETURNING *`,
+            [client_name, client_phone || '', email, password, type, country, JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        logger.success(`Cuenta actualizada: ${id}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error actualizando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
+    try {
+        const { accountId, profileIndex } = req.params;
+        const { numero_operacion, monto_pagado } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+        
+        // Validar datos del voucher
+        if (!numero_operacion || !monto_pagado) {
+            return res.status(400).json({ error: 'Número de operación y monto son requeridos' });
+        }
+        
+        const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
+        if (accountResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        const account = accountResult.rows[0];
+        const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
+        const profileIdx = parseInt(profileIndex);
+        
+        if (profileIdx < 0 || profileIdx >= profiles.length) {
+            return res.status(400).json({ error: 'Índice de perfil inválido' });
+        }
+        
+        const profile = profiles[profileIdx];
+        const voucherBase64 = req.file.buffer.toString('base64');
+        
+        // Actualizar perfil con voucher
+        profile.voucherImagen = voucherBase64;
+        profile.numeroOperacion = numero_operacion;
+        profile.montoPagado = parseFloat(monto_pagado);
+        profile.voucherSubido = true;
+        profile.fechaVoucher = new Date().toISOString();
+        
+        if (profile.estado === 'vendido') {
+            const fechaVencimientoActual = new Date(profile.fechaVencimiento);
+            const nuevaFechaVencimiento = new Date(fechaVencimientoActual);
+            nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
+            
+            profile.fechaVencimiento = nuevaFechaVencimiento.toISOString().split('T')[0];
+            
+            const fechaProximoPago = new Date(nuevaFechaVencimiento);
+            fechaProximoPago.setDate(fechaProximoPago.getDate() - 1);
+            profile.fechaProximoPago = fechaProximoPago.toISOString().split('T')[0];
+            profile.fechaCorte = nuevaFechaVencimiento.toISOString().split('T')[0];
+            profile.diasRestantes = calcularDiasRestantesPerfil(profile.fechaVencimiento);
+            profile.estadoPago = 'pagado';
+            profile.fechaUltimaRenovacion = new Date().toISOString().split('T')[0];
+        } else {
+            profile.estadoPago = 'confirmado';
+        }
+        
+        await pool.query('UPDATE accounts SET profiles = $1 WHERE id = $2', [JSON.stringify(profiles), accountId]);
+        
+        logger.success(`Voucher procesado para cuenta ${accountId}, perfil ${profileIndex}`);
+        res.json({ success: true, message: 'Voucher procesado', profile: profile });
+    } catch (error) {
+        logger.error('Error procesando voucher:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+app.delete('/api/accounts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        logger.success(`Cuenta eliminada: ${id}`);
+        res.json({ message: 'Cuenta eliminada exitosamente' });
+    } catch (error) {
+        logger.error('Error eliminando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+app.get('/api/stats', async (req, res) => {
+    try {
+        const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
+        const accountsResult = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
+        
+        let activeCount = 0, expiringCount = 0, totalProfiles = 0, soldProfiles = 0;
+        const today = new Date();
+        
+        accountsResult.rows.forEach(row => {
+            const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles || [];
+            totalProfiles += profiles.length;
+            soldProfiles += profiles.filter(p => p.estado === 'vendido').length;
+            
+            if (row.fecha_vencimiento_proveedor) {
+                const vencimiento = new Date(row.fecha_vencimiento_proveedor);
+                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
+                if (diffDays > 5) activeCount++;
+                else if (diffDays > 0) expiringCount++;
+            }
+        });
+        
+        res.json({
+            total: parseInt(totalResult.rows[0].count),
+            active: activeCount,
+            profiles: totalProfiles,
+            expiring: expiringCount,
+            sold_profiles: soldProfiles
+        });
+    } catch (error) {
+        logger.error('Error obteniendo estadísticas:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
 app.get('/api/alarms/settings', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
@@ -674,172 +846,3 @@ process.on('uncaughtException', (error) => {
 // INICIAR APLICACIÓN
 // ===============================================
 startServer();
-
-app.post('/api/accounts', validateAccount, handleValidationErrors, async (req, res) => {
-    try {
-        const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
-        
-        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
-        const fechaVencimientoProveedor = new Date(fechaInicio);
-        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
-        
-        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
-        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
-        
-        const result = await pool.query(
-            `INSERT INTO accounts (id, client_name, client_phone, email, password, type, country, profiles, days_remaining, status, fecha_inicio_proveedor, fecha_vencimiento_proveedor, estado_pago, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()) RETURNING *`,
-            [id, client_name, client_phone || '', email, password, type, country, JSON.stringify(profiles), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, 'activo']
-        );
-        
-        logger.success(`Cuenta creada: ${id} para ${client_name}`);
-        res.json(result.rows[0]);
-    } catch (error) {
-        logger.error('Error creando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
-    }
-});
-
-app.put('/api/accounts/:id', validateAccount, handleValidationErrors, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
-        
-        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
-        const fechaVencimientoProveedor = new Date(fechaInicio);
-        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
-        
-        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
-        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
-        const profilesActualizados = procesarPerfiles(profiles);
-        
-        const result = await pool.query(
-            `UPDATE accounts SET client_name = $1, client_phone = $2, email = $3, password = $4, type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
-             WHERE id = $12 RETURNING *`,
-            [client_name, client_phone || '', email, password, type, country, JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, id]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
-        logger.success(`Cuenta actualizada: ${id}`);
-        res.json(result.rows[0]);
-    } catch (error) {
-        logger.error('Error actualizando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
-    }
-});
-
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
-    try {
-        const { accountId, profileIndex } = req.params;
-        const { numero_operacion, monto_pagado } = req.body;
-        
-        if (!req.file) {
-            return res.status(400).json({ error: 'No se subió ningún archivo' });
-        }
-        
-        // Validar datos del voucher
-        if (!numero_operacion || !monto_pagado) {
-            return res.status(400).json({ error: 'Número de operación y monto son requeridos' });
-        }
-        
-        const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
-        if (accountResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
-        const account = accountResult.rows[0];
-        const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
-        const profileIdx = parseInt(profileIndex);
-        
-        if (profileIdx < 0 || profileIdx >= profiles.length) {
-            return res.status(400).json({ error: 'Índice de perfil inválido' });
-        }
-        
-        const profile = profiles[profileIdx];
-        const voucherBase64 = req.file.buffer.toString('base64');
-        
-        // Actualizar perfil con voucher
-        profile.voucherImagen = voucherBase64;
-        profile.numeroOperacion = numero_operacion;
-        profile.montoPagado = parseFloat(monto_pagado);
-        profile.voucherSubido = true;
-        profile.fechaVoucher = new Date().toISOString();
-        
-        if (profile.estado === 'vendido') {
-            const fechaVencimientoActual = new Date(profile.fechaVencimiento);
-            const nuevaFechaVencimiento = new Date(fechaVencimientoActual);
-            nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
-            
-            profile.fechaVencimiento = nuevaFechaVencimiento.toISOString().split('T')[0];
-            
-            const fechaProximoPago = new Date(nuevaFechaVencimiento);
-            fechaProximoPago.setDate(fechaProximoPago.getDate() - 1);
-            profile.fechaProximoPago = fechaProximoPago.toISOString().split('T')[0];
-            profile.fechaCorte = nuevaFechaVencimiento.toISOString().split('T')[0];
-            profile.diasRestantes = calcularDiasRestantesPerfil(profile.fechaVencimiento);
-            profile.estadoPago = 'pagado';
-            profile.fechaUltimaRenovacion = new Date().toISOString().split('T')[0];
-        } else {
-            profile.estadoPago = 'confirmado';
-        }
-        
-        await pool.query('UPDATE accounts SET profiles = $1 WHERE id = $2', [JSON.stringify(profiles), accountId]);
-        
-        logger.success(`Voucher procesado para cuenta ${accountId}, perfil ${profileIndex}`);
-        res.json({ success: true, message: 'Voucher procesado', profile: profile });
-    } catch (error) {
-        logger.error('Error procesando voucher:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
-    }
-});
-
-app.delete('/api/accounts/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
-        logger.success(`Cuenta eliminada: ${id}`);
-        res.json({ message: 'Cuenta eliminada exitosamente' });
-    } catch (error) {
-        logger.error('Error eliminando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
-app.get('/api/stats', async (req, res) => {
-    try {
-        const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
-        const accountsResult = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
-        
-        let activeCount = 0, expiringCount = 0, totalProfiles = 0, soldProfiles = 0;
-        const today = new Date();
-        
-        accountsResult.rows.forEach(row => {
-            const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles || [];
-            totalProfiles += profiles.length;
-            soldProfiles += profiles.filter(p => p.estado === 'vendido').length;
-            
-            if (row.fecha_vencimiento_proveedor) {
-                const vencimiento = new Date(row.fecha_vencimiento_proveedor);
-                const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
-                if (diffDays > 5) activeCount++;
-                else if (diffDays > 0) expiringCount++;
-            }
-        });
-        
-        res.json({
-            total: parseInt(totalResult.rows[0].count),
-            active: activeCount,
-            profiles: totalProfiles,
-            expiring: expiringCount,
-            sold_profiles: soldProfiles
-        });
-    } catch (error) {
-        logger.error('Error obteniendo estadísticas:', error);
