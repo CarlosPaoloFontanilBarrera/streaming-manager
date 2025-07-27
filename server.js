@@ -28,22 +28,20 @@ app.use(cors({
     credentials: true
 }));
 
-// Rate limiting mejorado para Railway
+// Rate limiting mejorado
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 100, // máximo 100 requests por IP
     message: { error: 'Demasiadas solicitudes, intenta en 15 minutos' },
     standardHeaders: true,
     legacyHeaders: false,
-    trustProxy: true, // Configuración para Railway
 });
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 5, // máximo 5 intentos de login por IP
     message: { error: 'Demasiados intentos de login, intenta en 15 minutos' },
-    skipSuccessfulRequests: true,
-    trustProxy: true, // Configuración para Railway
+    skipSuccessfulRequests: true
 });
 
 app.use('/api/', limiter);
@@ -243,7 +241,6 @@ async function createAdminUser() {
         logger.error('Error creando usuario admin:', error);
     }
 }
-
 // ===============================================
 // SISTEMA DE ALARMAS NTFY
 // ===============================================
@@ -470,42 +467,8 @@ app.post('/api/accounts', validateAccount, handleValidationErrors, async (req, r
         res.json(result.rows[0]);
     } catch (error) {
         logger.error('Error creando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
-    }
-});
-
-app.put('/api/accounts/:id', validateAccount, handleValidationErrors, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
-        
-        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
-        const fechaVencimientoProveedor = new Date(fechaInicio);
-        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
-        
-        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
-        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
-        const profilesActualizados = procesarPerfiles(profiles);
-        
-        const result = await pool.query(
-            `UPDATE accounts SET client_name = $1, client_phone = $2, email = $3, password = $4, type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
-             WHERE id = $12 RETURNING *`,
-            [client_name, client_phone || '', email, password, type, country, JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, id]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-        
-        logger.success(`Cuenta actualizada: ${id}`);
-        res.json(result.rows[0]);
-    } catch (error) {
-        logger.error('Error actualizando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
-    }
-});
-
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
+        res.status(500).json({ error: 'Error interno del servidor: ' + error
+                              app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
@@ -651,10 +614,6 @@ app.put('/api/alarms/settings', [
     }
 });
 
-app.post('/api/alarms/test', async (req, res) => {
-    logger.info('Disparando prueba de alarmas manualmente...');
-    try {
-        await checkAndSendAlarms();
 app.post('/api/alarms/test', async (req, res) => {
     logger.info('Disparando prueba de alarmas manualmente...');
     try {
