@@ -841,4 +841,18 @@
             elements.username.focus();
         }
 
-        // Initialize when DOM
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', initializeApp);
+        
+        // Periodic connection check
+        setInterval(checkRailwayConnection, 30000); // Check every 30 seconds
+        
+        // Handle visibility change to refresh connection
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                checkRailwayConnection();
+            }
+        });
+    </script>
+</body>
+</html>
