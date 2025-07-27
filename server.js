@@ -241,6 +241,7 @@ async function createAdminUser() {
         logger.error('Error creando usuario admin:', error);
     }
 }
+
 // ===============================================
 // SISTEMA DE ALARMAS NTFY
 // ===============================================
@@ -467,7 +468,38 @@ app.post('/api/accounts', validateAccount, handleValidationErrors, async (req, r
         res.json(result.rows[0]);
     } catch (error) {
         logger.error('Error creando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' +
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+app.put('/api/accounts/:id', validateAccount, handleValidationErrors, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
+        
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        const profilesActualizados = procesarPerfiles(profiles);
+        
+        const result = await pool.query(
+            `UPDATE accounts SET client_name = $1, client_phone = $2, email = $3, password = $4, type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
+             WHERE id = $12 RETURNING *`,
+            [client_name, client_phone || '', email, password, type, country, JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        logger.success(`Cuenta actualizada: ${id}`);
+        res.json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error actualizando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
