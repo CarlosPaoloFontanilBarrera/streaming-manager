@@ -467,8 +467,11 @@ app.post('/api/accounts', validateAccount, handleValidationErrors, async (req, r
         res.json(result.rows[0]);
     } catch (error) {
         logger.error('Error creando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' + error
-                              app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
+        res.status(500).json({ error: 'Error interno del servidor: ' +
+    }
+});
+
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
