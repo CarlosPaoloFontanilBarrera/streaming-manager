@@ -3,8 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - JIREH Streaming Manager</title>
+    <title>Login Seguro - JIREH Streaming Manager</title>
     <style>
+        :root {
+            --primary-color: #e50914;
+            --secondary-color: #141414;
+            --accent-color: #f40612;
+            --success-color: #00d4aa;
+            --warning-color: #ff9500;
+            --error-color: #ff5252;
+            --text-light: #ffffff;
+            --text-dark: #333333;
+            --border-radius: 12px;
+            --box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            --gradient-primary: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+            --gradient-card: linear-gradient(145deg, #ffffff, #f8f9fa);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,122 +27,247 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #141414, #e50914);
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--gradient-primary);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Background Animation */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(229, 9, 20, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(20, 20, 20, 0.1) 0%, transparent 50%);
+            animation: backgroundPulse 8s ease-in-out infinite alternate;
+            z-index: -1;
+        }
+
+        @keyframes backgroundPulse {
+            0% { opacity: 0.5; transform: scale(1); }
+            100% { opacity: 0.8; transform: scale(1.05); }
         }
         
         .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            background: var(--gradient-card);
+            padding: 50px 40px;
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.15),
+                0 0 40px rgba(229, 9, 20, 0.1);
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             text-align: center;
+            position: relative;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .login-logo {
-            font-size: 3em;
-            color: #e50914;
+            font-size: 4em;
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             margin-bottom: 20px;
+            animation: logoPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes logoPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
         }
         
         .login-title {
-            font-size: 2em;
-            color: #333;
-            margin-bottom: 10px;
+            font-size: 2.2em;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
         
         .login-subtitle {
             color: #666;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
             font-size: 1.1em;
+            font-weight: 400;
+        }
+
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--success-color);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-bottom: 30px;
+            border: 1px solid rgba(0, 212, 170, 0.2);
         }
         
         .login-form {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 24px;
+        }
+
+        .input-group {
+            position: relative;
+            width: 100%;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            color: #999;
+            z-index: 2;
+            transition: all 0.3s ease;
         }
         
         .login-input {
-            padding: 15px;
-            border: 2px solid #dee2e6;
-            border-radius: 10px;
+            width: 100%;
+            padding: 18px 18px 18px 55px;
+            border: 2px solid #e1e5e9;
+            border-radius: var(--border-radius);
             font-size: 1.1em;
             transition: all 0.3s ease;
-            width: 100%;
+            background: #ffffff;
+            color: var(--text-dark);
+            font-weight: 500;
         }
         
         .login-input:focus {
             outline: none;
-            border-color: #e50914;
-            box-shadow: 0 0 10px rgba(229, 9, 20, 0.2);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.1);
+            transform: translateY(-2px);
         }
-        
+
+        .login-input:focus + .input-icon {
+            color: var(--primary-color);
+            transform: translateY(-50%) scale(1.1);
+        }
+
         .password-container {
             position: relative;
-            width: 100%;
         }
         
         .password-toggle {
             position: absolute;
-            right: 15px;
+            right: 18px;
             top: 50%;
             transform: translateY(-50%);
             background: none;
             border: none;
             cursor: pointer;
-            font-size: 1.2em;
-            color: #666;
-            padding: 5px;
-            z-index: 10;
-            border-radius: 3px;
+            font-size: 1.3em;
+            color: #999;
+            padding: 8px;
+            border-radius: 6px;
             transition: all 0.3s ease;
+            z-index: 10;
         }
         
         .password-toggle:hover {
-            color: #e50914;
+            color: var(--primary-color);
             background: rgba(229, 9, 20, 0.1);
+        }
+
+        .security-features {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 15px 0;
         }
         
         .remember-me {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.9em;
+            gap: 10px;
+            font-size: 0.95em;
             color: #666;
-            margin-top: 10px;
-            justify-content: flex-start;
         }
         
         .remember-me input[type="checkbox"] {
-            margin: 0;
-            transform: scale(1.2);
-            accent-color: #e50914;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .forgot-password {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.95em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .forgot-password:hover {
+            color: var(--accent-color);
+            text-decoration: underline;
         }
         
         .login-btn {
-            background: linear-gradient(45deg, #e50914, #dc143c);
-            color: white;
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            color: var(--text-light);
             border: none;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 18px 24px;
+            border-radius: var(--border-radius);
             font-size: 1.2em;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(229, 9, 20, 0.3);
+            box-shadow: 0 8px 25px rgba(229, 9, 20, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .login-btn:hover::before {
+            left: 100%;
         }
         
         .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(229, 9, 20, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(229, 9, 20, 0.4);
         }
         
         .login-btn:disabled {
@@ -135,71 +275,154 @@
             cursor: not-allowed;
             transform: none;
         }
-        
-        .login-error {
-            color: #dc3545;
-            margin-top: 10px;
-            font-weight: bold;
-            background: rgba(220, 53, 69, 0.1);
-            padding: 10px;
-            border-radius: 5px;
-            border-left: 3px solid #dc3545;
+
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         
-        .login-info {
+        .alert {
+            padding: 16px 20px;
+            border-radius: var(--border-radius);
+            font-weight: 500;
             margin-top: 20px;
-            font-size: 0.9em;
-            color: #666;
+            border-left: 4px solid;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-error {
+            background: rgba(255, 82, 82, 0.1);
+            color: var(--error-color);
+            border-left-color: var(--error-color);
+        }
+
+        .alert-success {
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--success-color);
+            border-left-color: var(--success-color);
+        }
+
+        .alert-warning {
+            background: rgba(255, 149, 0, 0.1);
+            color: var(--warning-color);
+            border-left-color: var(--warning-color);
+        }
+        
+        .system-info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(20, 20, 20, 0.05);
+            border-radius: var(--border-radius);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
+            gap: 12px;
+            font-size: 0.95em;
+            color: #666;
         }
-        
-        .loading {
-            display: none;
-            margin-top: 10px;
-            color: #e50914;
-            font-weight: bold;
-        }
-        
-        .status-indicator {
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
             margin-top: 15px;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 0.9em;
-            display: none;
+            transition: all 0.3s ease;
         }
-        
-        .status-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+
+        .status-connected {
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(0, 212, 170, 0.2);
         }
-        
-        .status-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+
+        .status-disconnected {
+            background: rgba(255, 82, 82, 0.1);
+            color: var(--error-color);
+            border: 1px solid rgba(255, 82, 82, 0.2);
         }
-        
+
+        .status-checking {
+            background: rgba(255, 149, 0, 0.1);
+            color: var(--warning-color);
+            border: 1px solid rgba(255, 149, 0, 0.2);
+        }
+
+        /* Responsive Design */
         @media (max-width: 480px) {
             .login-container {
                 margin: 20px;
-                padding: 30px 20px;
+                padding: 40px 25px;
                 max-width: 90%;
             }
             
             .login-logo {
-                font-size: 2.5em;
+                font-size: 3em;
             }
             
             .login-title {
-                font-size: 1.5em;
+                font-size: 1.8em;
             }
             
             .login-subtitle {
                 font-size: 1em;
+            }
+
+            .login-input {
+                padding: 16px 16px 16px 50px;
+            }
+
+            .security-features {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .login-container {
+                background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
+                color: var(--text-light);
+            }
+
+            .login-title {
+                color: var(--text-light);
+            }
+
+            .login-input {
+                background: #2d2d2d;
+                color: var(--text-light);
+                border-color: #404040;
+            }
+
+            .system-info {
+                background: rgba(255, 255, 255, 0.05);
             }
         }
     </style>
@@ -207,138 +430,200 @@
 <body>
     <div class="login-container">
         <div class="login-logo">🎬</div>
-        <h2 class="login-title">JIREH Streaming Manager</h2>
-        <p class="login-subtitle">Sistema con PostgreSQL en Railway</p>
+        <h1 class="login-title">JIREH Streaming Manager</h1>
+        <p class="login-subtitle">Sistema Seguro con PostgreSQL + Railway</p>
+        
+        <div class="security-badge">
+            <span>🔒</span>
+            <span>Autenticación Segura</span>
+        </div>
         
         <form class="login-form" id="loginForm">
-            <input type="text" class="login-input" id="username" placeholder="👤 Usuario" required autocomplete="username">
-            <div class="password-container">
-                <input type="password" class="login-input" id="password" placeholder="🔒 Contraseña" required autocomplete="current-password">
+            <div class="input-group">
+                <input type="text" class="login-input" id="username" placeholder="Nombre de usuario" required autocomplete="username">
+                <span class="input-icon">👤</span>
+            </div>
+            
+            <div class="input-group password-container">
+                <input type="password" class="login-input" id="password" placeholder="Contraseña segura" required autocomplete="current-password">
+                <span class="input-icon">🔒</span>
                 <button type="button" class="password-toggle" id="togglePassword" title="Mostrar contraseña">👁️</button>
             </div>
-            <div class="remember-me">
-                <input type="checkbox" id="rememberMe">
-                <label for="rememberMe">Recordar mis credenciales</label>
+
+            <div class="security-features">
+                <div class="remember-me">
+                    <input type="checkbox" id="rememberMe">
+                    <label for="rememberMe">Recordar sesión</label>
+                </div>
+                <a href="#" class="forgot-password" id="forgotPassword">¿Olvidaste tu contraseña?</a>
             </div>
-            <button type="submit" class="login-btn" id="loginButton">🚀 Iniciar Sesión</button>
-            <div class="loading" id="loading">⏳ Conectando con Railway...</div>
-            <div class="login-error" id="loginError" style="display: none;"></div>
-            <div class="status-indicator" id="statusIndicator"></div>
+            
+            <button type="submit" class="login-btn" id="loginButton">
+                <div class="loading-spinner" id="loadingSpinner"></div>
+                <span id="buttonText">🚀 Iniciar Sesión Segura</span>
+            </button>
+            
+            <div class="alert alert-error" id="errorAlert"></div>
+            <div class="alert alert-success" id="successAlert"></div>
+            <div class="alert alert-warning" id="warningAlert"></div>
         </form>
+
+        <div class="connection-status status-checking" id="connectionStatus">
+            <span>⏳</span>
+            <span>Verificando conexión...</span>
+        </div>
         
-        <div class="login-info">
-            <span>🔐</span>
-            <span>Acceso restringido - Sistema Railway</span>
+        <div class="system-info">
+            <span>🛡️</span>
+            <span>Conexión encriptada SSL/TLS</span>
+            <span>•</span>
+            <span>Sistema Railway Cloud</span>
         </div>
     </div>
 
     <script>
-        // API Configuration
-        const API_BASE = '/api';
-        
-        // Cargar credenciales guardadas al cargar la página
-        function loadSavedCredentials() {
-            const savedCredentials = localStorage.getItem('streamingAdminCredentials');
-            if (savedCredentials) {
-                try {
-                    const { username, password } = JSON.parse(savedCredentials);
-                    document.getElementById('username').value = username || '';
-                    document.getElementById('password').value = password || '';
-                    document.getElementById('rememberMe').checked = true;
-                } catch (error) {
-                    console.log('Error cargando credenciales guardadas');
-                }
+        // Enhanced Security Configuration
+        const CONFIG = {
+            API_BASE: '/api',
+            MAX_LOGIN_ATTEMPTS: 3,
+            LOCKOUT_DURATION: 15 * 60 * 1000, // 15 minutes
+            CONNECTION_TIMEOUT: 10000,
+            SESSION_DURATION: 24 * 60 * 60 * 1000 // 24 hours
+        };
+
+        // Security State Management
+        let loginAttempts = parseInt(localStorage.getItem('loginAttempts') || '0');
+        let lastFailedAttempt = parseInt(localStorage.getItem('lastFailedAttempt') || '0');
+        let connectionStatus = 'checking';
+
+        // Enhanced DOM Elements
+        const elements = {
+            form: document.getElementById('loginForm'),
+            username: document.getElementById('username'),
+            password: document.getElementById('password'),
+            rememberMe: document.getElementById('rememberMe'),
+            loginButton: document.getElementById('loginButton'),
+            buttonText: document.getElementById('buttonText'),
+            loadingSpinner: document.getElementById('loadingSpinner'),
+            togglePassword: document.getElementById('togglePassword'),
+            forgotPassword: document.getElementById('forgotPassword'),
+            connectionStatusEl: document.getElementById('connectionStatus'),
+            errorAlert: document.getElementById('errorAlert'),
+            successAlert: document.getElementById('successAlert'),
+            warningAlert: document.getElementById('warningAlert')
+        };
+
+        // Enhanced Security Functions
+        function isAccountLocked() {
+            if (loginAttempts >= CONFIG.MAX_LOGIN_ATTEMPTS) {
+                const timeRemaining = CONFIG.LOCKOUT_DURATION - (Date.now() - lastFailedAttempt);
+                return timeRemaining > 0;
             }
+            return false;
         }
-        
-        // Guardar credenciales si está marcado
-        function saveCredentials(username, password) {
-            const rememberMe = document.getElementById('rememberMe').checked;
-            if (rememberMe) {
-                localStorage.setItem('streamingAdminCredentials', JSON.stringify({
-                    username,
-                    password
-                }));
-            } else {
-                localStorage.removeItem('streamingAdminCredentials');
-            }
+
+        function getRemainingLockoutTime() {
+            const timeRemaining = CONFIG.LOCKOUT_DURATION - (Date.now() - lastFailedAttempt);
+            return Math.ceil(timeRemaining / 1000 / 60); // minutes
         }
-        
-        // Mostrar/ocultar contraseña
-        function togglePasswordVisibility() {
-            const passwordInput = document.getElementById('password');
-            const toggleButton = document.getElementById('togglePassword');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleButton.textContent = '🙈';
-                toggleButton.title = 'Ocultar contraseña';
-            } else {
-                passwordInput.type = 'password';
-                toggleButton.textContent = '👁️';
-                toggleButton.title = 'Mostrar contraseña';
-            }
+
+        function recordFailedAttempt() {
+            loginAttempts++;
+            lastFailedAttempt = Date.now();
+            localStorage.setItem('loginAttempts', loginAttempts.toString());
+            localStorage.setItem('lastFailedAttempt', lastFailedAttempt.toString());
         }
-        
-        // Mostrar error
-        function showError(message) {
-            const errorDiv = document.getElementById('loginError');
-            const loadingDiv = document.getElementById('loading');
-            const statusDiv = document.getElementById('statusIndicator');
+
+        function resetFailedAttempts() {
+            loginAttempts = 0;
+            localStorage.removeItem('loginAttempts');
+            localStorage.removeItem('lastFailedAttempt');
+        }
+
+        // Enhanced Alert System
+        function showAlert(type, message, duration = 5000) {
+            const alertEl = elements[`${type}Alert`];
+            alertEl.textContent = message;
+            alertEl.style.display = 'block';
             
-            loadingDiv.style.display = 'none';
-            statusDiv.style.display = 'none';
-            errorDiv.textContent = '❌ ' + message;
-            errorDiv.style.display = 'block';
-            
-            // Limpiar error después de 5 segundos
+            // Auto-hide after duration
             setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 5000);
+                alertEl.style.display = 'none';
+            }, duration);
         }
-        
-        // Mostrar éxito
-        function showSuccess(message) {
-            const statusDiv = document.getElementById('statusIndicator');
-            const loadingDiv = document.getElementById('loading');
-            const errorDiv = document.getElementById('loginError');
+
+        function hideAllAlerts() {
+            elements.errorAlert.style.display = 'none';
+            elements.successAlert.style.display = 'none';
+            elements.warningAlert.style.display = 'none';
+        }
+
+        // Enhanced Loading State
+        function setLoadingState(isLoading) {
+            elements.loginButton.disabled = isLoading;
+            elements.loadingSpinner.style.display = isLoading ? 'inline-block' : 'none';
+            elements.buttonText.textContent = isLoading ? 'Autenticando...' : '🚀 Iniciar Sesión Segura';
+        }
+
+        // Enhanced Connection Status
+        function updateConnectionStatus(status, message) {
+            connectionStatus = status;
+            const statusEl = elements.connectionStatusEl;
             
-            loadingDiv.style.display = 'none';
-            errorDiv.style.display = 'none';
-            statusDiv.className = 'status-indicator status-success';
-            statusDiv.textContent = '✅ ' + message;
-            statusDiv.style.display = 'block';
-        }
-        
-        // Mostrar loading
-        function showLoading() {
-            const errorDiv = document.getElementById('loginError');
-            const loadingDiv = document.getElementById('loading');
-            const statusDiv = document.getElementById('statusIndicator');
-            const loginButton = document.getElementById('loginButton');
+            statusEl.className = `connection-status status-${status}`;
             
-            errorDiv.style.display = 'none';
-            statusDiv.style.display = 'none';
-            loadingDiv.style.display = 'block';
-            loginButton.disabled = true;
-        }
-        
-        // Ocultar loading
-        function hideLoading() {
-            const loadingDiv = document.getElementById('loading');
-            const loginButton = document.getElementById('loginButton');
+            const icons = {
+                connected: '✅',
+                disconnected: '❌',
+                checking: '⏳'
+            };
             
-            loadingDiv.style.display = 'none';
-            loginButton.disabled = false;
+            statusEl.innerHTML = `<span>${icons[status]}</span><span>${message}</span>`;
         }
-        
-        // Login con API de Railway
-        async function loginWithAPI(username, password) {
+
+        // Enhanced Connection Check
+        async function checkRailwayConnection() {
             try {
-                const response = await fetch(`${API_BASE}/login`, {
+                updateConnectionStatus('checking', 'Verificando conexión...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.CONNECTION_TIMEOUT);
+                
+                const response = await fetch(`${CONFIG.API_BASE}/health`, {
+                    signal: controller.signal,
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.status === 'OK') {
+                        updateConnectionStatus('connected', 'Conectado a Railway');
+                        return true;
+                    }
+                }
+                
+                updateConnectionStatus('disconnected', 'Error de conexión');
+                return false;
+                
+            } catch (error) {
+                console.error('Connection check failed:', error);
+                updateConnectionStatus('disconnected', 'Sin conexión a Railway');
+                return false;
+            }
+        }
+
+        // Enhanced Authentication
+        async function authenticateUser(username, password) {
+            try {
+                const response = await fetch(`${CONFIG.API_BASE}/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
                     },
                     body: JSON.stringify({ username, password })
                 });
@@ -348,133 +633,212 @@
                 if (response.ok && result.success) {
                     return { success: true, message: result.message };
                 } else {
-                    return { success: false, message: result.message || 'Error desconocido' };
+                    return { success: false, message: result.message || 'Credenciales inválidas' };
                 }
                 
             } catch (error) {
-                console.error('❌ Error en login:', error);
-                return { success: false, message: 'Error de conexión con Railway' };
+                console.error('Authentication error:', error);
+                return { success: false, message: 'Error de conexión con el servidor' };
             }
         }
-        
-        // Verificar conexión con Railway
-        async function checkRailwayConnection() {
-            try {
-                const response = await fetch(`${API_BASE}/health`);
-                const result = await response.json();
-                
-                if (response.ok && result.status === 'OK') {
-                    return true;
-                } else {
-                    return false;
-                }
-            } catch (error) {
-                console.error('❌ Error verificando conexión:', error);
-                return false;
-            }
-        }
-        
-        // Manejar login
+
+        // Enhanced Login Handler
         async function handleLogin(event) {
             event.preventDefault();
+            hideAllAlerts();
             
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            
-            if (!username || !password) {
-                showError('Por favor completa todos los campos');
+            // Check if account is locked
+            if (isAccountLocked()) {
+                const remainingTime = getRemainingLockoutTime();
+                showAlert('error', `Cuenta bloqueada. Intenta nuevamente en ${remainingTime} minutos.`);
                 return;
             }
             
-            // Mostrar loading
-            showLoading();
+            const username = elements.username.value.trim();
+            const password = elements.password.value.trim();
             
-            // Verificar conexión primero
+            // Enhanced validation
+            if (!username || username.length < 3) {
+                showAlert('warning', 'El nombre de usuario debe tener al menos 3 caracteres');
+                return;
+            }
+            
+            if (!password || password.length < 6) {
+                showAlert('warning', 'La contraseña debe tener al menos 6 caracteres');
+                return;
+            }
+            
+            setLoadingState(true);
+            
+            // Verify connection first
             const isConnected = await checkRailwayConnection();
             if (!isConnected) {
-                hideLoading();
-                showError('No se puede conectar con Railway. Verifica tu conexión.');
+                setLoadingState(false);
+                showAlert('error', 'No se puede conectar con Railway. Verifica tu conexión.');
                 return;
             }
             
-            // Intentar login
-            const result = await loginWithAPI(username, password);
+            // Attempt authentication
+            const result = await authenticateUser(username, password);
             
             if (result.success) {
-                // Guardar credenciales si está marcado
-                saveCredentials(username, password);
+                resetFailedAttempts();
+                showAlert('success', 'Autenticación exitosa, redirigiendo...');
                 
-                // Mostrar éxito
-                showSuccess('Login exitoso, redirigiendo...');
-                
-                // Marcar como logueado
-                localStorage.setItem('streamingAdminLoggedIn', 'true');
-                
-                // Redirigir al dashboard después de un breve delay
-                setTimeout(() => {
-                    window.location.href = '/dashboard';
-                }, 1000);
-                
-            } else {
-                hideLoading();
-                showError(result.message);
-            }
-        }
-        
-        // Verificar si ya está logueado
-        function checkAuth() {
-            const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
-            if (isLoggedIn === 'true') {
-                // Ya está logueado, redirigir al dashboard
-                window.location.href = '/dashboard';
-            }
-        }
-        
-        // Test de conectividad
-        async function testConnection() {
-            try {
-                const isConnected = await checkRailwayConnection();
-                const statusDiv = document.getElementById('statusIndicator');
-                
-                if (isConnected) {
-                    statusDiv.className = 'status-indicator status-success';
-                    statusDiv.textContent = '✅ Conectado a Railway';
-                } else {
-                    statusDiv.className = 'status-indicator status-error';
-                    statusDiv.textContent = '❌ Sin conexión a Railway';
+                // Save credentials if requested
+                if (elements.rememberMe.checked) {
+                    const credentials = { username, timestamp: Date.now() };
+                    localStorage.setItem('streamingAdminCredentials', JSON.stringify(credentials));
                 }
                 
-                statusDiv.style.display = 'block';
+                // Set session
+                const sessionData = {
+                    loggedIn: true,
+                    timestamp: Date.now(),
+                    username: username
+                };
+                localStorage.setItem('streamingAdminSession', JSON.stringify(sessionData));
                 
+                // Redirect after delay
                 setTimeout(() => {
-                    statusDiv.style.display = 'none';
-                }, 3000);
+                    window.location.href = '/dashboard';
+                }, 1500);
                 
-            } catch (error) {
-                console.error('Error en test de conexión:', error);
+            } else {
+                recordFailedAttempt();
+                setLoadingState(false);
+                
+                const remainingAttempts = CONFIG.MAX_LOGIN_ATTEMPTS - loginAttempts;
+                if (remainingAttempts > 0) {
+                    showAlert('error', `${result.message}. Te quedan ${remainingAttempts} intentos.`);
+                } else {
+                    showAlert('error', 'Demasiados intentos fallidos. Cuenta bloqueada por 15 minutos.');
+                }
             }
         }
-        
-        // Event listeners
-        document.getElementById('loginForm').addEventListener('submit', handleLogin);
-        document.getElementById('togglePassword').addEventListener('click', function(e) {
-            e.preventDefault();
-            togglePasswordVisibility();
-        });
-        
-        // Doble click en el logo para test de conexión
-        document.querySelector('.login-logo').addEventListener('dblclick', testConnection);
-        
-        // Inicializar al cargar la página
-        window.onload = function() {
-            checkAuth();
+
+        // Enhanced Session Check
+        function checkExistingSession() {
+            try {
+                const sessionData = localStorage.getItem('streamingAdminSession');
+                if (sessionData) {
+                    const session = JSON.parse(sessionData);
+                    const sessionAge = Date.now() - session.timestamp;
+                    
+                    if (session.loggedIn && sessionAge < CONFIG.SESSION_DURATION) {
+                        // Valid session found
+                        showAlert('success', 'Sesión válida encontrada, redirigiendo...');
+                        setTimeout(() => {
+                            window.location.href = '/dashboard';
+                        }, 1000);
+                        return true;
+                    } else {
+                        // Expired session
+                        localStorage.removeItem('streamingAdminSession');
+                    }
+                }
+            } catch (error) {
+                console.error('Session check error:', error);
+                localStorage.removeItem('streamingAdminSession');
+            }
+            return false;
+        }
+
+        // Enhanced Credential Loading
+        function loadSavedCredentials() {
+            try {
+                const savedData = localStorage.getItem('streamingAdminCredentials');
+                if (savedData) {
+                    const credentials = JSON.parse(savedData);
+                    const credentialAge = Date.now() - credentials.timestamp;
+                    
+                    // Credentials expire after 30 days
+                    if (credentialAge < 30 * 24 * 60 * 60 * 1000) {
+                        elements.username.value = credentials.username || '';
+                        elements.rememberMe.checked = true;
+                    } else {
+                        localStorage.removeItem('streamingAdminCredentials');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading credentials:', error);
+                localStorage.removeItem('streamingAdminCredentials');
+            }
+        }
+
+        // Enhanced Password Toggle
+        function togglePasswordVisibility() {
+            const isPassword = elements.password.type === 'password';
+            elements.password.type = isPassword ? 'text' : 'password';
+            elements.togglePassword.textContent = isPassword ? '🙈' : '👁️';
+            elements.togglePassword.title = isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña';
+        }
+
+        // Enhanced Event Listeners
+        function setupEventListeners() {
+            elements.form.addEventListener('submit', handleLogin);
+            elements.togglePassword.addEventListener('click', (e) => {
+                e.preventDefault();
+                togglePasswordVisibility();
+            });
+
+            // Forgot password handler
+            elements.forgotPassword.addEventListener('click', (e) => {
+                e.preventDefault();
+                showAlert('warning', 'Contacta al administrador del sistema para recuperar tu contraseña.');
+            });
+
+            // Real-time validation
+            elements.username.addEventListener('input', () => {
+                if (elements.username.value.length >= 3) {
+                    elements.username.style.borderColor = '#00d4aa';
+                } else {
+                    elements.username.style.borderColor = '#e1e5e9';
+                }
+            });
+
+            elements.password.addEventListener('input', () => {
+                if (elements.password.value.length >= 6) {
+                    elements.password.style.borderColor = '#00d4aa';
+                } else {
+                    elements.password.style.borderColor = '#e1e5e9';
+                }
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    elements.form.dispatchEvent(new Event('submit'));
+                }
+            });
+        }
+
+        // Enhanced Initialization
+        async function initializeApp() {
+            console.log('🚀 JIREH Streaming Manager - Login Seguro iniciado');
+            
+            // Check for existing session first
+            if (checkExistingSession()) {
+                return;
+            }
+            
+            // Check if account is locked
+            if (isAccountLocked()) {
+                const remainingTime = getRemainingLockoutTime();
+                showAlert('warning', `Cuenta temporalmente bloqueada. ${remainingTime} minutos restantes.`);
+            }
+            
+            // Load saved credentials
             loadSavedCredentials();
             
-            // Test de conexión automático
-            setTimeout(testConnection, 1000);
+            // Setup event listeners
+            setupEventListeners();
             
-            console.log('🚀 Login page para Railway cargado');
-        };
-    </script>
-</body>
-</html>
+            // Check connection
+            await checkRailwayConnection();
+            
+            // Focus username field
+            elements.username.focus();
+        }
+
+        // Initialize when DOM
