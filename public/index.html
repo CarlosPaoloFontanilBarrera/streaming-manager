@@ -3,86 +3,749 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JIREH Streaming Manager - Cargando...</title>
+    <title>JIREH Streaming Manager - Sistema Profesional</title>
+    <meta name="description" content="Sistema profesional de gestión multi-plataforma de streaming con PostgreSQL y Railway">
+    <meta name="keywords" content="streaming, manager, postgresql, nodejs, railway, vouchers">
     <style>
-        body {
+        :root {
+            --primary-color: #e50914;
+            --secondary-color: #141414;
+            --accent-color: #f40612;
+            --success-color: #00d4aa;
+            --warning-color: #ff9500;
+            --text-light: #ffffff;
+            --text-dark: #333333;
+            --gradient-primary: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+            --gradient-secondary: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            --border-radius: 12px;
+            --box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--gradient-primary);
             min-height: 100vh;
-            background: linear-gradient(135deg, #141414, #e50914);
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(229, 9, 20, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(20, 20, 20, 0.1) 0%, transparent 50%);
+            animation: backgroundFloat 10s ease-in-out infinite alternate;
+            z-index: -2;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.02)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.02)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.01)"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grain)"/></svg>');
+            z-index: -1;
+        }
+
+        @keyframes backgroundFloat {
+            0% { transform: translateY(0px); }
+            100% { transform: translateY(-20px); }
         }
         
         .loading-container {
             text-align: center;
-            color: white;
+            color: var(--text-light);
+            max-width: 600px;
+            animation: fadeInUp 0.8s ease-out;
+            position: relative;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .loading-logo {
-            font-size: 5em;
-            margin-bottom: 20px;
-            animation: pulse 2s infinite;
+            font-size: 6em;
+            margin-bottom: 30px;
+            animation: logoAnimation 3s ease-in-out infinite;
+            text-shadow: 0 0 30px rgba(229, 9, 20, 0.5);
+            position: relative;
+        }
+
+        @keyframes logoAnimation {
+            0%, 100% { 
+                transform: scale(1) rotate(0deg); 
+            }
+            25% { 
+                transform: scale(1.05) rotate(2deg); 
+            }
+            50% { 
+                transform: scale(1.1) rotate(0deg); 
+            }
+            75% { 
+                transform: scale(1.05) rotate(-2deg); 
+            }
         }
         
-        .loading-text {
-            font-size: 1.5em;
+        .loading-title {
+            font-size: 3em;
+            margin-bottom: 15px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(45deg, var(--text-light), #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+        }
+
+        .loading-subtitle {
+            font-size: 1.3em;
+            margin-bottom: 40px;
+            opacity: 0.9;
+            font-weight: 300;
+            line-height: 1.5;
+        }
+
+        .features-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .feature-item {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .feature-item:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 2em;
             margin-bottom: 10px;
+            display: block;
         }
-        
-        .loading-subtext {
-            font-size: 1em;
+
+        .feature-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-light);
+        }
+
+        .feature-description {
+            font-size: 0.9em;
             opacity: 0.8;
+            line-height: 1.4;
         }
         
+        .spinner-container {
+            margin: 40px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
             border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-            margin: 20px auto;
+            border-top-color: var(--text-light);
+            animation: spin 1s linear infinite;
         }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-        
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .loading-progress {
+            width: 100%;
+            max-width: 400px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--gradient-secondary);
+            width: 0%;
+            border-radius: 3px;
+            animation: progressAnimation 3s ease-in-out;
+        }
+
+        @keyframes progressAnimation {
+            0% { width: 0%; }
+            50% { width: 60%; }
+            100% { width: 100%; }
+        }
+
+        .loading-text {
+            font-size: 1.2em;
+            margin: 20px 0;
+            font-weight: 500;
+            animation: textPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes textPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .system-status {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .status-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .status-icon {
+            font-size: 1.1em;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 12px 24px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-light);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .action-btn.primary {
+            background: var(--gradient-secondary);
+            border-color: transparent;
+        }
+
+        .action-btn.primary:hover {
+            background: linear-gradient(45deg, var(--accent-color), var(--primary-color));
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(229, 9, 20, 0.3);
+        }
+
+        .footer-info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.85em;
+            opacity: 0.7;
+            text-align: center;
+            color: var(--text-light);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .loading-container {
+                padding: 0 20px;
+            }
+
+            .loading-logo {
+                font-size: 4em;
+            }
+            
+            .loading-title {
+                font-size: 2.2em;
+            }
+            
+            .loading-subtitle {
+                font-size: 1.1em;
+                margin-bottom: 30px;
+            }
+
+            .features-list {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .action-btn {
+                width: 100%;
+                max-width: 250px;
+                justify-content: center;
+            }
+
+            .system-status {
+                gap: 10px;
+            }
+
+            .status-item {
+                font-size: 0.8em;
+                padding: 8px 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .loading-logo {
+                font-size: 3.5em;
+            }
+            
+            .loading-title {
+                font-size: 1.8em;
+            }
+
+            .feature-item {
+                padding: 15px;
+            }
+
+            .footer-info {
+                position: relative;
+                bottom: auto;
+                margin-top: 40px;
+            }
+        }
+
+        /* Animation delays for staggered effect */
+        .feature-item:nth-child(1) { animation-delay: 0.1s; }
+        .feature-item:nth-child(2) { animation-delay: 0.2s; }
+        .feature-item:nth-child(3) { animation-delay: 0.3s; }
+        .feature-item:nth-child(4) { animation-delay: 0.4s; }
+
+        .status-item:nth-child(1) { animation-delay: 0.1s; }
+        .status-item:nth-child(2) { animation-delay: 0.2s; }
+        .status-item:nth-child(3) { animation-delay: 0.3s; }
     </style>
 </head>
 <body>
     <div class="loading-container">
         <div class="loading-logo">🎬</div>
-        <div class="loading-text">JIREH Streaming Manager</div>
-        <div class="loading-subtext">Sistema con PostgreSQL en Railway</div>
-        <div class="spinner"></div>
+        <h1 class="loading-title">JIREH Streaming Manager</h1>
+        <p class="loading-subtitle">Sistema Profesional de Gestión Multi-Plataforma</p>
+        
+        <ul class="features-list">
+            <li class="feature-item">
+                <span class="feature-icon">🗄️</span>
+                <div class="feature-title">PostgreSQL + Railway</div>
+                <div class="feature-description">Base de datos robusta en la nube</div>
+            </li>
+            <li class="feature-item">
+                <span class="feature-icon">🔔</span>
+                <div class="feature-title">Notificaciones ntfy</div>
+                <div class="feature-description">Alertas automáticas de vencimiento</div>
+            </li>
+            <li class="feature-item">
+                <span class="feature-icon">💳</span>
+                <div class="feature-title">Sistema de Vouchers</div>
+                <div class="feature-description">Gestión completa de pagos</div>
+            </li>
+            <li class="feature-item">
+                <span class="feature-icon">📊</span>
+                <div class="feature-title">Dashboard Avanzado</div>
+                <div class="feature-description">Estadísticas en tiempo real</div>
+            </li>
+        </ul>
+
+        <div class="spinner-container">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loadingText">Inicializando sistema...</div>
+        </div>
+        
+        <div class="loading-progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="system-status">
+            <div class="status-item" id="databaseStatus">
+                <span class="status-icon">🗄️</span>
+                <span>Base de datos</span>
+            </div>
+            <div class="status-item" id="apiStatus">
+                <span class="status-icon">🔗</span>
+                <span>API Railway</span>
+            </div>
+            <div class="status-item" id="authStatus">
+                <span class="status-icon">🔐</span>
+                <span>Autenticación</span>
+            </div>
+        </div>
+
+        <div class="action-buttons" id="actionButtons" style="display: none;">
+            <a href="/login" class="action-btn primary">
+                <span>🚀</span>
+                <span>Acceder al Sistema</span>
+            </a>
+            <button class="action-btn" id="retryBtn">
+                <span>🔄</span>
+                <span>Reintentar Conexión</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="footer-info">
+        <div>© 2025 JIREH Streaming Manager v2.0.0</div>
+        <div>Sistema desarrollado por Paolo F • Powered by Railway</div>
     </div>
 
     <script>
-        // Verificar si está logueado y redirigir apropiadamente
-        function initializeApp() {
-            const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
-            
-            if (isLoggedIn === 'true') {
-                // Ya está logueado, ir al dashboard
-                window.location.href = '/dashboard';
-            } else {
-                // No está logueado, ir al login
-                window.location.href = '/login';
+        // Configuration
+        const CONFIG = {
+            API_BASE: '/api',
+            CHECK_INTERVAL: 2000,
+            MAX_RETRIES: 3,
+            REDIRECT_DELAY: 2000
+        };
+
+        // State management
+        let retryCount = 0;
+        let systemStatus = {
+            database: 'checking',
+            api: 'checking',
+            auth: 'checking'
+        };
+
+        // DOM Elements
+        const elements = {
+            loadingText: document.getElementById('loadingText'),
+            progressBar: document.getElementById('progressBar'),
+            databaseStatus: document.getElementById('databaseStatus'),
+            apiStatus: document.getElementById('apiStatus'),
+            authStatus: document.getElementById('authStatus'),
+            actionButtons: document.getElementById('actionButtons'),
+            retryBtn: document.getElementById('retryBtn')
+        };
+
+        // Loading messages
+        const loadingMessages = [
+            'Inicializando sistema...',
+            'Conectando con Railway...',
+            'Verificando base de datos...',
+            'Preparando autenticación...',
+            'Configurando servicios...',
+            'Sistema listo!'
+        ];
+
+        // Status update functions
+        function updateStatusItem(element, status, text) {
+            const icons = {
+                checking: '⏳',
+                success: '✅',
+                error: '❌',
+                warning: '⚠️'
+            };
+
+            const colors = {
+                checking: 'rgba(255, 149, 0, 0.2)',
+                success: 'rgba(0, 212, 170, 0.2)',
+                error: 'rgba(255, 82, 82, 0.2)',
+                warning: 'rgba(255, 149, 0, 0.2)'
+            };
+
+            element.style.background = colors[status];
+            element.querySelector('.status-icon').textContent = icons[status];
+            if (text) {
+                element.querySelector('span:last-child').textContent = text;
             }
         }
-        
-        // Redirigir después de un breve delay para mostrar la pantalla de carga
-        window.onload = function() {
-            setTimeout(initializeApp, 1500);
-        };
+
+        // System health check
+        async function checkSystemHealth() {
+            try {
+                updateStatusItem(elements.apiStatus, 'checking', 'Verificando...');
+                
+                const response = await fetch(`${CONFIG.API_BASE}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'OK') {
+                        systemStatus.api = 'success';
+                        systemStatus.database = 'success';
+                        updateStatusItem(elements.apiStatus, 'success', 'Conectado');
+                        updateStatusItem(elements.databaseStatus, 'success', 'Activa');
+                        return true;
+                    }
+                }
+
+                throw new Error('API not responding correctly');
+
+            } catch (error) {
+                console.error('Health check failed:', error);
+                systemStatus.api = 'error';
+                systemStatus.database = 'error';
+                updateStatusItem(elements.apiStatus, 'error', 'Error');
+                updateStatusItem(elements.databaseStatus, 'error', 'Error');
+                return false;
+            }
+        }
+
+        // Authentication check
+        async function checkAuthentication() {
+            try {
+                updateStatusItem(elements.authStatus, 'checking', 'Verificando...');
+
+                // Check for existing session
+                const sessionData = localStorage.getItem('streamingAdminSession');
+                if (sessionData) {
+                    const session = JSON.parse(sessionData);
+                    const sessionAge = Date.now() - session.timestamp;
+                    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+                    if (session.loggedIn && sessionAge < maxAge) {
+                        systemStatus.auth = 'success';
+                        updateStatusItem(elements.authStatus, 'success', 'Sesión activa');
+                        return 'authenticated';
+                    } else {
+                        localStorage.removeItem('streamingAdminSession');
+                    }
+                }
+
+                systemStatus.auth = 'success';
+                updateStatusItem(elements.authStatus, 'success', 'Listo');
+                return 'ready';
+
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                systemStatus.auth = 'warning';
+                updateStatusItem(elements.authStatus, 'warning', 'Verificar');
+                return 'ready';
+            }
+        }
+
+        // Progress animation
+        function animateProgress() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                }
+                elements.progressBar.style.width = `${progress}%`;
+            }, 200);
+        }
+
+        // Loading text animation
+        function animateLoadingText() {
+            let messageIndex = 0;
+            const interval = setInterval(() => {
+                if (messageIndex < loadingMessages.length) {
+                    elements.loadingText.textContent = loadingMessages[messageIndex];
+                    messageIndex++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 500);
+        }
+
+        // Redirect logic
+        function handleRedirect(authStatus) {
+            if (authStatus === 'authenticated') {
+                elements.loadingText.textContent = 'Sesión encontrada, redirigiendo al dashboard...';
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, CONFIG.REDIRECT_DELAY);
+            } else {
+                elements.loadingText.textContent = 'Sistema listo, redirigiendo al login...';
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, CONFIG.REDIRECT_DELAY);
+            }
+        }
+
+        // Show action buttons on error
+        function showActionButtons() {
+            elements.actionButtons.style.display = 'flex';
+            elements.actionButtons.style.animation = 'fadeInUp 0.5s ease-out';
+        }
+
+        // Retry connection
+        async function retryConnection() {
+            if (retryCount >= CONFIG.MAX_RETRIES) {
+                elements.loadingText.textContent = 'Error de conexión. Intenta más tarde.';
+                showActionButtons();
+                return;
+            }
+
+            retryCount++;
+            elements.loadingText.textContent = `Reintentando conexión (${retryCount}/${CONFIG.MAX_RETRIES})...`;
+            
+            // Reset status
+            systemStatus = {
+                database: 'checking',
+                api: 'checking',
+                auth: 'checking'
+            };
+            
+            updateStatusItem(elements.databaseStatus, 'checking', 'Verificando...');
+            updateStatusItem(elements.apiStatus, 'checking', 'Verificando...');
+            updateStatusItem(elements.authStatus, 'checking', 'Verificando...');
+
+            await initializeSystem();
+        }
+
+        // Main initialization
+        async function initializeSystem() {
+            try {
+                // Start animations
+                animateProgress();
+                animateLoadingText();
+
+                // Wait for initial animations
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Check system health
+                const healthOk = await checkSystemHealth();
+                
+                if (!healthOk) {
+                    throw new Error('System health check failed');
+                }
+
+                // Check authentication
+                const authStatus = await checkAuthentication();
+
+                // Wait a bit more for UX
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // All checks passed, redirect
+                handleRedirect(authStatus);
+
+            } catch (error) {
+                console.error('System initialization failed:', error);
+                elements.loadingText.textContent = 'Error de conexión con Railway';
+                
+                if (retryCount < CONFIG.MAX_RETRIES) {
+                    setTimeout(retryConnection, 2000);
+                } else {
+                    showActionButtons();
+                }
+            }
+        }
+
+        // Event listeners
+        elements.retryBtn.addEventListener('click', () => {
+            elements.actionButtons.style.display = 'none';
+            retryCount = 0;
+            initializeSystem();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'r' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                location.reload();
+            }
+            if (e.key === 'Enter') {
+                window.location.href = '/login';
+            }
+        });
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // Re-check when page becomes visible
+                checkSystemHealth();
+            }
+        });
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 JIREH Streaming Manager v2.0.0 - Iniciando...');
+            
+            // Start initialization after a small delay
+            setTimeout(initializeSystem, 500);
+        });
+
+        // Error handling
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.error);
+            elements.loadingText.textContent = 'Error inesperado. Recargando...';
+            setTimeout(() => location.reload(), 2000);
+        });
+
+        // Handle unhandled promise rejections
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled promise rejection:', e.reason);
+            e.preventDefault();
+        });
     </script>
 </body>
 </html>
