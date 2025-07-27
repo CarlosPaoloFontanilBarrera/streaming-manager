@@ -28,20 +28,22 @@ app.use(cors({
     credentials: true
 }));
 
-// Rate limiting mejorado
+// Rate limiting mejorado para Railway
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 100, // máximo 100 requests por IP
     message: { error: 'Demasiadas solicitudes, intenta en 15 minutos' },
     standardHeaders: true,
     legacyHeaders: false,
+    trustProxy: true, // Configuración para Railway
 });
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 5, // máximo 5 intentos de login por IP
     message: { error: 'Demasiados intentos de login, intenta en 15 minutos' },
-    skipSuccessfulRequests: true
+    skipSuccessfulRequests: true,
+    trustProxy: true, // Configuración para Railway
 });
 
 app.use('/api/', limiter);
@@ -649,6 +651,10 @@ app.put('/api/alarms/settings', [
     }
 });
 
+app.post('/api/alarms/test', async (req, res) => {
+    logger.info('Disparando prueba de alarmas manualmente...');
+    try {
+        await checkAndSendAlarms();
 app.post('/api/alarms/test', async (req, res) => {
     logger.info('Disparando prueba de alarmas manualmente...');
     try {
