@@ -1064,6 +1064,10 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
 // 🔧 FUNCIÓN PUT CORREGIDA SIN ERRORES - SOLUCIÓN DEFINITIVA
 // ===============================================
 
+// ===============================================
+// 🔧 FUNCIÓN PUT CORREGIDA - SOLUCIÓN DEFINITIVA AL ERROR text = integer
+// ===============================================
+
 app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1094,9 +1098,18 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
             }
         }
 
-        // Calcular días restantes si hay fecha de vencimiento
+        // ✅ FIX CRÍTICO: Convertir days_remaining a INTEGER explícitamente
         if (updateData.fecha_vencimiento_proveedor) {
-            updateData.days_remaining = calcularDiasRestantes(updateData.fecha_vencimiento_proveedor);
+            const daysRemaining = calcularDiasRestantes(updateData.fecha_vencimiento_proveedor);
+            updateData.days_remaining = parseInt(daysRemaining); // ✅ CONVERSIÓN EXPLÍCITA A INTEGER
+        }
+
+        // ✅ FIX CRÍTICO: Convertir otros campos numéricos si existen
+        if (updateData.days_remaining !== undefined) {
+            updateData.days_remaining = parseInt(updateData.days_remaining);
+        }
+        if (updateData.monto_pagado !== undefined && updateData.monto_pagado !== '') {
+            updateData.monto_pagado = parseFloat(updateData.monto_pagado);
         }
 
         // Procesar profiles si vienen como string
@@ -1117,14 +1130,26 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
         delete updateData.id; // No permitir cambiar el ID
         delete updateData.created_at; // No permitir cambiar fecha de creación
         
-        // Remover campos vacíos o null para evitar sobrescribir datos válidos
+        // ✅ FIX CRÍTICO: Remover campos vacíos EXCEPTO números válidos (incluyendo 0)
         Object.keys(updateData).forEach(key => {
-            if (updateData[key] === '' || updateData[key] === null || updateData[key] === undefined) {
+            const value = updateData[key];
+            if (value === '' || value === null || value === undefined) {
                 delete updateData[key];
+            }
+            // ✅ Mantener números válidos incluyendo 0
+            if (typeof value === 'number' && !isNaN(value)) {
+                // Mantener el campo
+                return;
+            }
+            // ✅ Mantener strings no vacíos
+            if (typeof value === 'string' && value.trim() !== '') {
+                // Mantener el campo
+                return;
             }
         });
 
         console.log(`🔧 Datos a actualizar:`, Object.keys(updateData));
+        console.log(`🔧 Valores:`, updateData);
 
         // Verificar que hay datos para actualizar
         const fields = Object.keys(updateData);
@@ -1134,14 +1159,14 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
 
         // ✅ CONSTRUCCIÓN CORRECTA DEL QUERY SQL - SOLUCIÓN DEFINITIVA
         const values = Object.values(updateData);
-        const setClause = fields.map((field, index) => `${field} = ${index + 1}`).join(', ');
-        const query = `UPDATE accounts SET ${setClause} WHERE id = ${fields.length + 1}`;
+        const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+        const query = `UPDATE accounts SET ${setClause} WHERE id = $${fields.length + 1}`;
         
         // Agregar el ID al final del array de valores
         values.push(id);
         
         console.log(`🔧 Query SQL generado: ${query}`);
-        console.log(`🔧 Valores: [${values.map((v, i) => `${i + 1}=${typeof v === 'string' && v.length > 50 ? v.substring(0, 50) + '...' : v}`).join(', ')}]`);
+        console.log(`🔧 Valores finales:`, values.map((v, i) => `$${i + 1}=${typeof v === 'string' && v.length > 50 ? v.substring(0, 50) + '...' : v} (${typeof v})`));
         
         // Ejecutar la actualización
         const result = await pool.query(query, values);
@@ -1167,6 +1192,15 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
         console.error('❌ Error actualizando cuenta:', error);
         console.error('❌ Stack trace:', error.stack);
         
+        // ✅ FIX: Manejo específico del error text = integer
+        if (error.message.includes('operator does not exist: text = integer')) {
+            return res.status(400).json({ 
+                error: 'Error de tipo de datos',
+                message: 'Conflicto entre tipos de datos text e integer. Contacte al administrador.',
+                details: 'Error en conversión de tipos numéricos'
+            });
+        }
+        
         // Manejo específico de errores comunes
         if (error.code === '22P02') {
             return res.status(400).json({ 
@@ -1187,29 +1221,6 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
             message: error.message,
             account_id: req.params.id
         });
-    }
-});
-
-app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING id', [id]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Cuenta no encontrada' });
-        }
-
-        // Invalidar cache relacionado
-        cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
-        cache.del(getCacheKey('api', '/api/stats', req.user?.userId || 'anonymous'));
-
-        console.log(`✅ Cuenta eliminada exitosamente: ID ${id}`);
-        res.json({ success: true, message: 'Cuenta eliminada exitosamente' });
-
-    } catch (error) {
-        console.error('❌ Error eliminando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
