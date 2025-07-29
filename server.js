@@ -26,6 +26,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ===============================================
+// 🔧 FIX: CONFIGURAR TRUST PROXY PARA RAILWAY
+// ===============================================
+app.set('trust proxy', true); // CRÍTICO para Railway
+
+// ===============================================
 // 🔐 CONFIGURACIÓN DE SEGURIDAD
 // ===============================================
 
@@ -192,7 +197,7 @@ const verifyToken = (req, res, next) => {
 };
 
 // ===============================================
-// 🗄️ INICIALIZACIÓN DE BASE DE DATOS - FIX DEFINITIVO BASADO EN TU CÓDIGO
+// 🗄️ INICIALIZACIÓN DE BASE DE DATOS - FIX DEFINITIVO
 // ===============================================
 
 async function initDB() {
@@ -249,19 +254,15 @@ async function initDB() {
             
             // CASOS DE MIGRACIÓN
             if (!hasPasswordHash && !hasPassword) {
-                // No tiene ninguna columna de contraseña
                 console.log('⚠️ Agregando columna password_hash faltante...');
                 await client.query(`ALTER TABLE admin_users ADD COLUMN password_hash VARCHAR(255)`);
                 console.log('✅ Columna password_hash agregada');
                 
             } else if (!hasPasswordHash && hasPassword) {
-                // Tiene password pero no password_hash - MIGRAR
                 console.log('🔄 Migrando de password a password_hash...');
                 
-                // Agregar nueva columna
                 await client.query(`ALTER TABLE admin_users ADD COLUMN password_hash VARCHAR(255)`);
                 
-                // Obtener usuarios para migrar
                 const usersResult = await client.query(`
                     SELECT id, username, password 
                     FROM admin_users 
@@ -270,12 +271,10 @@ async function initDB() {
                 
                 console.log(`🔒 Encontrados ${usersResult.rows.length} usuarios para migrar`);
                 
-                // Migrar cada usuario
                 for (const user of usersResult.rows) {
                     try {
                         let hashedPassword;
                         
-                        // Verificar si ya está hasheado (evitar doble hash)
                         if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
                             hashedPassword = user.password;
                             console.log(`♻️ Usuario ${user.username}: password ya hasheado, copiando...`);
@@ -294,16 +293,13 @@ async function initDB() {
                     }
                 }
                 
-                // Eliminar columna password antigua
                 console.log('🗑️ Eliminando columna password antigua...');
                 await client.query(`ALTER TABLE admin_users DROP COLUMN IF EXISTS password`);
                 console.log('✅ Migración de admin_users completada exitosamente');
                 
             } else if (hasPasswordHash && hasPassword) {
-                // Tiene ambas columnas - completar migración y limpiar
                 console.log('🔄 Completando migración (ambas columnas presentes)...');
                 
-                // Asegurar que todos los usuarios tengan password_hash
                 const incompleteUsers = await client.query(`
                     SELECT id, username, password 
                     FROM admin_users 
@@ -326,12 +322,10 @@ async function initDB() {
                     }
                 }
                 
-                // Eliminar columna password
                 await client.query(`ALTER TABLE admin_users DROP COLUMN IF EXISTS password`);
                 console.log('✅ Migración completada - columna password eliminada');
                 
             } else if (hasPasswordHash && !hasPassword) {
-                // Solo tiene password_hash - perfecto
                 console.log('✅ Tabla admin_users ya tiene estructura correcta (solo password_hash)');
             }
         }
@@ -361,12 +355,12 @@ async function initDB() {
         }
         
         // ===============================================
-        // 📋 CREAR OTRAS TABLAS (MANTENER TU ESTRUCTURA)
+        // 📋 CREAR OTRAS TABLAS CON ESTRUCTURA CORRECTA
         // ===============================================
         
         console.log('📊 Verificando tablas principales...');
         
-        // Crear tabla principal de cuentas
+        // 🔧 FIX: Crear tabla accounts con ID correcto para alarmas
         await client.query(`
             CREATE TABLE IF NOT EXISTS accounts (
                 id SERIAL PRIMARY KEY,
@@ -390,11 +384,11 @@ async function initDB() {
         `);
         console.log('✅ Tabla accounts verificada');
 
-        // Crear tabla de notificaciones enviadas
+        // 🔧 FIX: Crear tabla sent_notifications con referencia correcta
         await client.query(`
             CREATE TABLE IF NOT EXISTS sent_notifications (
                 id SERIAL PRIMARY KEY,
-                account_id INTEGER REFERENCES accounts(id),
+                account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
                 notification_type VARCHAR(50),
                 sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -414,6 +408,7 @@ async function initDB() {
             'CREATE INDEX IF NOT EXISTS idx_accounts_expiry ON accounts(fecha_vencimiento_proveedor)',
             'CREATE INDEX IF NOT EXISTS idx_accounts_client_search ON accounts USING gin(to_tsvector(\'spanish\', client_name || \' \' || COALESCE(email, \'\')))',
             'CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON sent_notifications(sent_at DESC)',
+            'CREATE INDEX IF NOT EXISTS idx_notifications_account_id ON sent_notifications(account_id)',
             'CREATE INDEX IF NOT EXISTS idx_users_username ON admin_users(username)'
         ];
         
@@ -437,7 +432,6 @@ async function initDB() {
         try {
             console.log('🚨 Intentando recuperación de emergencia...');
             
-            // Crear tabla básica si no existe
             await client.query(`
                 CREATE TABLE IF NOT EXISTS admin_users (
                     id SERIAL PRIMARY KEY,
@@ -447,7 +441,6 @@ async function initDB() {
                 )
             `);
             
-            // Verificar si existe admin
             const adminCheck = await client.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['admin']);
             if (adminCheck.rows[0].count === '0') {
                 const hashedPassword = await bcrypt.hash('admin123', BCRYPT_ROUNDS);
@@ -462,7 +455,7 @@ async function initDB() {
             
         } catch (recoveryError) {
             console.error('❌ Fallo en recuperación de emergencia:', recoveryError);
-            throw error; // Re-lanzar el error original
+            throw error;
         }
     } finally {
         client.release();
@@ -470,7 +463,7 @@ async function initDB() {
 }
 
 // ===============================================
-// 🔍 FUNCIONES AUXILIARES (MANTENER TUS FUNCIONES)
+// 🔍 FUNCIONES AUXILIARES
 // ===============================================
 
 function procesarPerfiles(profiles) {
@@ -514,7 +507,7 @@ const upload = multer({
 });
 
 // ===============================================
-// 🔐 RUTAS DE AUTENTICACIÓN (CORREGIR RESPUESTA DE LOGIN)
+// 🔐 RUTAS DE AUTENTICACIÓN
 // ===============================================
 
 app.post('/api/login', [
@@ -525,7 +518,7 @@ app.post('/api/login', [
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ 
-                message: 'Datos inválidos', // CAMBIO: usar 'message' no 'error'
+                message: 'Datos inválidos',
                 details: errors.array()
             });
         }
@@ -538,14 +531,14 @@ app.post('/api/login', [
         );
 
         if (userResult.rows.length === 0) {
-            return res.status(401).json({ message: 'Credenciales inválidas' }); // CAMBIO: usar 'message'
+            return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
         const user = userResult.rows[0];
         const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
         if (!isValidPassword) {
-            return res.status(401).json({ message: 'Credenciales inválidas' }); // CAMBIO: usar 'message'
+            return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
         const token = jwt.sign(
@@ -567,15 +560,14 @@ app.post('/api/login', [
 
     } catch (error) {
         console.error('❌ Error en login:', error);
-        res.status(500).json({ message: 'Error interno del servidor' }); // CAMBIO: usar 'message'
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
 });
 
 // ===============================================
-// 📊 APIS DE DATOS OPTIMIZADAS (MANTENER TU LÓGICA)
+// 📊 APIS DE DATOS OPTIMIZADAS
 // ===============================================
 
-// 🚀 Cuentas con cache y paginación
 app.get('/api/accounts', verifyToken, cacheMiddleware(120), async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -601,7 +593,6 @@ app.get('/api/accounts', verifyToken, cacheMiddleware(120), async (req, res) => 
             pool.query(countQuery, search ? [search] : [])
         ]);
 
-        // CAMBIO: Devolver array simple como espera tu frontend
         res.json(accountsResult.rows);
         
     } catch (error) {
@@ -610,10 +601,8 @@ app.get('/api/accounts', verifyToken, cacheMiddleware(120), async (req, res) => 
     }
 });
 
-// 🚀 Estadísticas con cache inteligente
 app.get('/api/stats', verifyToken, cacheMiddleware(60), async (req, res) => {
     try {
-        // Usar queries optimizadas en paralelo
         const [totalResult, accountsResult] = await Promise.all([
             pool.query('SELECT COUNT(*) FROM accounts'),
             pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts')
@@ -652,7 +641,6 @@ app.get('/api/stats', verifyToken, cacheMiddleware(60), async (req, res) => {
 // 🚀 NUEVAS APIS DE PERFORMANCE
 // ===============================================
 
-// 🚀 API de Analytics con cache inteligente
 app.get('/api/analytics', verifyToken, cacheMiddleware(600), async (req, res) => {
     try {
         if (process.env.ENABLE_ANALYTICS !== 'true') {
@@ -725,7 +713,6 @@ app.get('/api/analytics', verifyToken, cacheMiddleware(600), async (req, res) =>
     }
 });
 
-// 🚀 API de exportación a Excel
 app.get('/api/export/excel', verifyToken, async (req, res) => {
     try {
         if (process.env.ENABLE_EXCEL_EXPORT !== 'true') {
@@ -746,7 +733,6 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Cuentas JIREH Streaming');
 
-        // Configurar columnas
         worksheet.columns = [
             { header: 'ID', key: 'id', width: 15 },
             { header: 'Cliente', key: 'client_name', width: 25 },
@@ -761,7 +747,6 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
             { header: 'Vencimiento Proveedor', key: 'fecha_vencimiento_proveedor', width: 20 }
         ];
 
-        // Estilo del header
         worksheet.getRow(1).font = { bold: true };
         worksheet.getRow(1).fill = {
             type: 'pattern',
@@ -769,7 +754,6 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
             fgColor: { argb: 'FFE50914' }
         };
 
-        // Agregar datos
         accounts.rows.forEach(account => {
             worksheet.addRow({
                 ...account,
@@ -779,7 +763,6 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
             });
         });
 
-        // Configurar respuesta
         const filename = `jireh-streaming-${moment().format('YYYY-MM-DD-HHmm')}.xlsx`;
         
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -796,7 +779,6 @@ app.get('/api/export/excel', verifyToken, async (req, res) => {
     }
 });
 
-// 🚀 API de limpieza de cache
 app.post('/api/cache/clear', verifyToken, (req, res) => {
     try {
         if (process.env.ENABLE_CACHE_API !== 'true') {
@@ -821,7 +803,7 @@ app.post('/api/cache/clear', verifyToken, (req, res) => {
 });
 
 // ===============================================
-// 📝 GESTIÓN DE CUENTAS (MANTENER TU LÓGICA EXACTA)
+// 📝 GESTIÓN DE CUENTAS
 // ===============================================
 
 app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), [
@@ -967,7 +949,7 @@ app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
 });
 
 // ===============================================
-// 🔔 SISTEMA DE NOTIFICACIONES NTFY
+// 🔔 SISTEMA DE NOTIFICACIONES NTFY CORREGIDO
 // ===============================================
 
 async function sendNtfyNotification(topic, title, message, tags = [], priority = 3) {
@@ -994,8 +976,12 @@ async function sendNtfyNotification(topic, title, message, tags = [], priority =
     }
 }
 
+// 🔧 FIX: Función de alarmas corregida con estructura correcta de BD
 async function checkAndSendAlarms() {
     try {
+        console.log('⏰ Verificando alarmas...');
+        
+        // 🔧 FIX: Query corregida usando id (SERIAL) en lugar de account_id
         const accounts = await pool.query(`
             SELECT id, client_name, type, days_remaining, fecha_vencimiento_proveedor 
             FROM accounts 
@@ -1009,7 +995,7 @@ async function checkAndSendAlarms() {
             const vencimiento = new Date(account.fecha_vencimiento_proveedor);
             const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
 
-            // Verificar si ya se envió notificación hoy
+            // 🔧 FIX: Verificar notificaciones usando id correcto
             const notificationCheck = await pool.query(`
                 SELECT COUNT(*) FROM sent_notifications 
                 WHERE account_id = $1 AND notification_type = $2 AND DATE(sent_at) = CURRENT_DATE
@@ -1022,7 +1008,8 @@ async function checkAndSendAlarms() {
 Cliente: ${account.client_name}
 Servicio: ${account.type}
 Días restantes: ${diffDays}
-Vence: ${vencimiento.toLocaleDateString('es-PE')}`;
+Vence: ${vencimiento.toLocaleDateString('es-PE')}
+ID: ${account.id}`;
 
                 const success = await sendNtfyNotification(
                     'jireh-streaming-alerts',
@@ -1033,6 +1020,7 @@ Vence: ${vencimiento.toLocaleDateString('es-PE')}`;
                 );
 
                 if (success) {
+                    // 🔧 FIX: Insertar usando account_id correcto
                     await pool.query(`
                         INSERT INTO sent_notifications (account_id, notification_type) 
                         VALUES ($1, $2)
@@ -1044,6 +1032,8 @@ Vence: ${vencimiento.toLocaleDateString('es-PE')}`;
 
         if (alertCount > 0) {
             console.log(`⏰ ${alertCount} alertas de vencimiento enviadas`);
+        } else {
+            console.log('⏰ No hay cuentas próximas a vencer');
         }
 
     } catch (error) {
@@ -1052,13 +1042,11 @@ Vence: ${vencimiento.toLocaleDateString('es-PE')}`;
 }
 
 // ===============================================
-// 🔔 APIS DE ALARMAS (AGREGAR LAS QUE FALTAN)
+// 🔔 APIS DE ALARMAS
 // ===============================================
 
-// Obtener configuración de alarmas
 app.get('/api/alarms/settings', verifyToken, async (req, res) => {
     try {
-        // Crear configuración por defecto si no existe
         const defaultSettings = {
             provider_threshold_days: 5,
             client_threshold_days: 3,
@@ -1072,7 +1060,6 @@ app.get('/api/alarms/settings', verifyToken, async (req, res) => {
     }
 });
 
-// Actualizar configuración de alarmas
 app.put('/api/alarms/settings', verifyToken, [
     body('provider_threshold_days').isInt({ min: 1, max: 30 }).withMessage('Días proveedor debe ser entre 1 y 30'),
     body('client_threshold_days').isInt({ min: 1, max: 30 }).withMessage('Días cliente debe ser entre 1 y 30'),
@@ -1103,12 +1090,10 @@ app.put('/api/alarms/settings', verifyToken, [
     }
 });
 
-// Test de alarmas
 app.post('/api/alarms/test', verifyToken, async (req, res) => {
     try {
         console.log('🧪 Ejecutando test de alarmas...');
         
-        // Obtener cuentas próximas a vencer
         const accountsResult = await pool.query(`
             SELECT id, client_name, type, fecha_vencimiento_proveedor, profiles 
             FROM accounts 
@@ -1151,7 +1136,7 @@ Esta es una prueba del sistema de alarmas.`;
 });
 
 // ===============================================
-// 🚀 API DE VERIFICACIÓN DE CÓDIGOS MICUENTA.ME (AGREGAR LA QUE FALTA)
+// 🚀 API DE VERIFICACIÓN DE CÓDIGOS MICUENTA.ME
 // ===============================================
 
 app.post('/api/check-micuenta-me-code', verifyToken, [
@@ -1171,7 +1156,6 @@ app.post('/api/check-micuenta-me-code', verifyToken, [
         
         console.log(`🔍 Consultando micuenta.me - Code: ${code}, PDV: ${pdv}`);
         
-        // Simular consulta a micuenta.me
         const mockResult = {
             code: code,
             pdv: pdv,
@@ -1193,7 +1177,7 @@ app.post('/api/check-micuenta-me-code', verifyToken, [
 });
 
 // ===============================================
-// 🔔 GESTIÓN DE VOUCHERS (AGREGAR LA QUE FALTA)
+// 🔔 GESTIÓN DE VOUCHERS
 // ===============================================
 
 app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, upload.single('voucher'), async (req, res) => {
@@ -1205,7 +1189,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             return res.status(400).json({ error: 'Archivo de voucher requerido' });
         }
 
-        // Obtener la cuenta
         const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
         if (accountResult.rows.length === 0) {
             return res.status(404).json({ error: 'Cuenta no encontrada' });
@@ -1218,7 +1201,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             return res.status(400).json({ error: 'Índice de perfil inválido' });
         }
 
-        // Optimizar imagen si está habilitado
         let voucherBase64;
         if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
             const optimizedBuffer = await optimizeImage(req.file.buffer, {
@@ -1231,7 +1213,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             voucherBase64 = req.file.buffer.toString('base64');
         }
 
-        // Actualizar el perfil
         profiles[profileIndex] = {
             ...profiles[profileIndex],
             voucherSubido: true,
@@ -1241,7 +1222,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             fechaVoucherSubido: new Date().toISOString().split('T')[0]
         };
 
-        // Guardar en base de datos
         await pool.query(
             'UPDATE accounts SET profiles = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [JSON.stringify(profiles), accountId]
@@ -1266,7 +1246,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
 
 app.get('/api/health', async (req, res) => {
     try {
-        // Test de conexión a la base de datos
         await pool.query('SELECT 1');
         
         const memUsage = process.memoryUsage();
@@ -1309,7 +1288,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ===============================================
-// 🎨 RUTAS ESTÁTICAS (MANTENER EXACTAS)
+// 🎨 RUTAS ESTÁTICAS
 // ===============================================
 
 app.use(express.static('public'));
@@ -1340,7 +1319,6 @@ async function startServer() {
             console.log(`🌐 Servidor corriendo en puerto ${PORT}`);
             console.log('🚀 ================================');
             
-            // Configurar sistema de alarmas
             console.log('⏰ Sistema de alarmas ntfy iniciado');
             
             if (process.env.ENABLE_CRON_JOBS === 'true') {
@@ -1395,11 +1373,9 @@ async function gracefulShutdown(signal) {
     console.log(`${signal} recibido, cerrando servidor gracefully...`);
     
     try {
-        // Cerrar pool de base de datos
         await pool.end();
         console.log('✅ Pool de PostgreSQL cerrado');
         
-        // Mostrar estadísticas finales de cache
         const stats = cache.getStats();
         console.log(`📊 Estadísticas finales de cache - Keys: ${stats.keys}, Hits: ${stats.hits}, Misses: ${stats.misses}`);
         
