@@ -195,19 +195,127 @@ const verifyToken = (req, res, next) => {
 // 🗄️ INICIALIZACIÓN DE BASE DE DATOS
 // ===============================================
 
+// ===============================================
+// 🔧 FUNCIÓN initDB() CORREGIDA - FIX DEFINITIVO
+// REEMPLAZAR COMPLETAMENTE LA FUNCIÓN initDB() EN TU SERVER.JS
+// ===============================================
+
 async function initDB() {
     try {
         console.log('🔧 Inicializando base de datos...');
         
-        // Crear tabla de usuarios admin
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
+        // ===============================================
+        // 🔄 MIGRACIÓN SUPER ROBUSTA DE TABLA admin_users
+        // ===============================================
+        
+        // Verificar si la tabla existe y obtener todas sus columnas
+        const tableCheck = await pool.query(`
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'admin_users'
+            ORDER BY ordinal_position
         `);
+        
+        const columns = tableCheck.rows.map(row => row.column_name);
+        const hasPasswordHash = columns.includes('password_hash');
+        const hasPassword = columns.includes('password');
+        
+        console.log(`🔍 Tabla admin_users - Columnas existentes: [${columns.join(', ')}]`);
+        console.log(`🔍 Tiene password_hash: ${hasPasswordHash}, Tiene password: ${hasPassword}`);
+        
+        if (tableCheck.rows.length === 0) {
+            // Tabla no existe - crear nueva con estructura correcta
+            console.log('📝 Creando nueva tabla admin_users...');
+            await pool.query(`
+                CREATE TABLE admin_users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            console.log('✅ Tabla admin_users creada con estructura correcta');
+        } else if (!hasPasswordHash && !hasPassword) {
+            // Tabla existe pero no tiene ninguna columna de password
+            console.log('⚠️ Tabla existe pero sin columnas de password - agregando password_hash...');
+            await pool.query(`ALTER TABLE admin_users ADD COLUMN password_hash VARCHAR(255)`);
+            console.log('✅ Columna password_hash agregada');
+        } else if (!hasPasswordHash && hasPassword) {
+            // Tiene password pero no password_hash - migrar
+            console.log('🔄 Migrando de password a password_hash...');
+            
+            // Agregar columna password_hash
+            await pool.query(`ALTER TABLE admin_users ADD COLUMN password_hash VARCHAR(255)`);
+            
+            // Obtener usuarios con password pero sin password_hash
+            const usersToMigrate = await pool.query(`
+                SELECT id, username, password 
+                FROM admin_users 
+                WHERE password IS NOT NULL AND (password_hash IS NULL OR password_hash = '')
+            `);
+            
+            console.log(`🔒 Migrando ${usersToMigrate.rows.length} usuarios...`);
+            
+            for (const user of usersToMigrate.rows) {
+                try {
+                    let hashedPassword;
+                    
+                    // Verificar si ya está hasheado
+                    if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
+                        hashedPassword = user.password; // Ya está hasheado
+                        console.log(`♻️ Usuario ${user.username}: password ya hasheado`);
+                    } else {
+                        hashedPassword = await bcrypt.hash(user.password, BCRYPT_ROUNDS);
+                        console.log(`🔒 Usuario ${user.username}: password hasheado`);
+                    }
+                    
+                    await pool.query(
+                        'UPDATE admin_users SET password_hash = $1 WHERE id = $2',
+                        [hashedPassword, user.id]
+                    );
+                } catch (userError) {
+                    console.error(`❌ Error migrando usuario ${user.username}:`, userError);
+                }
+            }
+            
+            // Eliminar columna password antigua
+            console.log('🗑️ Eliminando columna password antigua...');
+            await pool.query(`ALTER TABLE admin_users DROP COLUMN password`);
+            
+            console.log('✅ Migración de admin_users completada');
+        } else if (hasPasswordHash && hasPassword) {
+            // Tiene ambas columnas - completar migración y eliminar password
+            console.log('🔄 Completando migración (ambas columnas presentes)...');
+            
+            // Asegurar que todos tengan password_hash
+            const incompleteUsers = await pool.query(`
+                SELECT id, username, password 
+                FROM admin_users 
+                WHERE (password_hash IS NULL OR password_hash = '') AND password IS NOT NULL
+            `);
+            
+            for (const user of incompleteUsers.rows) {
+                const hashedPassword = user.password.startsWith('$2b$') ? 
+                    user.password : 
+                    await bcrypt.hash(user.password, BCRYPT_ROUNDS);
+                    
+                await pool.query(
+                    'UPDATE admin_users SET password_hash = $1 WHERE id = $2',
+                    [hashedPassword, user.id]
+                );
+            }
+            
+            // Eliminar columna password
+            await pool.query(`ALTER TABLE admin_users DROP COLUMN password`);
+            console.log('✅ Migración completada - columna password eliminada');
+        } else if (hasPasswordHash && !hasPassword) {
+            // Solo tiene password_hash - perfecto, no hacer nada
+            console.log('✅ Tabla admin_users ya tiene estructura correcta');
+        }
+
+        // ===============================================
+        // 📊 CREAR/VERIFICAR OTRAS TABLAS
+        // ===============================================
 
         // Crear tabla principal de cuentas
         await pool.query(`
@@ -242,7 +350,11 @@ async function initDB() {
             )
         `);
 
+        // ===============================================
         // 🚀 CREAR ÍNDICES PARA PERFORMANCE
+        // ===============================================
+        console.log('📈 Creando índices de performance...');
+        
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_created_at ON accounts(created_at DESC)`);
@@ -251,6 +363,10 @@ async function initDB() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON sent_notifications(sent_at DESC)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON admin_users(username)`);
 
+        // ===============================================
+        // 👤 VERIFICAR/CREAR USUARIO ADMIN
+        // ===============================================
+        
         // Verificar si existe usuario admin
         const adminCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['admin']);
         
@@ -265,12 +381,40 @@ async function initDB() {
             );
             
             console.log('✅ Usuario admin creado - Usuario: admin, Password: admin123');
+        } else {
+            console.log('👤 Usuario admin ya existe');
         }
 
         console.log('✅ Base de datos inicializada correctamente');
         console.log('📦 Índices de performance creados');
+        
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
+        
+        // En caso de error crítico, intentar crear tabla desde cero
+        console.log('🚨 Intentando recuperación de emergencia...');
+        try {
+            await pool.query('DROP TABLE IF EXISTS admin_users CASCADE');
+            await pool.query(`
+                CREATE TABLE admin_users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            
+            const hashedPassword = await bcrypt.hash('admin123', BCRYPT_ROUNDS);
+            await pool.query(
+                'INSERT INTO admin_users (username, password_hash) VALUES ($1, $2)',
+                ['admin', hashedPassword]
+            );
+            
+            console.log('✅ Recuperación exitosa - tabla admin_users recreada');
+        } catch (recoveryError) {
+            console.error('❌ Fallo en recuperación:', recoveryError);
+            throw error;
+        }
     }
 }
 
