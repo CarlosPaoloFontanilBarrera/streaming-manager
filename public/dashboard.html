@@ -2267,7 +2267,7 @@ Su acceso a ${state.currentAccount.type} ha sido configurado exitosamente.
                     formData.append('monto_pagado', paidAmount);
                     
                     const submitBtn = event.target.querySelector('button[type="submit"]');
-                    const originalText = submitBtn.textContent;
+                    const originalText = submitBtn.textContent; // Declarar ANTES de usar
                     submitBtn.textContent = '⏳ Subiendo...';
                     submitBtn.disabled = true;
                     
