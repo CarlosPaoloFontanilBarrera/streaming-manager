@@ -1093,12 +1093,24 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
             updateData.profiles = JSON.stringify(typeof updateData.profiles === 'string' ? JSON.parse(updateData.profiles) : updateData.profiles);
         }
 
-        // 🔧 FIX V4: Query corregida con placeholders correctos
-        const fields = Object.keys(updateData).map((key, index) => `${key} = ${index + 1}`).join(', ');
+        // 🔧 FIX: CORREGIR EL QUERY CON PLACEHOLDERS CORRECTOS
+        const fields = Object.keys(updateData);
         const values = Object.values(updateData);
-        values.push(id);
-
-        await pool.query(`UPDATE accounts SET ${fields} WHERE id = ${values.length}`, values);
+        
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No hay datos para actualizar' });
+        }
+        
+        // ✅ LÍNEA CORREGIDA: Crear placeholders SQL correctos
+        const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+        const query = `UPDATE accounts SET ${setClause} WHERE id = $${fields.length + 1}`;
+        
+        values.push(id); // Agregar el ID al final
+        
+        console.log('🔧 Ejecutando query:', query);
+        console.log('🔧 Con valores:', values);
+        
+        await pool.query(query, values);
 
         // Invalidar cache relacionado
         cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
@@ -1109,6 +1121,7 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
 
     } catch (error) {
         console.error('❌ Error actualizando cuenta:', error);
+        console.error('❌ Error stack:', error.stack);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
