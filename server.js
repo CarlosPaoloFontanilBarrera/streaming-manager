@@ -85,7 +85,7 @@ const createRateLimit = (windowMs, max, message) => rateLimit({
     message: { error: message },
     standardHeaders: true,
     legacyHeaders: false,
-    trustProxy: process.env.NODE_ENV === 'production' // CAMBIO AQUÍ
+    trustProxy: process.env.NODE_ENV === 'production' // FIX: CORREGIDO
 });
 
 const generalLimiter = createRateLimit(15 * 60 * 1000, parseInt(process.env.API_RATE_LIMIT) || 100, 'Demasiadas solicitudes');
@@ -367,7 +367,7 @@ async function initDB() {
         
         console.log('📊 Verificando tablas principales...');
         
-        // 🔧 FIX: Crear tabla accounts con TODAS las columnas necesarias
+        // 🔧 FIX: Crear tabla accounts con TODAS las columnas necesarias SIN updated_at
         await client.query(`
             CREATE TABLE IF NOT EXISTS accounts (
                 id SERIAL PRIMARY KEY,
@@ -388,12 +388,11 @@ async function initDB() {
                 days_remaining INTEGER DEFAULT 0,
                 profiles TEXT DEFAULT '[]',
                 status VARCHAR(20) DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
         
-        // 🔧 FIX: Verificar y agregar columnas faltantes en accounts
+        // 🔧 FIX: Verificar y agregar columnas faltantes en accounts (SIN updated_at)
         const accountColumnsResult = await client.query(`
             SELECT column_name 
             FROM information_schema.columns 
@@ -404,10 +403,9 @@ async function initDB() {
         const accountColumns = accountColumnsResult.rows.map(row => row.column_name);
         console.log(`🔍 Columnas existentes en accounts: [${accountColumns.join(', ')}]`);
         
-        // Verificar y agregar columnas faltantes
+        // Verificar y agregar columnas faltantes (SIN updated_at)
         const requiredColumns = [
             { name: 'password', type: 'VARCHAR(255)' },
-            { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
             { name: 'voucher_imagen', type: 'TEXT' },
             { name: 'numero_operacion', type: 'VARCHAR(100)' },
             { name: 'monto_pagado', type: 'DECIMAL(10,2)' },
@@ -424,7 +422,7 @@ async function initDB() {
             }
         }
         
-        console.log('✅ Tabla accounts verificada con todas las columnas');
+        console.log('✅ Tabla accounts verificada con todas las columnas (SIN updated_at)');
 
         // 🔧 FIX: Crear tabla sent_notifications con referencia correcta
         await client.query(`
@@ -893,13 +891,13 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
 
         const days_remaining = calcularDiasRestantes(fecha_vencimiento_proveedor);
 
-        // 🔧 FIX: Query corregida con todas las columnas necesarias
+        // 🔧 FIX: Query corregida SIN updated_at y con todas las columnas necesarias
         const result = await pool.query(`
             INSERT INTO accounts (
                 client_name, client_phone, email, password, type, country,
                 fecha_inicio_proveedor, fecha_vencimiento_proveedor, 
-                days_remaining, profiles, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                days_remaining, profiles, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
             RETURNING id
         `, [
             client_name, 
@@ -933,7 +931,7 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
     }
 });
 
-// 🔧 FIX: Función de actualización de cuentas corregida
+// 🔧 FIX: Función de actualización de cuentas corregida SIN updated_at
 app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -960,12 +958,12 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
             updateData.profiles = JSON.stringify(typeof updateData.profiles === 'string' ? JSON.parse(updateData.profiles) : updateData.profiles);
         }
 
-        // 🔧 FIX: Query corregida con placeholders correctos
+        // 🔧 FIX: Query corregida SIN updated_at
         const fields = Object.keys(updateData).map((key, index) => `${key} = ${index + 1}`).join(', ');
         const values = Object.values(updateData);
         values.push(id);
 
-        await pool.query(`UPDATE accounts SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ${values.length}`, values);
+        await pool.query(`UPDATE accounts SET ${fields} WHERE id = ${values.length}`, values);
 
         // Invalidar cache relacionado
         cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
@@ -1207,19 +1205,22 @@ app.post('/api/check-micuenta-me-code', verifyToken, [
         
         console.log(`🔍 Consultando micuenta.me - Code: ${code}, PDV: ${pdv}`);
         
-        const mockResult = {
-            code: code,
-            pdv: pdv,
-            status: 'active',
-            expiry_date: '2024-12-31',
-            details: `Código ${code} válido y activo para PDV: ${pdv}`,
-            checked_at: new Date().toISOString()
-        };
-        
-        res.json({
-            success: true,
-            result: mockResult
+        const response = await fetch('https://micuenta.me/e/redeem', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code: code, pdv: pdv })
         });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Error desconocido del proxy de micuenta.me.' }));
+            console.error('Error al consultar micuenta.me:', response.status, errorData.message);
+            return res.status(response.status).json(errorData);
+        }
+
+        const data = await response.json();
+        res.json(data);
         
     } catch (error) {
         console.error('❌ Error verificando código micuenta.me:', error);
@@ -1275,9 +1276,9 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             fechaVoucherSubido: new Date().toISOString().split('T')[0]
         };
 
-        // 🔧 FIX: Query condicional para updated_at
+        // 🔧 FIX: Query SIN updated_at
         await pool.query(
-            'UPDATE accounts SET profiles = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            'UPDATE accounts SET profiles = $1 WHERE id = $2',
             [JSON.stringify(profiles), accountId]
         );
 
