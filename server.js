@@ -896,7 +896,7 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
             INSERT INTO accounts (
                 client_name, client_phone, email, password, type, country,
                 fecha_inicio_proveedor, fecha_vencimiento_proveedor, 
-                days_remaining, profiles, created_at
+                days_remaining, profiles
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
             RETURNING id
         `, [
@@ -959,11 +959,12 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
         }
 
         // 🔧 FIX: Query corregida SIN updated_at
-        const fields = Object.keys(updateData).map((key, index) => `${key} = ${index + 1}`).join(', ');
+        // LÍNEA 960-966 - CORREGIR UPDATE dinámico
+        const fields = Object.keys(updateData).map((key, index) => `${key} = $${index + 1}`).join(', ');
         const values = Object.values(updateData);
         values.push(id);
 
-        await pool.query(`UPDATE accounts SET ${fields} WHERE id = ${values.length}`, values);
+        await pool.query(`UPDATE accounts SET ${fields} WHERE id = $${values.length}`, values);
 
         // Invalidar cache relacionado
         cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
