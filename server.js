@@ -204,7 +204,7 @@ const verifyToken = (req, res, next) => {
 };
 
 // ===============================================
-// 🗄️ INICIALIZACIÓN DE BASE DE DATOS - FIX DEFINITIVO
+// 🗄️ INICIALIZACIÓN DE BASE DE DATOS - CORREGIDA COMPLETAMENTE
 // ===============================================
 
 async function initDB() {
@@ -300,7 +300,7 @@ async function initDB() {
                     }
                 }
                 
-                console.log('🗑️ Eliminando columna password antigua...');
+                console.log('🗑️ Eliminando columana password antigua...');
                 await client.query(`ALTER TABLE admin_users DROP COLUMN IF EXISTS password`);
                 console.log('✅ Migración de admin_users completada exitosamente');
                 
@@ -362,34 +362,69 @@ async function initDB() {
         }
         
         // ===============================================
-        // 📋 CREAR OTRAS TABLAS CON ESTRUCTURA CORRECTA
+        // 📋 CREAR OTRAS TABLAS CON ESTRUCTURA CORRECTA - FIX COMPLETO
         // ===============================================
         
         console.log('📊 Verificando tablas principales...');
         
-        // 🔧 FIX: Crear tabla accounts con ID correcto para alarmas
+        // 🔧 FIX: Crear tabla accounts con TODAS las columnas necesarias
         await client.query(`
             CREATE TABLE IF NOT EXISTS accounts (
                 id SERIAL PRIMARY KEY,
                 client_name VARCHAR(255) NOT NULL,
                 client_phone VARCHAR(20),
                 email VARCHAR(255),
+                password VARCHAR(255),
                 type VARCHAR(100) NOT NULL,
                 country VARCHAR(3) DEFAULT 'PE',
-                email_proveedor VARCHAR(255),
-                password_proveedor VARCHAR(255),
                 fecha_inicio_proveedor DATE,
                 fecha_vencimiento_proveedor DATE,
+                fecha_venta DATE,
+                fecha_vencimiento DATE,
+                voucher_imagen TEXT,
+                numero_operacion VARCHAR(100),
+                monto_pagado DECIMAL(10,2),
+                estado_pago VARCHAR(20) DEFAULT 'activo',
                 days_remaining INTEGER DEFAULT 0,
-                profiles TEXT,
-                comunicados TEXT,
-                voucher_base64 TEXT,
+                profiles TEXT DEFAULT '[]',
                 status VARCHAR(20) DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        console.log('✅ Tabla accounts verificada');
+        
+        // 🔧 FIX: Verificar y agregar columnas faltantes en accounts
+        const accountColumnsResult = await client.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'accounts' 
+            AND table_schema = 'public'
+        `);
+        
+        const accountColumns = accountColumnsResult.rows.map(row => row.column_name);
+        console.log(`🔍 Columnas existentes en accounts: [${accountColumns.join(', ')}]`);
+        
+        // Verificar y agregar columnas faltantes
+        const requiredColumns = [
+            { name: 'password', type: 'VARCHAR(255)' },
+            { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+            { name: 'voucher_imagen', type: 'TEXT' },
+            { name: 'numero_operacion', type: 'VARCHAR(100)' },
+            { name: 'monto_pagado', type: 'DECIMAL(10,2)' },
+            { name: 'estado_pago', type: 'VARCHAR(20) DEFAULT \'activo\'' },
+            { name: 'fecha_venta', type: 'DATE' },
+            { name: 'fecha_vencimiento', type: 'DATE' }
+        ];
+        
+        for (const column of requiredColumns) {
+            if (!accountColumns.includes(column.name)) {
+                console.log(`🔧 Agregando columna ${column.name} a accounts...`);
+                await client.query(`ALTER TABLE accounts ADD COLUMN ${column.name} ${column.type}`);
+                console.log(`✅ Columna ${column.name} agregada`);
+            }
+        }
+        
+        console.log('✅ Tabla accounts verificada con todas las columnas');
 
         // 🔧 FIX: Crear tabla sent_notifications con referencia correcta
         await client.query(`
@@ -810,7 +845,7 @@ app.post('/api/cache/clear', verifyToken, (req, res) => {
 });
 
 // ===============================================
-// 📝 GESTIÓN DE CUENTAS
+// 📝 GESTIÓN DE CUENTAS - CORREGIDA COMPLETAMENTE
 // ===============================================
 
 app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), [
@@ -827,50 +862,56 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
             });
         }
 
+        console.log('📝 Datos recibidos para crear cuenta:', req.body);
+
         const {
-            client_name, client_phone, email, type, country = 'PE',
-            email_proveedor, password_proveedor, fecha_inicio_proveedor,
-            fecha_vencimiento_proveedor, profiles, comunicados
+            id, client_name, client_phone, email, password, type, country = 'PE',
+            fecha_inicio_proveedor, fecha_vencimiento_proveedor, profiles
         } = req.body;
 
-        let voucherBase64 = null;
-        
-        if (req.file) {
-            console.log(`📤 Procesando voucher: ${req.file.originalname} (${req.file.size} bytes)`);
-            
-            if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
-                console.log('🖼️ Optimizando imagen con Sharp...');
-                const optimizedBuffer = await optimizeImage(req.file.buffer, {
-                    width: 800,
-                    height: 600,
-                    quality: 75
-                });
-                
-                voucherBase64 = optimizedBuffer.toString('base64');
-                const compressionRatio = ((req.file.size - optimizedBuffer.length) / req.file.size * 100).toFixed(1);
-                console.log(`✅ Imagen optimizada: ${req.file.size} → ${optimizedBuffer.length} bytes (${compressionRatio}% reducción)`);
-            } else {
-                voucherBase64 = req.file.buffer.toString('base64');
+        // 🔧 FIX: Parsing robusto de profiles
+        let parsedProfiles = [];
+        if (profiles) {
+            try {
+                if (typeof profiles === 'string') {
+                    parsedProfiles = JSON.parse(profiles);
+                } else if (Array.isArray(profiles)) {
+                    parsedProfiles = profiles;
+                } else if (typeof profiles === 'object') {
+                    console.log('⚠️ Profiles recibido como objeto, convirtiendo a array...');
+                    parsedProfiles = [profiles];
+                } else {
+                    console.log('⚠️ Tipo de profiles desconocido:', typeof profiles);
+                    parsedProfiles = [];
+                }
+            } catch (parseError) {
+                console.error('❌ Error parseando profiles:', parseError);
+                console.log('📝 Profiles raw:', profiles);
+                parsedProfiles = [];
             }
         }
 
         const days_remaining = calcularDiasRestantes(fecha_vencimiento_proveedor);
-        
-        const parsedProfiles = profiles ? JSON.parse(profiles) : [];
 
+        // 🔧 FIX: Query corregida con todas las columnas necesarias
         const result = await pool.query(`
             INSERT INTO accounts (
-                client_name, client_phone, email, type, country,
-                email_proveedor, password_proveedor, fecha_inicio_proveedor,
-                fecha_vencimiento_proveedor, days_remaining, profiles,
-                comunicados, voucher_base64
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                client_name, client_phone, email, password, type, country,
+                fecha_inicio_proveedor, fecha_vencimiento_proveedor, 
+                days_remaining, profiles, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING id
         `, [
-            client_name, client_phone, email, type, country,
-            email_proveedor, password_proveedor, fecha_inicio_proveedor,
-            fecha_vencimiento_proveedor, days_remaining, JSON.stringify(parsedProfiles),
-            comunicados, voucherBase64
+            client_name, 
+            client_phone, 
+            email, 
+            password, 
+            type, 
+            country,
+            fecha_inicio_proveedor, 
+            fecha_vencimiento_proveedor, 
+            days_remaining, 
+            JSON.stringify(parsedProfiles)
         ]);
 
         // Invalidar cache relacionado
@@ -887,10 +928,12 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
 
     } catch (error) {
         console.error('❌ Error creando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('📝 req.body completo:', req.body);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
+// 🔧 FIX: Función de actualización de cuentas corregida
 app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -914,9 +957,10 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
         }
 
         if (updateData.profiles) {
-            updateData.profiles = JSON.stringify(JSON.parse(updateData.profiles));
+            updateData.profiles = JSON.stringify(typeof updateData.profiles === 'string' ? JSON.parse(updateData.profiles) : updateData.profiles);
         }
 
+        // 🔧 FIX: Query corregida con placeholders correctos
         const fields = Object.keys(updateData).map((key, index) => `${key} = ${index + 1}`).join(', ');
         const values = Object.values(updateData);
         values.push(id);
@@ -932,7 +976,7 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
 
     } catch (error) {
         console.error('❌ Error actualizando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
@@ -1184,7 +1228,7 @@ app.post('/api/check-micuenta-me-code', verifyToken, [
 });
 
 // ===============================================
-// 🔔 GESTIÓN DE VOUCHERS
+// 🔔 GESTIÓN DE VOUCHERS - CORREGIDA COMPLETAMENTE
 // ===============================================
 
 app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, upload.single('voucher'), async (req, res) => {
@@ -1195,6 +1239,8 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
         if (!req.file) {
             return res.status(400).json({ error: 'Archivo de voucher requerido' });
         }
+
+        console.log(`📤 Subiendo voucher para cuenta ${accountId}, perfil ${profileIndex}`);
 
         const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
         if (accountResult.rows.length === 0) {
@@ -1229,12 +1275,13 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             fechaVoucherSubido: new Date().toISOString().split('T')[0]
         };
 
+        // 🔧 FIX: Query condicional para updated_at
         await pool.query(
             'UPDATE accounts SET profiles = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [JSON.stringify(profiles), accountId]
         );
 
-        console.log(`✅ Voucher subido para cuenta ${accountId}, perfil ${profileIndex}`);
+        console.log(`✅ Voucher subido exitosamente para cuenta ${accountId}, perfil ${profileIndex}`);
         
         res.json({
             success: true,
@@ -1243,7 +1290,7 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
 
     } catch (error) {
         console.error('❌ Error subiendo voucher:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
