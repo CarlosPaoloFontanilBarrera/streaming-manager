@@ -362,15 +362,15 @@ async function initDB() {
         }
         
         // ===============================================
-        // 📋 CREAR OTRAS TABLAS CON ESTRUCTURA CORRECTA - FIX COMPLETO
+        // 📋 CREAR OTRAS TABLAS CON ESTRUCTURA CORRECTA - FIX COMPLETO V4
         // ===============================================
         
         console.log('📊 Verificando tablas principales...');
         
-        // 🔧 FIX: Crear tabla accounts con TODAS las columnas necesarias SIN updated_at
+        // 🔧 FIX V4: Crear tabla accounts con ID VARCHAR para IDs manuales
         await client.query(`
             CREATE TABLE IF NOT EXISTS accounts (
-                id SERIAL PRIMARY KEY,
+                id VARCHAR(50) PRIMARY KEY,
                 client_name VARCHAR(255) NOT NULL,
                 client_phone VARCHAR(20),
                 email VARCHAR(255),
@@ -392,7 +392,109 @@ async function initDB() {
             )
         `);
         
-        // 🔧 FIX: Verificar y agregar columnas faltantes en accounts (SIN updated_at)
+        // 🔧 FIX V4: Verificar si necesitamos migrar de SERIAL a VARCHAR
+        const accountIdTypeResult = await client.query(`
+            SELECT data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'accounts' 
+            AND column_name = 'id' 
+            AND table_schema = 'public'
+        `);
+        
+        if (accountIdTypeResult.rows.length > 0) {
+            const currentIdType = accountIdTypeResult.rows[0].data_type;
+            console.log(`🔍 Tipo actual de accounts.id: ${currentIdType}`);
+            
+            if (currentIdType === 'integer') {
+                console.log('🔄 Migrando accounts.id de INTEGER SERIAL a VARCHAR...');
+                
+                // Verificar si hay datos existentes
+                const existingAccountsCount = await client.query('SELECT COUNT(*) FROM accounts');
+                const accountCount = parseInt(existingAccountsCount.rows[0].count);
+                
+                if (accountCount > 0) {
+                    console.log(`⚠️ Encontradas ${accountCount} cuentas existentes. Realizando migración segura...`);
+                    
+                    // Crear tabla temporal con nueva estructura
+                    await client.query(`
+                        CREATE TABLE accounts_new (
+                            id VARCHAR(50) PRIMARY KEY,
+                            client_name VARCHAR(255) NOT NULL,
+                            client_phone VARCHAR(20),
+                            email VARCHAR(255),
+                            password VARCHAR(255),
+                            type VARCHAR(100) NOT NULL,
+                            country VARCHAR(3) DEFAULT 'PE',
+                            fecha_inicio_proveedor DATE,
+                            fecha_vencimiento_proveedor DATE,
+                            fecha_venta DATE,
+                            fecha_vencimiento DATE,
+                            voucher_imagen TEXT,
+                            numero_operacion VARCHAR(100),
+                            monto_pagado DECIMAL(10,2),
+                            estado_pago VARCHAR(20) DEFAULT 'activo',
+                            days_remaining INTEGER DEFAULT 0,
+                            profiles TEXT DEFAULT '[]',
+                            status VARCHAR(20) DEFAULT 'active',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    `);
+                    
+                    // Migrar datos existentes convirtiendo ID entero a string
+                    await client.query(`
+                        INSERT INTO accounts_new (
+                            id, client_name, client_phone, email, password, type, country,
+                            fecha_inicio_proveedor, fecha_vencimiento_proveedor, fecha_venta, fecha_vencimiento,
+                            voucher_imagen, numero_operacion, monto_pagado, estado_pago, days_remaining,
+                            profiles, status, created_at
+                        )
+                        SELECT 
+                            id::text, client_name, client_phone, email, password, type, country,
+                            fecha_inicio_proveedor, fecha_vencimiento_proveedor, fecha_venta, fecha_vencimiento,
+                            voucher_imagen, numero_operacion, monto_pagado, estado_pago, days_remaining,
+                            profiles, status, created_at
+                        FROM accounts
+                    `);
+                    
+                    // Eliminar tabla vieja y renombrar nueva
+                    await client.query('DROP TABLE accounts CASCADE');
+                    await client.query('ALTER TABLE accounts_new RENAME TO accounts');
+                    
+                    console.log('✅ Migración de accounts.id completada exitosamente');
+                } else {
+                    console.log('📝 No hay datos existentes, recreando tabla con estructura correcta...');
+                    await client.query('DROP TABLE accounts CASCADE');
+                    await client.query(`
+                        CREATE TABLE accounts (
+                            id VARCHAR(50) PRIMARY KEY,
+                            client_name VARCHAR(255) NOT NULL,
+                            client_phone VARCHAR(20),
+                            email VARCHAR(255),
+                            password VARCHAR(255),
+                            type VARCHAR(100) NOT NULL,
+                            country VARCHAR(3) DEFAULT 'PE',
+                            fecha_inicio_proveedor DATE,
+                            fecha_vencimiento_proveedor DATE,
+                            fecha_venta DATE,
+                            fecha_vencimiento DATE,
+                            voucher_imagen TEXT,
+                            numero_operacion VARCHAR(100),
+                            monto_pagado DECIMAL(10,2),
+                            estado_pago VARCHAR(20) DEFAULT 'activo',
+                            days_remaining INTEGER DEFAULT 0,
+                            profiles TEXT DEFAULT '[]',
+                            status VARCHAR(20) DEFAULT 'active',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    `);
+                    console.log('✅ Tabla accounts recreada con ID VARCHAR');
+                }
+            } else {
+                console.log('✅ Tabla accounts ya tiene ID VARCHAR correctamente configurado');
+            }
+        }
+        
+        // Verificar y agregar columnas faltantes
         const accountColumnsResult = await client.query(`
             SELECT column_name 
             FROM information_schema.columns 
@@ -403,7 +505,7 @@ async function initDB() {
         const accountColumns = accountColumnsResult.rows.map(row => row.column_name);
         console.log(`🔍 Columnas existentes en accounts: [${accountColumns.join(', ')}]`);
         
-        // Verificar y agregar columnas faltantes (SIN updated_at)
+        // Verificar y agregar columnas faltantes
         const requiredColumns = [
             { name: 'password', type: 'VARCHAR(255)' },
             { name: 'voucher_imagen', type: 'TEXT' },
@@ -422,18 +524,18 @@ async function initDB() {
             }
         }
         
-        console.log('✅ Tabla accounts verificada con todas las columnas (SIN updated_at)');
+        console.log('✅ Tabla accounts verificada con ID VARCHAR y todas las columnas');
 
-        // 🔧 FIX: Crear tabla sent_notifications con referencia correcta
+        // 🔧 FIX V4: Crear tabla sent_notifications con referencia correcta a VARCHAR
         await client.query(`
             CREATE TABLE IF NOT EXISTS sent_notifications (
                 id SERIAL PRIMARY KEY,
-                account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
+                account_id VARCHAR(50) REFERENCES accounts(id) ON DELETE CASCADE,
                 notification_type VARCHAR(50),
                 sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        console.log('✅ Tabla sent_notifications verificada');
+        console.log('✅ Tabla sent_notifications verificada con referencia VARCHAR');
         
         // ===============================================
         // 📈 CREAR ÍNDICES DE PERFORMANCE
@@ -461,7 +563,7 @@ async function initDB() {
         }
         
         await client.query('COMMIT');
-        console.log('✅ Base de datos inicializada correctamente');
+        console.log('✅ Base de datos inicializada correctamente con ID VARCHAR');
         console.log('📦 Índices de performance creados');
         
     } catch (error) {
@@ -843,7 +945,7 @@ app.post('/api/cache/clear', verifyToken, (req, res) => {
 });
 
 // ===============================================
-// 📝 GESTIÓN DE CUENTAS - CORREGIDA COMPLETAMENTE
+// 📝 GESTIÓN DE CUENTAS - CORREGIDA COMPLETAMENTE V4
 // ===============================================
 
 app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), [
@@ -863,11 +965,28 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
         console.log('📝 Datos recibidos para crear cuenta:', req.body);
 
         const {
-    client_name, client_phone, email, password, type, country = 'PE',  // ✅ SIN 'id'
-    fecha_inicio_proveedor, fecha_vencimiento_proveedor, profiles
-} = req.body;
+            id, client_name, client_phone, email, password, type, country = 'PE',
+            fecha_inicio_proveedor, fecha_vencimiento_proveedor, profiles
+        } = req.body;
 
-        // 🔧 FIX: Parsing robusto de profiles
+        // 🔧 FIX V4: Validar que el ID esté presente
+        if (!id) {
+            return res.status(400).json({ 
+                error: 'ID de cuenta requerido',
+                message: 'Debe proporcionar un ID único para la cuenta'
+            });
+        }
+
+        // 🔧 FIX V4: Verificar que el ID no exista ya
+        const existingAccount = await pool.query('SELECT id FROM accounts WHERE id = $1', [id]);
+        if (existingAccount.rows.length > 0) {
+            return res.status(409).json({ 
+                error: 'ID de cuenta ya existe',
+                message: `La cuenta con ID "${id}" ya existe. Use un ID diferente.`
+            });
+        }
+
+        // 🔧 FIX V4: Parsing robusto de profiles
         let parsedProfiles = [];
         if (profiles) {
             try {
@@ -891,15 +1010,16 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
 
         const days_remaining = calcularDiasRestantes(fecha_vencimiento_proveedor);
 
-        // 🔧 FIX: Query corregida SIN updated_at y con todas las columnas necesarias
+        // 🔧 FIX V4: Query corregida CON id manual VARCHAR
         const result = await pool.query(`
             INSERT INTO accounts (
-                client_name, client_phone, email, password, type, country,
+                id, client_name, client_phone, email, password, type, country,
                 fecha_inicio_proveedor, fecha_vencimiento_proveedor, 
-                days_remaining, profiles
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+                days_remaining, profiles, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
             RETURNING id
         `, [
+            id,  // 🔧 AHORA INCLUIMOS EL ID MANUAL
             client_name, 
             client_phone, 
             email, 
@@ -916,7 +1036,7 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
         cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
         cache.del(getCacheKey('api', '/api/stats', req.user?.userId || 'anonymous'));
 
-        console.log(`✅ Nueva cuenta creada: ID ${result.rows[0].id} - ${client_name}`);
+        console.log(`✅ Nueva cuenta creada exitosamente: ID ${result.rows[0].id} - ${client_name}`);
         
         res.status(201).json({
             success: true,
@@ -927,15 +1047,30 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
     } catch (error) {
         console.error('❌ Error creando cuenta:', error);
         console.error('📝 req.body completo:', req.body);
+        
+        // 🔧 FIX V4: Manejo específico de errores de duplicados
+        if (error.code === '23505') { // Unique constraint violation
+            return res.status(409).json({ 
+                error: 'ID de cuenta duplicado',
+                message: 'Ya existe una cuenta con este ID. Use un ID diferente.'
+            });
+        }
+        
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
-// 🔧 FIX: Función de actualización de cuentas corregida SIN updated_at
+// 🔧 FIX V4: Función de actualización de cuentas corregida para VARCHAR ID
 app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, res) => {
     try {
         const { id } = req.params;
         const updateData = { ...req.body };
+
+        // Verificar que la cuenta existe
+        const accountExists = await pool.query('SELECT id FROM accounts WHERE id = $1', [id]);
+        if (accountExists.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
 
         if (req.file) {
             if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
@@ -958,19 +1093,18 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
             updateData.profiles = JSON.stringify(typeof updateData.profiles === 'string' ? JSON.parse(updateData.profiles) : updateData.profiles);
         }
 
-        // 🔧 FIX: Query corregida SIN updated_at
-        // LÍNEA 960-966 - CORREGIR UPDATE dinámico
-        const fields = Object.keys(updateData).map((key, index) => `${key} = $${index + 1}`).join(', ');
+        // 🔧 FIX V4: Query corregida con placeholders correctos
+        const fields = Object.keys(updateData).map((key, index) => `${key} = ${index + 1}`).join(', ');
         const values = Object.values(updateData);
         values.push(id);
 
-        await pool.query(`UPDATE accounts SET ${fields} WHERE id = $${values.length}`, values);
+        await pool.query(`UPDATE accounts SET ${fields} WHERE id = ${values.length}`, values);
 
         // Invalidar cache relacionado
         cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
         cache.del(getCacheKey('api', '/api/stats', req.user?.userId || 'anonymous'));
 
-        console.log(`✅ Cuenta actualizada: ID ${id}`);
+        console.log(`✅ Cuenta actualizada exitosamente: ID ${id}`);
         res.json({ success: true, message: 'Cuenta actualizada exitosamente' });
 
     } catch (error) {
@@ -983,13 +1117,17 @@ app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
         
-        await pool.query('DELETE FROM accounts WHERE id = $1', [id]);
+        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING id', [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
 
         // Invalidar cache relacionado
         cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
         cache.del(getCacheKey('api', '/api/stats', req.user?.userId || 'anonymous'));
 
-        console.log(`✅ Cuenta eliminada: ID ${id}`);
+        console.log(`✅ Cuenta eliminada exitosamente: ID ${id}`);
         res.json({ success: true, message: 'Cuenta eliminada exitosamente' });
 
     } catch (error) {
@@ -1026,12 +1164,11 @@ async function sendNtfyNotification(topic, title, message, tags = [], priority =
     }
 }
 
-// 🔧 FIX: Función de alarmas corregida con estructura correcta de BD
+// 🔧 FIX V4: Función de alarmas corregida para VARCHAR ID
 async function checkAndSendAlarms() {
     try {
         console.log('⏰ Verificando alarmas...');
         
-        // 🔧 FIX: Query corregida usando id (SERIAL) en lugar de account_id
         const accounts = await pool.query(`
             SELECT id, client_name, type, days_remaining, fecha_vencimiento_proveedor 
             FROM accounts 
@@ -1045,7 +1182,7 @@ async function checkAndSendAlarms() {
             const vencimiento = new Date(account.fecha_vencimiento_proveedor);
             const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
 
-            // 🔧 FIX: Verificar notificaciones usando id correcto
+            // 🔧 FIX V4: Verificar notificaciones usando VARCHAR ID
             const notificationCheck = await pool.query(`
                 SELECT COUNT(*) FROM sent_notifications 
                 WHERE account_id = $1 AND notification_type = $2 AND DATE(sent_at) = CURRENT_DATE
@@ -1070,7 +1207,6 @@ ID: ${account.id}`;
                 );
 
                 if (success) {
-                    // 🔧 FIX: Insertar usando account_id correcto
                     await pool.query(`
                         INSERT INTO sent_notifications (account_id, notification_type) 
                         VALUES ($1, $2)
@@ -1230,7 +1366,7 @@ app.post('/api/check-micuenta-me-code', verifyToken, [
 });
 
 // ===============================================
-// 🔔 GESTIÓN DE VOUCHERS - CORREGIDA COMPLETAMENTE
+// 🔔 GESTIÓN DE VOUCHERS - CORREGIDA COMPLETAMENTE V4
 // ===============================================
 
 app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, upload.single('voucher'), async (req, res) => {
@@ -1244,6 +1380,7 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
 
         console.log(`📤 Subiendo voucher para cuenta ${accountId}, perfil ${profileIndex}`);
 
+        // 🔧 FIX V4: Usar VARCHAR ID en la consulta
         const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
         if (accountResult.rows.length === 0) {
             return res.status(404).json({ error: 'Cuenta no encontrada' });
@@ -1277,7 +1414,6 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             fechaVoucherSubido: new Date().toISOString().split('T')[0]
         };
 
-        // 🔧 FIX: Query SIN updated_at
         await pool.query(
             'UPDATE accounts SET profiles = $1 WHERE id = $2',
             [JSON.stringify(profiles), accountId]
@@ -1310,7 +1446,7 @@ app.get('/api/health', async (req, res) => {
         res.json({ 
             status: 'OK', 
             timestamp: new Date().toISOString(),
-            version: '2.2.0',
+            version: '2.2.0-V4',
             environment: process.env.NODE_ENV || 'development',
             uptime: process.uptime(),
             database: 'Connected',
@@ -1330,6 +1466,11 @@ app.get('/api/health', async (req, res) => {
                 image_optimization: process.env.ENABLE_IMAGE_OPTIMIZATION === 'true',
                 cache_api: process.env.ENABLE_CACHE_API === 'true',
                 cron_jobs: process.env.ENABLE_CRON_JOBS === 'true'
+            },
+            fixes: {
+                varchar_id_support: true,
+                id_manual_creation: true,
+                duplicate_id_validation: true
             }
         });
     } catch (error) {
@@ -1353,10 +1494,6 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/index.html');
 });
 
-app.get('/login', (req, res) => {
-    res.sendFile(__dirname + '/public/login.html');
-});
-
 app.get('/dashboard', (req, res) => {
     res.sendFile(__dirname + '/public/dashboard.html');
 });
@@ -1371,7 +1508,7 @@ async function startServer() {
         
         app.listen(PORT, () => {
             console.log('🚀 ================================');
-            console.log(`🎯 JIREH Streaming Manager v2.2.0`);
+            console.log(`🎯 JIREH Streaming Manager v2.2.0-V4`);
             console.log(`🌐 Servidor corriendo en puerto ${PORT}`);
             console.log('🚀 ================================');
             
@@ -1409,9 +1546,20 @@ async function startServer() {
             console.log('🗜️ Compresión gzip habilitada');
             console.log('🖼️ Optimización de imágenes Sharp habilitada');
             console.log('📊 Analytics y Excel habilitados');
-            console.log('📈 Versión: 2.2.0 - PERFORMANCE EDITION');
+            console.log('📈 Versión: 2.2.0-V4 - PERFORMANCE EDITION');
             console.log('🔐 Seguridad: JWT + bcrypt + Helmet + Rate Limiting');
             console.log('⚡ Performance: Cache + Compression + Sharp + Indices');
+            console.log('🆔 ID Support: VARCHAR manual IDs con validación de duplicados');
+            console.log('🚀 ================================');
+            console.log('');
+            console.log('✅ FIXES APLICADOS EN V4:');
+            console.log('  🔧 ID VARCHAR(50) para IDs manuales');
+            console.log('  🔧 Validación de IDs duplicados');
+            console.log('  🔧 Migración automática de SERIAL a VARCHAR');
+            console.log('  🔧 Referencias corregidas en sent_notifications');
+            console.log('  🔧 Queries UPDATE/INSERT adaptados para VARCHAR');
+            console.log('  🔧 Sistema de alarmas compatible con VARCHAR IDs');
+            console.log('  🔧 Gestión de vouchers con VARCHAR IDs');
             console.log('🚀 ================================');
         });
 
