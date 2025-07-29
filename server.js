@@ -1,18 +1,62 @@
-// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS
+// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS + SEGURIDAD MEJORADA
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
-const fetch = require('node-fetch'); // Se necesita para enviar notificaciones a ntfy
+const fetch = require('node-fetch');
+
+// NUEVAS DEPENDENCIAS DE SEGURIDAD
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const { body, validationResult } = require('express-validator');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// CONFIGURACIÓN DE SEGURIDAD
+const JWT_SECRET = process.env.JWT_SECRET || 'jireh_streaming_secret_2025_ultra_secure!';
+const BCRYPT_ROUNDS = 12;
+
+// Helmet para headers de seguridad
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'", "https://ntfy.sh"]
+        }
+    }
+}));
+
+// Rate limiting
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 5, // 5 intentos por IP
+    message: { error: 'Demasiados intentos de login. Intenta en 15 minutos.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minuto
+    max: 100, // 100 requests por minuto por IP
+    message: { error: 'Demasiadas solicitudes. Intenta más tarde.' }
+});
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Aplicar rate limiting
+app.use('/api/login', loginLimiter);
+app.use('/api', apiLimiter);
 
 // Configuración de PostgreSQL
 const pool = new Pool({
@@ -26,6 +70,50 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB máximo
 });
+
+// MIDDLEWARE DE AUTENTICACIÓN JWT
+function verifyToken(req, res, next) {
+    const token = req.headers['authorization']?.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Token requerido' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(403).json({ error: 'Token inválido o expirado' });
+    }
+}
+
+// VALIDADORES DE INPUT
+const loginValidators = [
+    body('username')
+        .trim()
+        .isLength({ min: 3, max: 30 })
+        .matches(/^[a-zA-Z0-9_]+$/)
+        .withMessage('Usuario debe tener 3-30 caracteres alfanuméricos'),
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password debe tener mínimo 6 caracteres')
+];
+
+const accountValidators = [
+    body('client_name')
+        .trim()
+        .isLength({ min: 2, max: 100 })
+        .matches(/^[a-zA-ZÀ-ÿ\s]+$/)
+        .withMessage('Nombre debe tener 2-100 caracteres'),
+    body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Email inválido'),
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password debe tener mínimo 6 caracteres')
+];
 
 // Función para calcular días restantes (timezone-safe)
 function calcularDiasRestantes(fechaVencimiento) {
@@ -118,7 +206,6 @@ async function initDB() {
     }
 }
 
-// ########## INICIO DEL CÓDIGO MODIFICADO ##########
 // LÓGICA DE ENVÍO DE ALARMAS POR NTFY
 async function checkAndSendAlarms() {
     console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
@@ -150,7 +237,6 @@ async function checkAndSendAlarms() {
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                     console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
                 } else {
-                    // LÍNEA DE DEPURACIÓN AÑADIDA
                     console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                 }
             }
@@ -173,7 +259,6 @@ async function checkAndSendAlarms() {
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                            console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
                         } else {
-                            // LÍNEA DE DEPURACIÓN AÑADIDA
                             console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                         }
                     }
@@ -184,24 +269,96 @@ async function checkAndSendAlarms() {
         console.error('❌ Error durante la revisión de alarmas:', error);
     }
 }
-// ########## FIN DEL CÓDIGO MODIFICADO ##########
 
-// RUTAS API
+// RUTAS API MEJORADAS CON SEGURIDAD
 app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
-app.post('/api/login', async (req, res) => {
+
+// RUTA DE LOGIN MEJORADA CON BCRYPT Y JWT
+app.post('/api/login', loginValidators, async (req, res) => {
     try {
-        const { username, password } = req.body;
-        const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND password = $2', [username, password]);
-        if (result.rows.length > 0) {
-            res.json({ success: true, message: 'Login exitoso' });
-        } else {
-            res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+        // Validar inputs
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Datos inválidos',
+                errors: errors.array()
+            });
         }
+
+        const { username, password } = req.body;
+
+        // Buscar usuario
+        const result = await pool.query(
+            'SELECT id, username, password FROM admin_users WHERE username = $1', 
+            [username]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Credenciales inválidas' 
+            });
+        }
+
+        const user = result.rows[0];
+        
+        // Verificar password (primero plain text, luego migraremos a bcrypt)
+        let isValidPassword = false;
+        
+        // Si el password ya está hasheado (empieza con $2b$)
+        if (user.password.startsWith('$2b$')) {
+            isValidPassword = await bcrypt.compare(password, user.password);
+        } else {
+            // Password en texto plano (migrar después)
+            isValidPassword = password === user.password;
+            
+            // Si es válido, actualizar a bcrypt
+            if (isValidPassword) {
+                const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+                await pool.query(
+                    'UPDATE admin_users SET password = $1 WHERE id = $2',
+                    [hashedPassword, user.id]
+                );
+                console.log(`✅ Password migrado a bcrypt para usuario: ${username}`);
+            }
+        }
+        
+        if (!isValidPassword) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Credenciales inválidas' 
+            });
+        }
+
+        // Generar JWT
+        const token = jwt.sign(
+            { userId: user.id, username: user.username }, 
+            JWT_SECRET, 
+            { expiresIn: '24h' }
+        );
+
+        // Log de seguridad
+        console.log(`✅ Login exitoso: ${username} desde ${req.ip} a las ${new Date().toISOString()}`);
+
+        res.json({ 
+            success: true, 
+            message: 'Login exitoso',
+            token,
+            user: { id: user.id, username: user.username }
+        });
+
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        console.error('❌ Error en login:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error interno del servidor' 
+        });
     }
 });
-app.get('/api/accounts', async (req, res) => {
+
+// RUTAS PROTEGIDAS CON JWT
+app.get('/api/accounts', verifyToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
         res.json(result.rows);
@@ -209,8 +366,18 @@ app.get('/api/accounts', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
-app.post('/api/accounts', async (req, res) => {
+
+app.post('/api/accounts', accountValidators, verifyToken, async (req, res) => {
     try {
+        // Validar inputs
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                error: 'Datos inválidos',
+                details: errors.array()
+            });
+        }
+
         const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
         const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
         const fechaVencimientoProveedor = new Date(fechaInicio);
@@ -227,8 +394,18 @@ app.post('/api/accounts', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.put('/api/accounts/:id', async (req, res) => {
+
+app.put('/api/accounts/:id', accountValidators, verifyToken, async (req, res) => {
     try {
+        // Validar inputs
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                error: 'Datos inválidos',
+                details: errors.array()
+            });
+        }
+
         const { id } = req.params;
         const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
         const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
@@ -248,7 +425,8 @@ app.put('/api/accounts/:id', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
+
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, upload.single('voucher'), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
@@ -287,7 +465,8 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.delete('/api/accounts/:id', async (req, res) => {
+
+app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
@@ -297,7 +476,8 @@ app.delete('/api/accounts/:id', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
-app.get('/api/stats', async (req, res) => {
+
+app.get('/api/stats', verifyToken, async (req, res) => {
     try {
         const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
         const accountsResult = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
@@ -326,7 +506,7 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
-app.get('/api/alarms/settings', async (req, res) => {
+app.get('/api/alarms/settings', verifyToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
         res.json(result.rows[0] || { provider_threshold_days: 5, client_threshold_days: 3, ntfy_topic: '' });
@@ -335,7 +515,7 @@ app.get('/api/alarms/settings', async (req, res) => {
     }
 });
 
-app.put('/api/alarms/settings', async (req, res) => {
+app.put('/api/alarms/settings', verifyToken, async (req, res) => {
     try {
         const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
         const result = await pool.query(
@@ -348,7 +528,7 @@ app.put('/api/alarms/settings', async (req, res) => {
     }
 });
 
-app.post('/api/alarms/test', async (req, res) => {
+app.post('/api/alarms/test', verifyToken, async (req, res) => {
     console.log('⚡️ Disparando prueba de alarmas manualmente...');
     try {
         await checkAndSendAlarms();
@@ -359,35 +539,32 @@ app.post('/api/alarms/test', async (req, res) => {
     }
 });
 
-// NUEVA RUTA API PARA CONSULTAR MICUENTA.ME
-app.post('/api/check-micuenta-me-code', async (req, res) => {
+app.post('/api/check-micuenta-me-code', verifyToken, async (req, res) => {
     try {
-        const { code, pdv } = req.body; // Recibe code y pdv del frontend de su dashboard
+        const { code, pdv } = req.body;
 
-        const response = await fetch('https://micuenta.me/e/redeem', { // URL del endpoint de micuenta.me
+        const response = await fetch('https://micuenta.me/e/redeem', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ code: code, pdv: pdv }) // Envía code y pdv como JSON
+            body: JSON.stringify({ code: code, pdv: pdv })
         });
 
-        // Reenviar el estado HTTP de micuenta.me si no es 2xx
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Error desconocido del proxy de micuenta.me.' }));
             console.error('Error al consultar micuenta.me:', response.status, errorData.message);
-            return res.status(response.status).json(errorData); // Reenviar el error del servicio externo
+            return res.status(response.status).json(errorData);
         }
 
         const data = await response.json();
-        res.json(data); // Reenviar la respuesta JSON de micuenta.me al frontend de su dashboard
+        res.json(data);
 
     } catch (error) {
         console.error('Error en la ruta /api/check-micuenta-me-code:', error);
         res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la solicitud externa a micuenta.me.' });
     }
 });
-
 
 // Servir archivos estáticos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -401,6 +578,8 @@ async function startServer() {
         await initDB();
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
+            console.log(`🔒 Seguridad JWT habilitada`);
+            console.log(`🛡️ Rate limiting configurado`);
             setInterval(checkAndSendAlarms, 3600000); 
             console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
         });
