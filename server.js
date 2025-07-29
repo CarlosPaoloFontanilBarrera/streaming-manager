@@ -28,7 +28,14 @@ const PORT = process.env.PORT || 3000;
 // ===============================================
 // 🔧 FIX: CONFIGURAR TRUST PROXY PARA RAILWAY
 // ===============================================
-app.set('trust proxy', true); // CRÍTICO para Railway
+// 🔧 FIX: Configuración específica de trust proxy para Railway
+if (process.env.NODE_ENV === 'production') {
+    // En Railway, confiar solo en el primer proxy
+    app.set('trust proxy', 1);
+} else {
+    // En desarrollo local, no usar proxy
+    app.set('trust proxy', false);
+}
 
 // ===============================================
 // 🔐 CONFIGURACIÓN DE SEGURIDAD
@@ -78,7 +85,7 @@ const createRateLimit = (windowMs, max, message) => rateLimit({
     message: { error: message },
     standardHeaders: true,
     legacyHeaders: false,
-    trustProxy: true // Importante para Railway
+    trustProxy: process.env.NODE_ENV === 'production' // CAMBIO AQUÍ
 });
 
 const generalLimiter = createRateLimit(15 * 60 * 1000, parseInt(process.env.API_RATE_LIMIT) || 100, 'Demasiadas solicitudes');
