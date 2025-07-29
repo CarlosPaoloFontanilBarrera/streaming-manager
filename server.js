@@ -192,75 +192,22 @@ const verifyToken = (req, res, next) => {
 };
 
 // ===============================================
-// 🗄️ INICIALIZACIÓN DE BASE DE DATOS CORREGIDA
+// 🗄️ INICIALIZACIÓN DE BASE DE DATOS
 // ===============================================
 
 async function initDB() {
     try {
         console.log('🔧 Inicializando base de datos...');
         
-        // ===============================================
-        // 🔄 MIGRACIÓN INTELIGENTE DE TABLA admin_users
-        // ===============================================
-        
-        // Verificar si la tabla existe y su estructura
-        const tableExists = await pool.query(`
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'admin_users'
+        // Crear tabla de usuarios admin
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
         `);
-        
-        if (tableExists.rows.length === 0) {
-            // Tabla no existe - crear nueva con estructura correcta
-            console.log('📝 Creando nueva tabla admin_users...');
-            await pool.query(`
-                CREATE TABLE admin_users (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(50) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            `);
-        } else {
-            // Verificar si tiene la columna password_hash
-            const hasPasswordHash = tableExists.rows.some(row => row.column_name === 'password_hash');
-            const hasPassword = tableExists.rows.some(row => row.column_name === 'password');
-            
-            if (!hasPasswordHash && hasPassword) {
-                console.log('🔄 Migrando tabla admin_users de password a password_hash...');
-                
-                // Agregar nueva columna password_hash
-                await pool.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
-                
-                // Migrar passwords existentes (solo si no están ya hasheados)
-                const existingUsers = await pool.query('SELECT id, username, password FROM admin_users WHERE password_hash IS NULL');
-                
-                for (const user of existingUsers.rows) {
-                    // Verificar si ya está hasheado (bcrypt hash empieza con $2b$)
-                    if (!user.password.startsWith('$2b$')) {
-                        console.log(`🔒 Hasheando password para usuario: ${user.username}`);
-                        const hashedPassword = await bcrypt.hash(user.password, BCRYPT_ROUNDS);
-                        await pool.query('UPDATE admin_users SET password_hash = $1 WHERE id = $2', [hashedPassword, user.id]);
-                    } else {
-                        // Ya está hasheado, solo copiar
-                        await pool.query('UPDATE admin_users SET password_hash = $1 WHERE id = $2', [user.password, user.id]);
-                    }
-                }
-                
-                // Eliminar columna password antigua después de migrar
-                console.log('🗑️ Eliminando columna password antigua...');
-                await pool.query(`ALTER TABLE admin_users DROP COLUMN IF EXISTS password`);
-                
-                console.log('✅ Migración de admin_users completada');
-            } else if (!hasPasswordHash) {
-                // No tiene ni password ni password_hash - agregar password_hash
-                await pool.query(`ALTER TABLE admin_users ADD COLUMN password_hash VARCHAR(255) NOT NULL DEFAULT ''`);
-            }
-        }
-
-        // ===============================================
-        // 📊 CREAR/VERIFICAR OTRAS TABLAS
-        // ===============================================
 
         // Crear tabla principal de cuentas
         await pool.query(`
@@ -295,11 +242,7 @@ async function initDB() {
             )
         `);
 
-        // ===============================================
         // 🚀 CREAR ÍNDICES PARA PERFORMANCE
-        // ===============================================
-        console.log('📈 Creando índices de performance...');
-        
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_created_at ON accounts(created_at DESC)`);
@@ -308,10 +251,6 @@ async function initDB() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON sent_notifications(sent_at DESC)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON admin_users(username)`);
 
-        // ===============================================
-        // 👤 VERIFICAR/CREAR USUARIO ADMIN
-        // ===============================================
-        
         // Verificar si existe usuario admin
         const adminCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['admin']);
         
@@ -326,16 +265,12 @@ async function initDB() {
             );
             
             console.log('✅ Usuario admin creado - Usuario: admin, Password: admin123');
-        } else {
-            console.log('👤 Usuario admin ya existe');
         }
 
         console.log('✅ Base de datos inicializada correctamente');
         console.log('📦 Índices de performance creados');
-        
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
-        throw error; // Re-throw para que el servidor no continue si hay error crítico
     }
 }
 
@@ -809,11 +744,11 @@ app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, 
             updateData.profiles = JSON.stringify(JSON.parse(updateData.profiles));
         }
 
-        const fields = Object.keys(updateData).map((key, index) => `${key} = ${index + 1}`).join(', ');
+        const fields = Object.keys(updateData).map((key, index) => `${key} = $${index + 1}`).join(', ');
         const values = Object.values(updateData);
         values.push(id);
 
-        await pool.query(`UPDATE accounts SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ${values.length}`, values);
+        await pool.query(`UPDATE accounts SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`, values);
 
         // Invalidar cache relacionado
         cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
