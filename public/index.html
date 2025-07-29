@@ -66,20 +66,45 @@
     </div>
 
     <script>
-        // Verificar si está logueado y redirigir apropiadamente
+        // ✅ CORREGIDO: Usar sistema JWT en lugar del viejo
         function initializeApp() {
-            const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
+            // Verificar JWT token
+            const token = localStorage.getItem('jireh_auth_token');
+            const user = localStorage.getItem('jireh_user_data');
             
-            if (isLoggedIn === 'true') {
-                // Ya está logueado, ir al dashboard
+            // Función para verificar si el token ha expirado
+            function isTokenExpired(token) {
+                if (!token) return true;
+                
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const currentTime = Date.now() / 1000;
+                    return payload.exp < currentTime;
+                } catch {
+                    return true;
+                }
+            }
+            
+            if (token && user && !isTokenExpired(token)) {
+                // Token válido, ir al dashboard
+                console.log('✅ Token JWT válido encontrado, redirigiendo al dashboard');
                 window.location.href = '/dashboard';
             } else {
-                // No está logueado, ir al login
+                // Token inválido o no existe, ir al login
+                console.log('🔒 Sin token válido, redirigiendo al login');
+                
+                // Limpiar tokens expirados
+                if (token && isTokenExpired(token)) {
+                    localStorage.removeItem('jireh_auth_token');
+                    localStorage.removeItem('jireh_user_data');
+                    console.log('🧹 Token expirado limpiado');
+                }
+                
                 window.location.href = '/login';
             }
         }
         
-        // Redirigir después de un breve delay para mostrar la pantalla de carga
+        // Redirigir después de mostrar la pantalla de carga
         window.onload = function() {
             setTimeout(initializeApp, 1500);
         };
