@@ -3,6 +3,7 @@
   "version": "2.2.0",
   "description": "Sistema profesional de gestión multi-plataforma de streaming con vouchers, seguridad JWT y optimizaciones de performance",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
