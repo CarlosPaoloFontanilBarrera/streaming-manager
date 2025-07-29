@@ -14,6 +14,7 @@ const helmet = require('helmet');
 const { body, validationResult } = require('express-validator');
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 
 // CONFIGURACIÓN DE SEGURIDAD
