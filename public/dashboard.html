@@ -2244,100 +2244,71 @@ Su acceso a ${state.currentAccount.type} ha sido configurado exitosamente.
             },
 
             async handleSubmit(event) {
-    event.preventDefault();
-    
-    const fileInput = document.getElementById('profileVoucherFile');
-    const operationNumber = document.getElementById('profileOperationNumber').value.trim();
-    const paidAmount = document.getElementById('profilePaidAmount').value.trim();
-    
-    if (!fileInput.files[0] || !operationNumber || !paidAmount) {
-        alert('Por favor completa todos los campos');
-        return;
-    }
-    
-    // ✅ MEJORA: Obtener botón al inicio y verificar
-    const submitBtn = event.target.querySelector('button[type="submit"]');
-    if (!submitBtn) {
-        console.error('❌ No se encontró el botón de submit');
-        alert('Error interno: No se puede procesar el formulario');
-        return;
-    }
-    
-    // ✅ MEJORA: Guardar estado original del botón
-    const buttonState = {
-        text: submitBtn.textContent,
-        disabled: submitBtn.disabled
-    };
-    
-    try {
-        const account = state.allAccounts.find(acc => acc.id === state.currentProfileAccountId);
-        if (!account) {
-            alert('❌ Error: Cuenta no encontrada');
-            return;
-        }
-        
-        const profile = account.profiles[state.currentProfileIndex];
-        if (!profile) {
-            alert('❌ Error: Perfil no encontrado');
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('voucher', fileInput.files[0]);
-        formData.append('numero_operacion', operationNumber);
-        formData.append('monto_pagado', paidAmount);
-        
-        // ✅ Cambiar estado del botón
-        submitBtn.textContent = '⏳ Subiendo voucher...';
-        submitBtn.disabled = true;
-        
-        console.log('📤 Subiendo voucher...');
-        const result = await this.uploadVoucher(state.currentProfileAccountId, state.currentProfileIndex, formData);
-        
-        if (result.success) {
-            console.log('✅ Voucher subido exitosamente');
-            
-            // Guardar posición y estado
-            const scrollPosition = window.scrollY;
-            const expandedAccountId = state.currentProfileAccountId;
-            
-            // Recargar datos
-            await dataManager.loadAccounts();
-            await dataManager.updateStats();
-            ui.renderAccounts();
-            
-            // Cerrar modal
-            modalManager.close('profileVoucherModal');
-            
-            // Restaurar estado de expansión
-            if (expandedAccountId) {
-                setTimeout(() => {
-                    const accordion = document.getElementById(`accordion-${expandedAccountId}`);
-                    if (accordion && !accordion.classList.contains('expanded')) {
-                        toggleAccordion(expandedAccountId);
+                event.preventDefault();
+                
+                const fileInput = document.getElementById('profileVoucherFile');
+                const operationNumber = document.getElementById('profileOperationNumber').value.trim();
+                const paidAmount = document.getElementById('profilePaidAmount').value.trim();
+                
+                if (!fileInput.files[0] || !operationNumber || !paidAmount) {
+                    alert('Por favor completa todos los campos');
+                    return;
+                }
+                
+                try {
+                    const account = state.allAccounts.find(acc => acc.id === state.currentProfileAccountId);
+                    if (!account) return;
+                    
+                    const profile = account.profiles[state.currentProfileIndex];
+                    
+                    const formData = new FormData();
+                    formData.append('voucher', fileInput.files[0]);
+                    formData.append('numero_operacion', operationNumber);
+                    formData.append('monto_pagado', paidAmount);
+                    
+                    const submitBtn = event.target.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.textContent;
+                    submitBtn.textContent = '⏳ Subiendo...';
+                    submitBtn.disabled = true;
+                    
+                    const result = await this.uploadVoucher(state.currentProfileAccountId, state.currentProfileIndex, formData);
+                    
+                    if (result.success) {
+                        const scrollPosition = window.scrollY;
+                        const expandedAccountId = state.currentProfileAccountId;
+                        
+                        await dataManager.loadAccounts();
+                        await dataManager.updateStats();
+                        ui.renderAccounts();
+                        
+                        modalManager.close('profileVoucherModal');
+                        
+                        if (expandedAccountId) {
+                            const accordion = document.getElementById(`accordion-${expandedAccountId}`);
+                            if (accordion && !accordion.classList.contains('expanded')) {
+                                toggleAccordion(expandedAccountId);
+                            }
+                        }
+                        
+                        window.scrollTo(0, scrollPosition);
+                        
+                        alert(`✅ ${result.message}`);
+                    } else {
+                        throw new Error(result.message || 'Error desconocido');
                     }
-                }, 100);
+                    
+                } catch (error) {
+                    console.error('Error al subir voucher:', error);
+                    alert('❌ Error al subir voucher: ' + error.message);
+                } finally {
+                    const submitBtn = event.target.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                    }
+                }
             }
-            
-            // Restaurar scroll
-            window.scrollTo(0, scrollPosition);
-            
-            alert(`✅ ${result.message || 'Voucher procesado exitosamente'}`);
-        } else {
-            throw new Error(result.message || 'Error desconocido del servidor');
-        }
-        
-    } catch (error) {
-        console.error('❌ Error al subir voucher:', error);
-        alert(`❌ Error al subir voucher: ${error.message}`);
-    } finally {
-        // ✅ SIEMPRE restaurar estado del botón
-        if (submitBtn) {
-            submitBtn.textContent = buttonState.text;
-            submitBtn.disabled = buttonState.disabled;
-        }
-    }
-}
+        };
 
         // ===============================================
         // FUNCIONES GLOBALES PARA COMPATIBILIDAD
