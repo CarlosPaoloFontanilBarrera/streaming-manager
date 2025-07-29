@@ -863,9 +863,9 @@ app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), 
         console.log('📝 Datos recibidos para crear cuenta:', req.body);
 
         const {
-            id, client_name, client_phone, email, password, type, country = 'PE',
-            fecha_inicio_proveedor, fecha_vencimiento_proveedor, profiles
-        } = req.body;
+    client_name, client_phone, email, password, type, country = 'PE',  // ✅ SIN 'id'
+    fecha_inicio_proveedor, fecha_vencimiento_proveedor, profiles
+} = req.body;
 
         // 🔧 FIX: Parsing robusto de profiles
         let parsedProfiles = [];
