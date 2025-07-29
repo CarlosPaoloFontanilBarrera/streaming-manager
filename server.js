@@ -1,331 +1,457 @@
-// ===============================================
-// 🚀 JIREH STREAMING MANAGER v2.2.0 - PERFORMANCE EDITION
-// Sistema profesional de gestión multi-plataforma con optimizaciones avanzadas
-// ===============================================
-
+// server.js - SISTEMA CORREGIDO COMPLETAMENTE
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const path = require('path');
 const multer = require('multer');
 const fetch = require('node-fetch');
+
+// DEPENDENCIAS DE SEGURIDAD
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { body, validationResult } = require('express-validator');
 
-// 🚀 DEPENDENCIAS DE PERFORMANCE
-const compression = require('compression');
-const NodeCache = require('node-cache');
-const sharp = require('sharp');
-const ExcelJS = require('exceljs');
-const moment = require('moment');
-const cron = require('node-cron');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===============================================
-// 🔐 CONFIGURACIÓN DE SEGURIDAD
-// ===============================================
+// CONFIGURACIÓN DE SEGURIDAD
+const JWT_SECRET = process.env.JWT_SECRET || 'jireh_streaming_secret_2025_ultra_secure!';
+const BCRYPT_ROUNDS = 12;
 
-const JWT_SECRET = process.env.JWT_SECRET || 'jireh-streaming-secret-2024';
-const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+// ✅ CORREGIDO: Trust proxy configurado correctamente para Railway
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1); // Solo confiar en el primer proxy
+} else {
+    app.set('trust proxy', false); // Desarrollo local
+}
 
-// 🚀 Cache optimizado con TTL inteligente
-const cache = new NodeCache({ 
-    stdTTL: parseInt(process.env.CACHE_TTL) || 300, // 5 minutos default
-    checkperiod: 60, // Verificar cada minuto
-    useClones: false, // Mejor performance
-    deleteOnExpire: true,
-    maxKeys: 1000 // Límite de memoria
-});
-
-// 🚀 Compresión avanzada
-app.use(compression({
-    level: parseInt(process.env.COMPRESSION_LEVEL) || 6,
-    threshold: 1024, // Solo comprimir archivos > 1KB
-    filter: (req, res) => {
-        if (req.headers['x-no-compression']) return false;
-        return compression.filter(req, res);
-    }
-}));
-
-// Configuración de seguridad con Helmet
+// Helmet para headers de seguridad (CORREGIDO)
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-            scriptSrcAttr: ["'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:", "blob:"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            scriptSrcAttr: ["'unsafe-inline'"], // ← ESTO ARREGLA LOS BOTONES
+            imgSrc: ["'self'", "data:", "blob:"],
             connectSrc: ["'self'", "https://ntfy.sh"]
         }
     }
 }));
 
-// Rate limiting configurado para Railway
-const createRateLimit = (windowMs, max, message) => rateLimit({
+// ✅ CORREGIDO: Rate limiting mejorado
+const createRateLimiter = (windowMs, max, message) => rateLimit({
     windowMs,
     max,
     message: { error: message },
     standardHeaders: true,
     legacyHeaders: false,
-    trustProxy: true // Importante para Railway
+    // Skip en desarrollo local
+    skip: (req) => {
+        if (process.env.NODE_ENV !== 'production') {
+            return req.ip === '127.0.0.1' || req.ip === '::1';
+        }
+        return false;
+    }
 });
 
-const generalLimiter = createRateLimit(15 * 60 * 1000, parseInt(process.env.API_RATE_LIMIT) || 100, 'Demasiadas solicitudes');
-const loginLimiter = createRateLimit(15 * 60 * 1000, parseInt(process.env.LOGIN_RATE_LIMIT) || 5, 'Demasiados intentos de login');
-const uploadLimiter = createRateLimit(60 * 1000, parseInt(process.env.UPLOAD_RATE_LIMIT) || 10, 'Demasiadas subidas de archivos');
+const loginLimiter = createRateLimiter(
+    15 * 60 * 1000, // 15 minutos
+    5, // 5 intentos
+    'Demasiados intentos de login. Intenta en 15 minutos.'
+);
 
-app.use('/api/', generalLimiter);
-app.use('/api/login', loginLimiter);
+const apiLimiter = createRateLimiter(
+    1 * 60 * 1000, // 1 minuto
+    100, // 100 requests
+    'Demasiadas solicitudes. Intenta más tarde.'
+);
 
-// Middlewares básicos
+// Middleware básico
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ===============================================
-// 🚀 CONFIGURACIÓN DE POSTGRESQL OPTIMIZADA
-// ===============================================
+// Aplicar rate limiting
+app.use('/api/login', loginLimiter);
+app.use('/api/', apiLimiter);
 
+// Configuración de PostgreSQL
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    // Optimizaciones de conexión
-    max: parseInt(process.env.POOL_MAX_CONNECTIONS) || 20,
-    idleTimeoutMillis: parseInt(process.env.POOL_IDLE_TIMEOUT) || 30000,
-    connectionTimeoutMillis: parseInt(process.env.POOL_CONNECTION_TIMEOUT) || 2000,
-    allowExitOnIdle: true
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// ===============================================
-// 🚀 SISTEMA DE CACHE INTELIGENTE
-// ===============================================
+// Configuración de multer
+const storage = multer.memoryStorage();
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB máximo
+});
 
-function getCacheKey(prefix, ...args) {
-    return `${prefix}:${args.join(':')}`;
-}
+// ✅ MIDDLEWARE DE AUTENTICACIÓN JWT MEJORADO
+function verifyToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-function setCacheWithTTL(key, data, ttl = 300) {
-    cache.set(key, data, ttl);
-}
-
-function getCachedData(key) {
-    return cache.get(key);
-}
-
-// Middleware de cache para APIs
-function cacheMiddleware(ttl = 300) {
-    return (req, res, next) => {
-        if (req.method !== 'GET') return next();
-        
-        const cacheKey = getCacheKey('api', req.originalUrl, req.user?.userId || 'anonymous');
-        const cachedData = getCachedData(cacheKey);
-        
-        if (cachedData) {
-            console.log(`📦 Cache hit: ${cacheKey}`);
-            return res.json(cachedData);
-        }
-        
-        // Interceptar res.json para cachear
-        const originalJson = res.json;
-        res.json = function(data) {
-            setCacheWithTTL(cacheKey, data, ttl);
-            console.log(`💾 Cache set: ${cacheKey}`);
-            return originalJson.call(this, data);
-        };
-        
-        next();
-    };
-}
-
-// 🚀 OPTIMIZACIÓN DE IMÁGENES CON SHARP
-async function optimizeImage(buffer, options = {}) {
-    const {
-        width = 1200,
-        height = 800,
-        quality = parseInt(process.env.IMAGE_QUALITY) || 75,
-        format = 'jpeg'
-    } = options;
-
-    try {
-        return await sharp(buffer)
-            .resize(width, height, { 
-                fit: 'inside', 
-                withoutEnlargement: true 
-            })
-            .jpeg({ 
-                quality, 
-                progressive: true,
-                mozjpeg: true // Mejor compresión
-            })
-            .toBuffer();
-    } catch (error) {
-        console.error('Error optimizando imagen:', error);
-        return buffer; // Retornar original si falla
-    }
-}
-
-// ===============================================
-// 🔐 MIDDLEWARE DE AUTENTICACIÓN
-// ===============================================
-
-const verifyToken = (req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    
     if (!token) {
-        return res.status(401).json({ error: 'Token de acceso requerido' });
+        return res.status(401).json({ error: 'Token requerido' });
     }
-    
+
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
         req.user = decoded;
         next();
     } catch (error) {
-        console.error('❌ Token inválido:', error.message);
-        return res.status(403).json({ error: 'Token inválido o expirado' });
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ error: 'Token expirado' });
+        }
+        return res.status(403).json({ error: 'Token inválido' });
     }
-};
+}
 
-// ===============================================
-// 🗄️ INICIALIZACIÓN DE BASE DE DATOS
-// ===============================================
+// ✅ VALIDADORES CORREGIDOS
+const loginValidators = [
+    body('username')
+        .trim()
+        .isLength({ min: 3, max: 30 })
+        .withMessage('Usuario debe tener 3-30 caracteres'),
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password debe tener mínimo 6 caracteres')
+];
 
+const accountValidators = [
+    body('client_name')
+        .trim()
+        .isLength({ min: 2, max: 100 })
+        .withMessage('Nombre debe tener 2-100 caracteres'),
+    body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Email inválido'),
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password debe tener mínimo 6 caracteres'),
+    body('type')
+        .notEmpty()
+        .withMessage('Tipo de servicio requerido'),
+    body('country')
+        .isIn(['PE', 'US', 'GB', 'ES'])
+        .withMessage('País inválido')
+];
+
+// Funciones de utilidad
+function calcularDiasRestantes(fechaVencimiento) {
+    if (!fechaVencimiento) return 0;
+
+    const hoy = new Date();
+    const hoyUTC = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
+
+    const vencimiento = new Date(fechaVencimiento);
+    const vencimientoUTC = Date.UTC(vencimiento.getUTCFullYear(), vencimiento.getUTCMonth(), vencimiento.getUTCDate());
+
+    const diferenciaMilisegundos = vencimientoUTC - hoyUTC;
+    const dias = Math.ceil(diferenciaMilisegundos / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, dias);
+}
+
+function calcularDiasRestantesPerfil(fechaVencimientoCliente) {
+    return calcularDiasRestantes(fechaVencimientoCliente);
+}
+
+function actualizarEstado(diasRestantes) {
+    if (diasRestantes > 5) return 'active';
+    if (diasRestantes > 0) return 'inactive';
+    return 'expired';
+}
+
+function procesarPerfiles(profiles) {
+    if (!profiles || !Array.isArray(profiles)) return [];
+    
+    return profiles.map(profile => {
+        if (profile.estado === 'vendido' && profile.fechaVencimiento) {
+            const diasRestantesCliente = calcularDiasRestantesPerfil(profile.fechaVencimiento);
+            return {
+                ...profile,
+                diasRestantes: diasRestantesCliente
+            };
+        }
+        return profile;
+    });
+}
+
+// Inicialización de base de datos
 async function initDB() {
     try {
-        console.log('🔧 Inicializando base de datos...');
-        
-        // Crear tabla de usuarios admin
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // Crear tabla principal de cuentas
         await pool.query(`
             CREATE TABLE IF NOT EXISTS accounts (
-                id SERIAL PRIMARY KEY,
-                client_name VARCHAR(255) NOT NULL,
-                client_phone VARCHAR(20),
-                email VARCHAR(255),
-                type VARCHAR(100) NOT NULL,
-                country VARCHAR(3) DEFAULT 'PE',
-                email_proveedor VARCHAR(255),
-                password_proveedor VARCHAR(255),
-                fecha_inicio_proveedor DATE,
-                fecha_vencimiento_proveedor DATE,
-                days_remaining INTEGER DEFAULT 0,
-                profiles TEXT,
-                comunicados TEXT,
-                voucher_base64 TEXT,
-                status VARCHAR(20) DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                id TEXT PRIMARY KEY,
+                client_name TEXT NOT NULL,
+                client_phone TEXT DEFAULT '',
+                email TEXT NOT NULL,
+                password TEXT NOT NULL,
+                type TEXT NOT NULL,
+                country TEXT NOT NULL DEFAULT 'PE',
+                profiles JSONB NOT NULL DEFAULT '[]',
+                days_remaining INTEGER NOT NULL DEFAULT 30,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT NOW(),
+                fecha_venta TIMESTAMP DEFAULT NOW(),
+                fecha_vencimiento TIMESTAMP,
+                fecha_inicio_proveedor TIMESTAMP,
+                fecha_vencimiento_proveedor TIMESTAMP,
+                voucher_imagen TEXT,
+                numero_operacion TEXT,
+                monto_pagado DECIMAL(10,2),
+                estado_pago TEXT DEFAULT 'activo'
             )
         `);
-
-        // Crear tabla de notificaciones enviadas
+        
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS alarm_settings (
+                id SERIAL PRIMARY KEY,
+                provider_threshold_days INTEGER NOT NULL DEFAULT 5,
+                client_threshold_days INTEGER NOT NULL DEFAULT 3,
+                ntfy_topic TEXT
+            )
+        `);
+        
+        const settings = await pool.query('SELECT * FROM alarm_settings');
+        if (settings.rows.length === 0) {
+            await pool.query('INSERT INTO alarm_settings (provider_threshold_days, client_threshold_days) VALUES (5, 3)');
+        }
+        
         await pool.query(`
             CREATE TABLE IF NOT EXISTS sent_notifications (
                 id SERIAL PRIMARY KEY,
-                account_id INTEGER REFERENCES accounts(id),
-                notification_type VARCHAR(50),
-                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                item_id TEXT NOT NULL,
+                item_type TEXT NOT NULL,
+                sent_at TIMESTAMP NOT NULL,
+                UNIQUE(item_id, item_type)
             )
         `);
-
-        // 🚀 CREAR ÍNDICES PARA PERFORMANCE
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_created_at ON accounts(created_at DESC)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_expiry ON accounts(fecha_vencimiento_proveedor)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_client_search ON accounts USING gin(to_tsvector('spanish', client_name || ' ' || email))`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON sent_notifications(sent_at DESC)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON admin_users(username)`);
-
-        // Verificar si existe usuario admin
-        const adminCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['admin']);
         
-        if (adminCheck.rows[0].count === '0') {
-            console.log('👤 Creando usuario admin por defecto...');
-            const defaultPassword = 'admin123';
-            const hashedPassword = await bcrypt.hash(defaultPassword, BCRYPT_ROUNDS);
-            
-            await pool.query(
-                'INSERT INTO admin_users (username, password_hash) VALUES ($1, $2)',
-                ['admin', hashedPassword]
-            );
-            
-            console.log('✅ Usuario admin creado - Usuario: admin, Password: admin123');
-        }
-
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        
+        await pool.query(`
+            INSERT INTO admin_users (username, password) 
+            VALUES ('paolof', 'elpoderosodeizrael777xD!') 
+            ON CONFLICT (username) DO NOTHING
+        `);
+        
         console.log('✅ Base de datos inicializada correctamente');
-        console.log('📦 Índices de performance creados');
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
+        throw error;
     }
 }
 
-// ===============================================
-// 🔍 FUNCIONES AUXILIARES
-// ===============================================
+// Sistema de alarmas
+async function checkAndSendAlarms() {
+    console.log('⏰ Revisando alarmas...');
 
-function procesarPerfiles(profiles) {
-    if (!profiles || profiles.length === 0) {
-        return { perfiles: 'Sin perfiles configurados', vendidos: 0, disponibles: 0 };
-    }
-    
-    const vendidos = profiles.filter(p => p.estado === 'vendido').length;
-    const disponibles = profiles.length - vendidos;
-    
-    return {
-        perfiles: profiles.map(p => `${p.perfil}: ${p.estado === 'vendido' ? '❌ Vendido' : '✅ Disponible'}`).join('<br>'),
-        vendidos,
-        disponibles
-    };
-}
+    try {
+        const settingsRes = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
+        const settings = settingsRes.rows[0];
 
-function calcularDiasRestantes(fechaVencimiento) {
-    if (!fechaVencimiento) return 0;
-    
-    const hoy = new Date();
-    const vencimiento = new Date(fechaVencimiento);
-    const diffTime = vencimiento - hoy;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return Math.max(0, diffDays);
-}
-
-// Configuración de multer para archivos
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Solo se permiten archivos de imagen (JPEG, PNG)'), false);
+        if (!settings?.ntfy_topic) {
+            console.log('⚠️ No hay tema de ntfy configurado');
+            return;
         }
+
+        const accountsRes = await pool.query('SELECT * FROM accounts');
+
+        for (const account of accountsRes.rows) {
+            // Alarmas de proveedor
+            const providerDays = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
+            if (providerDays > 0 && providerDays <= settings.provider_threshold_days) {
+                const notificationId = `provider-${account.id}`;
+                const checkRes = await pool.query(
+                    "SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", 
+                    [notificationId]
+                );
+                
+                if (checkRes.rows.length === 0) {
+                    const message = `🚨 La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
+                    
+                    try {
+                        await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
+                            method: 'POST',
+                            body: message,
+                            headers: { 
+                                'Title': 'Alarma de Proveedor', 
+                                'Priority': 'high', 
+                                'Tags': 'rotating_light' 
+                            }
+                        });
+                        
+                        await pool.query(
+                            "INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", 
+                            [notificationId]
+                        );
+                        
+                        console.log(`📲 Notificación de proveedor enviada para ${account.id}`);
+                    } catch (notifyError) {
+                        console.error(`❌ Error enviando notificación: ${notifyError.message}`);
+                    }
+                }
+            }
+
+            // Alarmas de cliente
+            const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
+            for (const [index, profile] of profiles.entries()) {
+                if (profile.estado === 'vendido' && profile.fechaVencimiento) {
+                    const clientDays = calcularDiasRestantesPerfil(profile.fechaVencimiento);
+                    if (clientDays > 0 && clientDays <= settings.client_threshold_days) {
+                        const notificationId = `client-${account.id}-${index}`;
+                        const checkRes = await pool.query(
+                            "SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", 
+                            [notificationId]
+                        );
+
+                        if (checkRes.rows.length === 0) {
+                            const message = `🔔 El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
+                            
+                            try {
+                                await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
+                                    method: 'POST',
+                                    body: message,
+                                    headers: { 
+                                        'Title': 'Alarma de Cliente', 
+                                        'Priority': 'default', 
+                                        'Tags': 'bell' 
+                                    }
+                                });
+                                
+                                await pool.query(
+                                    "INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", 
+                                    [notificationId]
+                                );
+                                
+                                console.log(`📲 Notificación de cliente enviada para ${account.id}-${index}`);
+                            } catch (notifyError) {
+                                console.error(`❌ Error enviando notificación: ${notifyError.message}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error en sistema de alarmas:', error);
+    }
+}
+
+// ✅ RUTAS API CORREGIDAS
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// ✅ LOGIN MEJORADO
+app.post('/api/login', loginValidators, async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Datos inválidos',
+                errors: errors.array()
+            });
+        }
+
+        const { username, password } = req.body;
+
+        const result = await pool.query(
+            'SELECT id, username, password FROM admin_users WHERE username = $1', 
+            [username]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Credenciales inválidas' 
+            });
+        }
+
+        const user = result.rows[0];
+        let isValidPassword = false;
+        
+        // Verificar password (soporte para migración gradual)
+        if (user.password.startsWith('$2b$')) {
+            isValidPassword = await bcrypt.compare(password, user.password);
+        } else {
+            isValidPassword = password === user.password;
+            
+            // Migrar a bcrypt si es válido
+            if (isValidPassword) {
+                const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+                await pool.query(
+                    'UPDATE admin_users SET password = $1 WHERE id = $2',
+                    [hashedPassword, user.id]
+                );
+                console.log(`✅ Password migrado a bcrypt para: ${username}`);
+            }
+        }
+        
+        if (!isValidPassword) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Credenciales inválidas' 
+            });
+        }
+
+        // Generar JWT
+        const token = jwt.sign(
+            { userId: user.id, username: user.username }, 
+            JWT_SECRET, 
+            { expiresIn: '24h' }
+        );
+
+        console.log(`✅ Login exitoso: ${username} desde ${req.ip}`);
+
+        res.json({ 
+            success: true, 
+            message: 'Login exitoso',
+            token,
+            user: { id: user.id, username: user.username }
+        });
+
+    } catch (error) {
+        console.error('❌ Error en login:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error interno del servidor' 
+        });
     }
 });
 
-// ===============================================
-// 🔐 RUTAS DE AUTENTICACIÓN
-// ===============================================
+// Cuentas - GET
+app.get('/api/accounts', verifyToken, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('❌ Error obteniendo cuentas:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
 
-app.post('/api/login', [
-    body('username').trim().isLength({ min: 1 }).withMessage('Username requerido'),
-    body('password').isLength({ min: 1 }).withMessage('Password requerido')
-], async (req, res) => {
+// Cuentas - POST
+app.post('/api/accounts', accountValidators, verifyToken, async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -335,105 +461,110 @@ app.post('/api/login', [
             });
         }
 
-        const { username, password } = req.body;
-
-        const userResult = await pool.query(
-            'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
-            [username]
-        );
-
-        if (userResult.rows.length === 0) {
-            return res.status(401).json({ error: 'Credenciales inválidas' });
-        }
-
-        const user = userResult.rows[0];
-        const isValidPassword = await bcrypt.compare(password, user.password_hash);
-
-        if (!isValidPassword) {
-            return res.status(401).json({ error: 'Credenciales inválidas' });
-        }
-
-        const token = jwt.sign(
-            { userId: user.id, username: user.username },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-
-        console.log(`✅ Login exitoso: ${username}`);
+        const { 
+            id, client_name, client_phone, email, password, 
+            type, country, profiles, fecha_inicio_proveedor 
+        } = req.body;
         
-        res.json({
-            success: true,
-            token,
-            user: {
-                id: user.id,
-                username: user.username
-            }
-        });
-
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        
+        const result = await pool.query(
+            `INSERT INTO accounts (
+                id, client_name, client_phone, email, password, type, country, 
+                profiles, days_remaining, status, fecha_inicio_proveedor, 
+                fecha_vencimiento_proveedor, estado_pago, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()) 
+            RETURNING *`,
+            [
+                id, client_name, client_phone || '', email, password, type, country, 
+                JSON.stringify(profiles || []), diasRestantesProveedor, estadoProveedor, 
+                fechaInicio, fechaVencimientoProveedor, 'activo'
+            ]
+        );
+        
+        res.json(result.rows[0]);
     } catch (error) {
-        console.error('❌ Error en login:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error creando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
-// ===============================================
-// 📊 APIS DE DATOS OPTIMIZADAS
-// ===============================================
-
-// 🚀 Cuentas con cache y paginación
-app.get('/api/accounts', verifyToken, cacheMiddleware(120), async (req, res) => {
+// Cuentas - PUT
+app.put('/api/accounts/:id', accountValidators, verifyToken, async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 50;
-        const offset = (page - 1) * limit;
-        const search = req.query.search;
-
-        let query = 'SELECT * FROM accounts';
-        let countQuery = 'SELECT COUNT(*) FROM accounts';
-        let params = [];
-
-        if (search) {
-            query += ` WHERE to_tsvector('spanish', client_name || ' ' || email || ' ' || type) @@ plainto_tsquery('spanish', $1)`;
-            countQuery += ` WHERE to_tsvector('spanish', client_name || ' ' || email || ' ' || type) @@ plainto_tsquery('spanish', $1)`;
-            params.push(search);
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                error: 'Datos inválidos',
+                details: errors.array()
+            });
         }
 
-        query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-        params.push(limit, offset);
-
-        const [accountsResult, countResult] = await Promise.all([
-            pool.query(query, params),
-            pool.query(countQuery, search ? [search] : [])
-        ]);
-
-        const total = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(total / limit);
-
-        res.json({
-            accounts: accountsResult.rows,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages,
-                hasNext: page < totalPages,
-                hasPrev: page > 1
-            }
-        });
+        const { id } = req.params;
+        const { 
+            client_name, client_phone, email, password, 
+            type, country, profiles, fecha_inicio_proveedor 
+        } = req.body;
+        
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        const profilesActualizados = procesarPerfiles(profiles);
+        
+        const result = await pool.query(
+            `UPDATE accounts SET 
+                client_name = $1, client_phone = $2, email = $3, password = $4, 
+                type = $5, country = $6, profiles = $7, days_remaining = $8, 
+                status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
+             WHERE id = $12 RETURNING *`,
+            [
+                client_name, client_phone || '', email, password, type, country, 
+                JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, 
+                fechaInicio, fechaVencimientoProveedor, id
+            ]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        res.json(result.rows[0]);
     } catch (error) {
-        console.error('❌ Error obteniendo cuentas:', error);
+        console.error('❌ Error actualizando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+// Cuentas - DELETE
+app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        res.json({ message: 'Cuenta eliminada exitosamente' });
+    } catch (error) {
+        console.error('❌ Error eliminando cuenta:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
-// 🚀 Estadísticas con cache inteligente
-app.get('/api/stats', verifyToken, cacheMiddleware(60), async (req, res) => {
+// Estadísticas
+app.get('/api/stats', verifyToken, async (req, res) => {
     try {
-        // Usar queries optimizadas en paralelo
-        const [totalResult, accountsResult] = await Promise.all([
-            pool.query('SELECT COUNT(*) FROM accounts'),
-            pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts')
-        ]);
+        const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
+        const accountsResult = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
         
         let activeCount = 0, expiringCount = 0, totalProfiles = 0, soldProfiles = 0;
         const today = new Date();
@@ -464,546 +595,190 @@ app.get('/api/stats', verifyToken, cacheMiddleware(60), async (req, res) => {
     }
 });
 
-// ===============================================
-// 🚀 NUEVAS APIS DE PERFORMANCE
-// ===============================================
-
-// 🚀 API de Analytics con cache inteligente
-app.get('/api/analytics', verifyToken, cacheMiddleware(600), async (req, res) => {
+// Configuración de alarmas
+app.get('/api/alarms/settings', verifyToken, async (req, res) => {
     try {
-        if (process.env.ENABLE_ANALYTICS !== 'true') {
-            return res.status(403).json({ error: 'Analytics deshabilitado' });
-        }
-
-        const { period = '30d' } = req.query;
-        
-        let dateFilter = '';
-        switch(period) {
-            case '7d':
-                dateFilter = "WHERE created_at >= NOW() - INTERVAL '7 days'";
-                break;
-            case '30d':
-                dateFilter = "WHERE created_at >= NOW() - INTERVAL '30 days'";
-                break;
-            case '90d':
-                dateFilter = "WHERE created_at >= NOW() - INTERVAL '90 days'";
-                break;
-            default:
-                dateFilter = "WHERE created_at >= NOW() - INTERVAL '30 days'";
-        }
-
-        const [
-            accountsOverTime,
-            serviceTypes,
-            countryStats
-        ] = await Promise.all([
-            pool.query(`
-                SELECT 
-                    DATE(created_at) as date,
-                    COUNT(*) as accounts_created,
-                    AVG(days_remaining) as avg_days_remaining
-                FROM accounts 
-                ${dateFilter}
-                GROUP BY DATE(created_at)
-                ORDER BY date DESC
-                LIMIT 30
-            `),
-            pool.query(`
-                SELECT 
-                    type,
-                    COUNT(*) as count,
-                    AVG(days_remaining) as avg_days
-                FROM accounts 
-                GROUP BY type
-                ORDER BY count DESC
-            `),
-            pool.query(`
-                SELECT 
-                    country,
-                    COUNT(*) as count
-                FROM accounts 
-                GROUP BY country
-                ORDER BY count DESC
-            `)
-        ]);
-
-        res.json({
-            period,
-            accounts_over_time: accountsOverTime.rows,
-            service_types: serviceTypes.rows,
-            country_stats: countryStats.rows,
-            generated_at: new Date().toISOString()
+        const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
+        res.json(result.rows[0] || { 
+            provider_threshold_days: 5, 
+            client_threshold_days: 3, 
+            ntfy_topic: '' 
         });
-
     } catch (error) {
-        console.error('❌ Error en analytics:', error);
-        res.status(500).json({ error: 'Error generando analytics' });
+        console.error('❌ Error obteniendo configuración de alarmas:', error);
+        res.status(500).json({ error: 'Error obteniendo configuración de alarmas' });
     }
 });
 
-// 🚀 API de exportación a Excel
-app.get('/api/export/excel', verifyToken, async (req, res) => {
+app.put('/api/alarms/settings', verifyToken, async (req, res) => {
     try {
-        if (process.env.ENABLE_EXCEL_EXPORT !== 'true') {
-            return res.status(403).json({ error: 'Exportación Excel deshabilitada' });
-        }
-
-        console.log('📊 Generando reporte Excel...');
-        
-        const accounts = await pool.query(`
-            SELECT 
-                id, client_name, client_phone, email, type, country,
-                status, days_remaining, created_at,
-                fecha_inicio_proveedor, fecha_vencimiento_proveedor
-            FROM accounts 
-            ORDER BY created_at DESC
-        `);
-
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Cuentas JIREH Streaming');
-
-        // Configurar columnas
-        worksheet.columns = [
-            { header: 'ID', key: 'id', width: 15 },
-            { header: 'Cliente', key: 'client_name', width: 25 },
-            { header: 'Teléfono', key: 'client_phone', width: 15 },
-            { header: 'Email', key: 'email', width: 30 },
-            { header: 'Tipo Servicio', key: 'type', width: 25 },
-            { header: 'País', key: 'country', width: 10 },
-            { header: 'Estado', key: 'status', width: 12 },
-            { header: 'Días Restantes', key: 'days_remaining', width: 15 },
-            { header: 'Fecha Creación', key: 'created_at', width: 20 },
-            { header: 'Inicio Proveedor', key: 'fecha_inicio_proveedor', width: 20 },
-            { header: 'Vencimiento Proveedor', key: 'fecha_vencimiento_proveedor', width: 20 }
-        ];
-
-        // Estilo del header
-        worksheet.getRow(1).font = { bold: true };
-        worksheet.getRow(1).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFE50914' }
-        };
-
-        // Agregar datos
-        accounts.rows.forEach(account => {
-            worksheet.addRow({
-                ...account,
-                created_at: moment(account.created_at).format('YYYY-MM-DD HH:mm'),
-                fecha_inicio_proveedor: account.fecha_inicio_proveedor ? moment(account.fecha_inicio_proveedor).format('YYYY-MM-DD') : '',
-                fecha_vencimiento_proveedor: account.fecha_vencimiento_proveedor ? moment(account.fecha_vencimiento_proveedor).format('YYYY-MM-DD') : ''
-            });
-        });
-
-        // Configurar respuesta
-        const filename = `jireh-streaming-${moment().format('YYYY-MM-DD-HHmm')}.xlsx`;
-        
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-        await workbook.xlsx.write(res);
-        res.end();
-
-        console.log(`✅ Reporte Excel generado: ${filename}`);
-
+        const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
+        const result = await pool.query(
+            `UPDATE alarm_settings SET 
+                provider_threshold_days = $1, 
+                client_threshold_days = $2, 
+                ntfy_topic = $3 
+             WHERE id = 1 RETURNING *`,
+            [provider_threshold_days, client_threshold_days, ntfy_topic]
+        );
+        res.json(result.rows[0]);
     } catch (error) {
-        console.error('❌ Error generando Excel:', error);
-        res.status(500).json({ error: 'Error generando reporte Excel' });
+        console.error('❌ Error actualizando configuración de alarmas:', error);
+        res.status(500).json({ error: 'Error actualizando configuración de alarmas' });
     }
 });
 
-// 🚀 API de limpieza de cache
-app.post('/api/cache/clear', verifyToken, (req, res) => {
+// Test de alarmas
+app.post('/api/alarms/test', verifyToken, async (req, res) => {
+    console.log('⚡️ Ejecutando test de alarmas...');
     try {
-        if (process.env.ENABLE_CACHE_API !== 'true') {
-            return res.status(403).json({ error: 'API de cache deshabilitada' });
-        }
-
-        const stats = cache.getStats();
-        cache.flushAll();
-        
-        console.log('🧹 Cache limpiado manualmente');
-        
-        res.json({
-            success: true,
-            message: 'Cache limpiado exitosamente',
-            previous_stats: stats,
-            cleared_at: new Date().toISOString()
+        await checkAndSendAlarms();
+        res.json({ 
+            success: true, 
+            message: 'Test de alarmas ejecutado. Revisa las notificaciones.' 
         });
     } catch (error) {
-        console.error('❌ Error limpiando cache:', error);
-        res.status(500).json({ error: 'Error limpiando cache' });
+        console.error('❌ Error en test de alarmas:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error al ejecutar test de alarmas.' 
+        });
     }
 });
 
-// ===============================================
-// 📝 GESTIÓN DE CUENTAS
-// ===============================================
-
-app.post('/api/accounts', verifyToken, uploadLimiter, upload.single('voucher'), [
-    body('client_name').trim().isLength({ min: 1 }).withMessage('Nombre del cliente requerido'),
-    body('email').optional().isEmail().withMessage('Email inválido'),
-    body('type').trim().isLength({ min: 1 }).withMessage('Tipo de servicio requerido')
-], async (req, res) => {
+// Vouchers
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, upload.single('voucher'), async (req, res) => {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Datos inválidos',
-                details: errors.array()
-            });
-        }
-
-        const {
-            client_name, client_phone, email, type, country = 'PE',
-            email_proveedor, password_proveedor, fecha_inicio_proveedor,
-            fecha_vencimiento_proveedor, profiles, comunicados
-        } = req.body;
-
-        let voucherBase64 = null;
+        const { accountId, profileIndex } = req.params;
+        const { numero_operacion, monto_pagado } = req.body;
         
-        if (req.file) {
-            console.log(`📤 Procesando voucher: ${req.file.originalname} (${req.file.size} bytes)`);
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+        
+        const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
+        if (accountResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        const account = accountResult.rows[0];
+        const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
+        const profileIdx = parseInt(profileIndex);
+        
+        if (profileIdx < 0 || profileIdx >= profiles.length) {
+            return res.status(400).json({ error: 'Índice de perfil inválido' });
+        }
+        
+        const profile = profiles[profileIdx];
+        const voucherBase64 = req.file.buffer.toString('base64');
+        
+        profile.voucherImagen = voucherBase64;
+        profile.numeroOperacion = numero_operacion;
+        profile.montoPagado = parseFloat(monto_pagado);
+        profile.voucherSubido = true;
+        profile.fechaVoucher = new Date().toISOString();
+        
+        if (profile.estado === 'vendido') {
+            const fechaVencimientoActual = new Date(profile.fechaVencimiento);
+            const nuevaFechaVencimiento = new Date(fechaVencimientoActual);
+            nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
             
-            if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
-                console.log('🖼️ Optimizando imagen con Sharp...');
-                const optimizedBuffer = await optimizeImage(req.file.buffer, {
-                    width: 800,
-                    height: 600,
-                    quality: 75
-                });
-                
-                voucherBase64 = optimizedBuffer.toString('base64');
-                const compressionRatio = ((req.file.size - optimizedBuffer.length) / req.file.size * 100).toFixed(1);
-                console.log(`✅ Imagen optimizada: ${req.file.size} → ${optimizedBuffer.length} bytes (${compressionRatio}% reducción)`);
-            } else {
-                voucherBase64 = req.file.buffer.toString('base64');
-            }
+            profile.fechaVencimiento = nuevaFechaVencimiento.toISOString().split('T')[0];
+            profile.diasRestantes = calcularDiasRestantesPerfil(profile.fechaVencimiento);
+            profile.estadoPago = 'pagado';
+            profile.fechaUltimaRenovacion = new Date().toISOString().split('T')[0];
+        } else {
+            profile.estadoPago = 'confirmado';
         }
-
-        const days_remaining = calcularDiasRestantes(fecha_vencimiento_proveedor);
         
-        const parsedProfiles = profiles ? JSON.parse(profiles) : [];
-
-        const result = await pool.query(`
-            INSERT INTO accounts (
-                client_name, client_phone, email, type, country,
-                email_proveedor, password_proveedor, fecha_inicio_proveedor,
-                fecha_vencimiento_proveedor, days_remaining, profiles,
-                comunicados, voucher_base64
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            RETURNING id
-        `, [
-            client_name, client_phone, email, type, country,
-            email_proveedor, password_proveedor, fecha_inicio_proveedor,
-            fecha_vencimiento_proveedor, days_remaining, JSON.stringify(parsedProfiles),
-            comunicados, voucherBase64
-        ]);
-
-        // Invalidar cache relacionado
-        cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
-        cache.del(getCacheKey('api', '/api/stats', req.user?.userId || 'anonymous'));
-
-        console.log(`✅ Nueva cuenta creada: ID ${result.rows[0].id} - ${client_name}`);
+        await pool.query('UPDATE accounts SET profiles = $1 WHERE id = $2', [JSON.stringify(profiles), accountId]);
         
-        res.status(201).json({
-            success: true,
-            message: 'Cuenta creada exitosamente',
-            id: result.rows[0].id
-        });
-
+        res.json({ success: true, message: 'Voucher procesado', profile: profile });
     } catch (error) {
-        console.error('❌ Error creando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error procesando voucher:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
-app.put('/api/accounts/:id', verifyToken, upload.single('voucher'), async (req, res) => {
+// Micuenta.me checker
+app.post('/api/check-micuenta-me-code', verifyToken, async (req, res) => {
     try {
-        const { id } = req.params;
-        const updateData = { ...req.body };
+        const { code, pdv } = req.body;
 
-        if (req.file) {
-            if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
-                const optimizedBuffer = await optimizeImage(req.file.buffer, {
-                    width: 800,
-                    height: 600,
-                    quality: 75
-                });
-                updateData.voucher_base64 = optimizedBuffer.toString('base64');
-            } else {
-                updateData.voucher_base64 = req.file.buffer.toString('base64');
-            }
-        }
-
-        if (updateData.fecha_vencimiento_proveedor) {
-            updateData.days_remaining = calcularDiasRestantes(updateData.fecha_vencimiento_proveedor);
-        }
-
-        if (updateData.profiles) {
-            updateData.profiles = JSON.stringify(JSON.parse(updateData.profiles));
-        }
-
-        const fields = Object.keys(updateData).map((key, index) => `${key} = $${index + 1}`).join(', ');
-        const values = Object.values(updateData);
-        values.push(id);
-
-        await pool.query(`UPDATE accounts SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`, values);
-
-        // Invalidar cache relacionado
-        cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
-        cache.del(getCacheKey('api', '/api/stats', req.user?.userId || 'anonymous'));
-
-        console.log(`✅ Cuenta actualizada: ID ${id}`);
-        res.json({ success: true, message: 'Cuenta actualizada exitosamente' });
-
-    } catch (error) {
-        console.error('❌ Error actualizando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
-app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        await pool.query('DELETE FROM accounts WHERE id = $1', [id]);
-
-        // Invalidar cache relacionado
-        cache.del(getCacheKey('api', '/api/accounts', req.user?.userId || 'anonymous'));
-        cache.del(getCacheKey('api', '/api/stats', req.user?.userId || 'anonymous'));
-
-        console.log(`✅ Cuenta eliminada: ID ${id}`);
-        res.json({ success: true, message: 'Cuenta eliminada exitosamente' });
-
-    } catch (error) {
-        console.error('❌ Error eliminando cuenta:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
-// ===============================================
-// 🔔 SISTEMA DE NOTIFICACIONES NTFY
-// ===============================================
-
-async function sendNtfyNotification(topic, title, message, tags = [], priority = 3) {
-    try {
-        const response = await fetch(`https://ntfy.sh/${topic}`, {
+        const response = await fetch('https://micuenta.me/e/redeem', {
             method: 'POST',
             headers: {
-                'Title': title,
-                'Tags': tags.join(','),
-                'Priority': priority.toString()
+                'Content-Type': 'application/json',
             },
-            body: message
+            body: JSON.stringify({ code: code, pdv: pdv })
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            const errorData = await response.json().catch(() => ({ 
+                message: 'Error desconocido del proxy de micuenta.me.' 
+            }));
+            console.error('Error al consultar micuenta.me:', response.status, errorData.message);
+            return res.status(response.status).json(errorData);
         }
 
-        console.log(`✅ Notificación enviada a ${topic}: ${title}`);
-        return true;
-    } catch (error) {
-        console.error(`❌ Error enviando notificación a ${topic}:`, error);
-        return false;
-    }
-}
-
-async function checkAndSendAlarms() {
-    try {
-        const accounts = await pool.query(`
-            SELECT id, client_name, type, days_remaining, fecha_vencimiento_proveedor 
-            FROM accounts 
-            WHERE fecha_vencimiento_proveedor IS NOT NULL
-        `);
-
-        const today = new Date();
-        let alertCount = 0;
-
-        for (const account of accounts.rows) {
-            const vencimiento = new Date(account.fecha_vencimiento_proveedor);
-            const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
-
-            // Verificar si ya se envió notificación hoy
-            const notificationCheck = await pool.query(`
-                SELECT COUNT(*) FROM sent_notifications 
-                WHERE account_id = $1 AND notification_type = $2 AND DATE(sent_at) = CURRENT_DATE
-            `, [account.id, 'expiry_warning']);
-
-            const alreadySent = parseInt(notificationCheck.rows[0].count) > 0;
-
-            if ((diffDays <= 5 && diffDays > 0) && !alreadySent) {
-                const message = `⚠️ CUENTA POR VENCER
-Cliente: ${account.client_name}
-Servicio: ${account.type}
-Días restantes: ${diffDays}
-Vence: ${vencimiento.toLocaleDateString('es-PE')}`;
-
-                const success = await sendNtfyNotification(
-                    'jireh-streaming-alerts',
-                    `🚨 Cuenta por vencer (${diffDays} días)`,
-                    message,
-                    ['warning', 'alarm_clock'],
-                    4
-                );
-
-                if (success) {
-                    await pool.query(`
-                        INSERT INTO sent_notifications (account_id, notification_type) 
-                        VALUES ($1, $2)
-                    `, [account.id, 'expiry_warning']);
-                    alertCount++;
-                }
-            }
-        }
-
-        if (alertCount > 0) {
-            console.log(`⏰ ${alertCount} alertas de vencimiento enviadas`);
-        }
+        const data = await response.json();
+        res.json(data);
 
     } catch (error) {
-        console.error('❌ Error en sistema de alarmas:', error);
+        console.error('Error en micuenta.me checker:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error interno del servidor al procesar la solicitud externa a micuenta.me.' 
+        });
     }
-}
-
-// ===============================================
-// 🚀 HEALTH CHECK AVANZADO
-// ===============================================
-
-app.get('/api/health', (req, res) => {
-    const memUsage = process.memoryUsage();
-    const cacheStats = cache.getStats();
-    
-    res.json({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        version: '2.2.0',
-        environment: process.env.NODE_ENV || 'development',
-        uptime: process.uptime(),
-        memory: {
-            used: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB',
-            total: Math.round(memUsage.heapTotal / 1024 / 1024) + 'MB'
-        },
-        cache: {
-            keys: cacheStats.keys,
-            hits: cacheStats.hits,
-            misses: cacheStats.misses,
-            hit_rate: cacheStats.hits > 0 ? ((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100).toFixed(2) + '%' : '0%'
-        },
-        features: {
-            analytics: process.env.ENABLE_ANALYTICS === 'true',
-            excel_export: process.env.ENABLE_EXCEL_EXPORT === 'true',
-            image_optimization: process.env.ENABLE_IMAGE_OPTIMIZATION === 'true',
-            cache_api: process.env.ENABLE_CACHE_API === 'true',
-            cron_jobs: process.env.ENABLE_CRON_JOBS === 'true'
-        }
-    });
 });
 
-// ===============================================
-// 🎨 RUTAS ESTÁTICAS
-// ===============================================
+// ✅ RUTAS ESTÁTICAS
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.use(express.static('public'));
-
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/public/index.html');
-});
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(__dirname + '/public/dashboard.html');
-});
-
-// ===============================================
-// 🚀 INICIALIZACIÓN DEL SERVIDOR
-// ===============================================
-
+// ✅ INICIAR SERVIDOR
 async function startServer() {
     try {
         await initDB();
         
         app.listen(PORT, () => {
-            console.log('🚀 ================================');
-            console.log(`🎯 JIREH Streaming Manager v2.2.0`);
-            console.log(`🌐 Servidor corriendo en puerto ${PORT}`);
-            console.log('🚀 ================================');
+            console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
+            console.log(`🔒 Seguridad JWT habilitada`);
+            console.log(`🛡️ Rate limiting configurado CORRECTAMENTE`);
+            console.log(`🌐 Entorno: ${process.env.NODE_ENV || 'development'}`);
             
-            // Configurar sistema de alarmas
+            // Iniciar sistema de alarmas
+            setInterval(checkAndSendAlarms, 3600000); // Cada hora
             console.log('⏰ Sistema de alarmas ntfy iniciado');
-            
-            if (process.env.ENABLE_CRON_JOBS === 'true') {
-                // Ejecutar alarmas cada hora
-                cron.schedule('0 * * * *', () => {
-                    console.log('⏰ Ejecutando alarmas programadas...');
-                    checkAndSendAlarms();
-                });
-
-                // Limpiar cache cada 6 horas
-                cron.schedule('0 */6 * * *', () => {
-                    const stats = cache.getStats();
-                    console.log(`🧹 Limpieza automática de cache - Keys: ${stats.keys}, Hits: ${stats.hits}, Misses: ${stats.misses}`);
-                    cache.flushAll();
-                });
-
-                // Optimizar base de datos cada domingo a las 3 AM
-                cron.schedule('0 3 * * 0', async () => {
-                    try {
-                        console.log('🔧 Optimizando base de datos...');
-                        await pool.query('VACUUM ANALYZE');
-                        console.log('✅ Base de datos optimizada');
-                    } catch (error) {
-                        console.error('❌ Error optimizando base de datos:', error);
-                    }
-                });
-
-                console.log('⏰ Tareas programadas iniciadas');
-            }
-
-            console.log('📦 Cache NodeCache inicializado (TTL: 300s)');
-            console.log('🗜️ Compresión gzip habilitada');
-            console.log('🖼️ Optimización de imágenes Sharp habilitada');
-            console.log('📊 Analytics y Excel habilitados');
-            console.log('📈 Versión: 2.2.0 - PERFORMANCE EDITION');
-            console.log('🔐 Seguridad: JWT + bcrypt + Helmet + Rate Limiting');
-            console.log('⚡ Performance: Cache + Compression + Sharp + Indices');
-            console.log('🚀 ================================');
         });
-
     } catch (error) {
         console.error('❌ Error iniciando servidor:', error);
         process.exit(1);
     }
 }
 
-// ===============================================
-// 🔚 GRACEFUL SHUTDOWN OPTIMIZADO
-// ===============================================
+// ✅ MANEJO DE ERRORES MEJORADO
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
-async function gracefulShutdown(signal) {
-    console.log(`${signal} recibido, cerrando servidor gracefully...`);
-    
-    try {
-        // Cerrar pool de base de datos
-        await pool.end();
-        console.log('✅ Pool de PostgreSQL cerrado');
-        
-        // Mostrar estadísticas finales de cache
-        const stats = cache.getStats();
-        console.log(`📊 Estadísticas finales de cache - Keys: ${stats.keys}, Hits: ${stats.hits}, Misses: ${stats.misses}`);
-        
-        process.exit(0);
-    } catch (error) {
-        console.error('❌ Error durante shutdown:', error);
-        process.exit(1);
-    }
-}
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
+});
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM recibido, cerrando servidor...');
+    process.exit(0);
+});
 
-// ===============================================
-// 🚀 INICIAR SERVIDOR
-// ===============================================
+process.on('SIGINT', () => {
+    console.log('SIGINT recibido, cerrando servidor...');
+    process.exit(0);
+});
 
 startServer();
