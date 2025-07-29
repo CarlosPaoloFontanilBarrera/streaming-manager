@@ -27,14 +27,15 @@ if (process.env.NODE_ENV === 'production') {
     app.set('trust proxy', false); // Desarrollo local
 }
 
-// Helmet para headers de seguridad
+// Helmet para headers de seguridad (CORREGIDO)
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            scriptSrcAttr: ["'unsafe-inline'"], // ← ESTO ARREGLA LOS BOTONES
             imgSrc: ["'self'", "data:", "blob:"],
             connectSrc: ["'self'", "https://ntfy.sh"]
         }
