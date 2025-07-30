@@ -1,4 +1,4 @@
-// server.js - Sistema completo MEJORADO con seguridad sin romper funcionalidad existente
+// server.js - SISTEMA CORREGIDO COMPLETAMENTE
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -6,128 +6,145 @@ const path = require('path');
 const multer = require('multer');
 const fetch = require('node-fetch');
 
-// ✅ NUEVAS DEPENDENCIAS DE SEGURIDAD Y PERFORMANCE
+// DEPENDENCIAS DE SEGURIDAD
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { body, validationResult } = require('express-validator');
-const compression = require('compression');
-const NodeCache = require('node-cache');
-const sharp = require('sharp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ CONFIGURACIÓN DE SEGURIDAD
-const JWT_SECRET = process.env.JWT_SECRET || 'jireh-streaming-secret-2025';
-const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+// CONFIGURACIÓN DE SEGURIDAD
+const JWT_SECRET = process.env.JWT_SECRET || 'jireh_streaming_secret_2025_ultra_secure!';
+const BCRYPT_ROUNDS = 12;
 
-// ✅ SISTEMA DE CACHÉ (MEJORA DE PERFORMANCE)
-const cache = new NodeCache({ 
-    stdTTL: parseInt(process.env.CACHE_TTL) || 300, // 5 minutos
-    checkperiod: 60,
-    useClones: false
-});
+// ✅ CORREGIDO: Trust proxy configurado correctamente para Railway
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1); // Solo confiar en el primer proxy
+} else {
+    app.set('trust proxy', false); // Desarrollo local
+}
 
-// ✅ SEGURIDAD CON HELMET
+// Helmet para headers de seguridad (CORREGIDO)
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:", "blob:"]
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            scriptSrcAttr: ["'unsafe-inline'"], // ← ESTO ARREGLA LOS BOTONES
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'", "https://ntfy.sh"]
         }
     }
 }));
 
-// ✅ COMPRESIÓN PARA MEJOR PERFORMANCE
-app.use(compression());
-
-// ✅ RATE LIMITING PARA SEGURIDAD
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: parseInt(process.env.API_RATE_LIMIT) || 100,
-    message: { error: 'Demasiadas solicitudes' }
+// ✅ CORREGIDO: Rate limiting mejorado
+const createRateLimiter = (windowMs, max, message) => rateLimit({
+    windowMs,
+    max,
+    message: { error: message },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip en desarrollo local
+    skip: (req) => {
+        if (process.env.NODE_ENV !== 'production') {
+            return req.ip === '127.0.0.1' || req.ip === '::1';
+        }
+        return false;
+    }
 });
 
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: parseInt(process.env.LOGIN_RATE_LIMIT) || 5,
-    message: { error: 'Demasiados intentos de login' }
-});
+const loginLimiter = createRateLimiter(
+    15 * 60 * 1000, // 15 minutos
+    5, // 5 intentos
+    'Demasiados intentos de login. Intenta en 15 minutos.'
+);
 
-// Aplicar rate limiting
-app.use('/api/', generalLimiter);
-app.use('/api/login', loginLimiter);
+const apiLimiter = createRateLimiter(
+    1 * 60 * 1000, // 1 minuto
+    100, // 100 requests
+    'Demasiadas solicitudes. Intenta más tarde.'
+);
 
-// Middleware básico (SIN CAMBIOS)
+// Middleware básico
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ✅ MIDDLEWARE DE AUTENTICACIÓN JWT (OPCIONAL - NO ROMPE FUNCIONALIDAD EXISTENTE)
-const verifyToken = (req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    
-    if (!token) {
-        // ✅ MODO COMPATIBLE: Si no hay token, permitir acceso (para no romper funcionalidad)
-        console.log('⚠️ Acceso sin token JWT (modo compatible)');
-        return next();
-    }
-    
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-        console.log('✅ Token JWT válido');
-        next();
-    } catch (error) {
-        console.error('❌ Token JWT inválido:', error.message);
-        // ✅ MODO COMPATIBLE: Si token inválido, permitir acceso (para no romper)
-        next();
-    }
-};
+// Aplicar rate limiting
+app.use('/api/login', loginLimiter);
+app.use('/api/', apiLimiter);
 
-// Configuración de PostgreSQL (SIN CAMBIOS)
+// Configuración de PostgreSQL
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// ✅ OPTIMIZACIÓN DE IMÁGENES CON SHARP
-async function optimizeImage(buffer, options = {}) {
-    const {
-        width = 1200,
-        height = 800,
-        quality = parseInt(process.env.IMAGE_QUALITY) || 85
-    } = options;
-
-    try {
-        return await sharp(buffer)
-            .resize(width, height, { 
-                fit: 'inside', 
-                withoutEnlargement: true 
-            })
-            .jpeg({ 
-                quality, 
-                progressive: true
-            })
-            .toBuffer();
-    } catch (error) {
-        console.error('Error optimizando imagen:', error);
-        return buffer; // Retornar original si falla
-    }
-}
-
-// Configuración de multer (SIN CAMBIOS)
+// Configuración de multer
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB máximo
 });
 
-// Funciones auxiliares (SIN CAMBIOS)
+// ✅ MIDDLEWARE DE AUTENTICACIÓN JWT MEJORADO
+function verifyToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Token requerido' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ error: 'Token expirado' });
+        }
+        return res.status(403).json({ error: 'Token inválido' });
+    }
+}
+
+// ✅ VALIDADORES CORREGIDOS
+const loginValidators = [
+    body('username')
+        .trim()
+        .isLength({ min: 3, max: 30 })
+        .withMessage('Usuario debe tener 3-30 caracteres'),
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password debe tener mínimo 6 caracteres')
+];
+
+const accountValidators = [
+    body('client_name')
+        .trim()
+        .isLength({ min: 2, max: 100 })
+        .withMessage('Nombre debe tener 2-100 caracteres'),
+    body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Email inválido'),
+    body('password')
+        .isLength({ min: 6 })
+        .withMessage('Password debe tener mínimo 6 caracteres'),
+    body('type')
+        .notEmpty()
+        .withMessage('Tipo de servicio requerido'),
+    body('country')
+        .isIn(['PE', 'US', 'GB', 'ES'])
+        .withMessage('País inválido')
+];
+
+// Funciones de utilidad
 function calcularDiasRestantes(fechaVencimiento) {
     if (!fechaVencimiento) return 0;
 
@@ -138,7 +155,6 @@ function calcularDiasRestantes(fechaVencimiento) {
     const vencimientoUTC = Date.UTC(vencimiento.getUTCFullYear(), vencimiento.getUTCMonth(), vencimiento.getUTCDate());
 
     const diferenciaMilisegundos = vencimientoUTC - hoyUTC;
-    
     const dias = Math.ceil(diferenciaMilisegundos / (1000 * 60 * 60 * 24));
     
     return Math.max(0, dias);
@@ -169,12 +185,30 @@ function procesarPerfiles(profiles) {
     });
 }
 
-// ✅ FUNCIÓN DE INICIALIZACIÓN MEJORADA
+// Inicialización de base de datos
 async function initDB() {
     try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS accounts (
-                id TEXT PRIMARY KEY, client_name TEXT NOT NULL, client_phone TEXT DEFAULT '', email TEXT NOT NULL, password TEXT NOT NULL, type TEXT NOT NULL, country TEXT NOT NULL DEFAULT 'PE', profiles JSONB NOT NULL DEFAULT '[]', days_remaining INTEGER NOT NULL DEFAULT 30, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMP DEFAULT NOW(), fecha_venta TIMESTAMP DEFAULT NOW(), fecha_vencimiento TIMESTAMP, fecha_inicio_proveedor TIMESTAMP, fecha_vencimiento_proveedor TIMESTAMP, voucher_imagen TEXT, numero_operacion TEXT, monto_pagado DECIMAL(10,2), estado_pago TEXT DEFAULT 'activo'
+                id TEXT PRIMARY KEY,
+                client_name TEXT NOT NULL,
+                client_phone TEXT DEFAULT '',
+                email TEXT NOT NULL,
+                password TEXT NOT NULL,
+                type TEXT NOT NULL,
+                country TEXT NOT NULL DEFAULT 'PE',
+                profiles JSONB NOT NULL DEFAULT '[]',
+                days_remaining INTEGER NOT NULL DEFAULT 30,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT NOW(),
+                fecha_venta TIMESTAMP DEFAULT NOW(),
+                fecha_vencimiento TIMESTAMP,
+                fecha_inicio_proveedor TIMESTAMP,
+                fecha_vencimiento_proveedor TIMESTAMP,
+                voucher_imagen TEXT,
+                numero_operacion TEXT,
+                monto_pagado DECIMAL(10,2),
+                estado_pago TEXT DEFAULT 'activo'
             )
         `);
         
@@ -186,224 +220,352 @@ async function initDB() {
                 ntfy_topic TEXT
             )
         `);
+        
         const settings = await pool.query('SELECT * FROM alarm_settings');
         if (settings.rows.length === 0) {
             await pool.query('INSERT INTO alarm_settings (provider_threshold_days, client_threshold_days) VALUES (5, 3)');
-        } else {
-            const columns = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name='alarm_settings' AND column_name='ntfy_topic'");
-            if (columns.rows.length === 0) {
-                await pool.query("ALTER TABLE alarm_settings ADD COLUMN ntfy_topic TEXT");
-            }
         }
         
         await pool.query(`
             CREATE TABLE IF NOT EXISTS sent_notifications (
-                id SERIAL PRIMARY KEY, item_id TEXT NOT NULL, item_type TEXT NOT NULL, sent_at TIMESTAMP NOT NULL, UNIQUE(item_id, item_type)
+                id SERIAL PRIMARY KEY,
+                item_id TEXT NOT NULL,
+                item_type TEXT NOT NULL,
+                sent_at TIMESTAMP NOT NULL,
+                UNIQUE(item_id, item_type)
             )
         `);
         
-        // ✅ TABLA DE USUARIOS MEJORADA CON BCRYPT
         await pool.query(`
             CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY, 
-                username TEXT UNIQUE NOT NULL, 
-                password_hash TEXT NOT NULL,
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT NOW()
             )
         `);
         
-        // ✅ VERIFICAR SI NECESITAMOS MIGRAR PASSWORDS A BCRYPT
-        const userCheck = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name='admin_users' AND column_name='password_hash'");
-        if (userCheck.rows.length === 0) {
-            // Migrar de password a password_hash
-            await pool.query("ALTER TABLE admin_users ADD COLUMN password_hash TEXT");
-            const users = await pool.query("SELECT id, username, password FROM admin_users WHERE password IS NOT NULL");
-            for (const user of users.rows) {
-                const hashedPassword = await bcrypt.hash(user.password, BCRYPT_ROUNDS);
-                await pool.query("UPDATE admin_users SET password_hash = $1 WHERE id = $2", [hashedPassword, user.id]);
-            }
-            await pool.query("ALTER TABLE admin_users DROP COLUMN IF EXISTS password");
-            console.log('✅ Passwords migrados a bcrypt');
-        }
+        await pool.query(`
+            INSERT INTO admin_users (username, password) 
+            VALUES ('paolof', 'elpoderosodeizrael777xD!') 
+            ON CONFLICT (username) DO NOTHING
+        `);
         
-        // ✅ CREAR USUARIO ADMIN CON BCRYPT
-        const adminCheck = await pool.query("SELECT * FROM admin_users WHERE username = 'paolof'");
-        if (adminCheck.rows.length === 0) {
-            const hashedPassword = await bcrypt.hash('elpoderosodeizrael777xD!', BCRYPT_ROUNDS);
-            await pool.query(`INSERT INTO admin_users (username, password_hash) VALUES ('paolof', $1)`, [hashedPassword]);
-            console.log('✅ Usuario admin creado con bcrypt');
-        }
-        
-        console.log('✅ Base de datos inicializada correctamente con mejoras de seguridad');
+        console.log('✅ Base de datos inicializada correctamente');
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
+        throw error;
     }
 }
 
-// Sistema de alarmas (SIN CAMBIOS)
+// Sistema de alarmas
 async function checkAndSendAlarms() {
-    console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
+    console.log('⏰ Revisando alarmas...');
 
     try {
         const settingsRes = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
         const settings = settingsRes.rows[0];
 
-        if (!settings || !settings.ntfy_topic) {
-            console.log('⚠️ No se ha configurado un tema de ntfy para notificaciones.');
+        if (!settings?.ntfy_topic) {
+            console.log('⚠️ No hay tema de ntfy configurado');
             return;
         }
 
         const accountsRes = await pool.query('SELECT * FROM accounts');
 
         for (const account of accountsRes.rows) {
+            // Alarmas de proveedor
             const providerDays = calcularDiasRestantes(account.fecha_vencimiento_proveedor);
             if (providerDays > 0 && providerDays <= settings.provider_threshold_days) {
                 const notificationId = `provider-${account.id}`;
-                const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
+                const checkRes = await pool.query(
+                    "SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", 
+                    [notificationId]
+                );
                 
                 if (checkRes.rows.length === 0) {
                     const message = `🚨 La cuenta de ${account.type} de "${account.client_name}" vence en ${providerDays} día(s).`;
-                    await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
-                        method: 'POST',
-                        body: message,
-                        headers: { 'Title': 'Alarma de Proveedor', 'Priority': 'high', 'Tags': 'rotating_light' }
-                    });
-                    await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
-                    console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
-                } else {
-                    console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
+                    
+                    try {
+                        await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
+                            method: 'POST',
+                            body: message,
+                            headers: { 
+                                'Title': 'Alarma de Proveedor', 
+                                'Priority': 'high', 
+                                'Tags': 'rotating_light' 
+                            }
+                        });
+                        
+                        await pool.query(
+                            "INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", 
+                            [notificationId]
+                        );
+                        
+                        console.log(`📲 Notificación de proveedor enviada para ${account.id}`);
+                    } catch (notifyError) {
+                        console.error(`❌ Error enviando notificación: ${notifyError.message}`);
+                    }
                 }
             }
 
+            // Alarmas de cliente
             const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
             for (const [index, profile] of profiles.entries()) {
-                if (profile.estado === 'vendido') {
+                if (profile.estado === 'vendido' && profile.fechaVencimiento) {
                     const clientDays = calcularDiasRestantesPerfil(profile.fechaVencimiento);
                     if (clientDays > 0 && clientDays <= settings.client_threshold_days) {
                         const notificationId = `client-${account.id}-${index}`;
-                        const checkRes = await pool.query("SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", [notificationId]);
+                        const checkRes = await pool.query(
+                            "SELECT 1 FROM sent_notifications WHERE item_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'", 
+                            [notificationId]
+                        );
 
                         if (checkRes.rows.length === 0) {
-                           const message = `🔔 El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
-                           await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
-                                method: 'POST',
-                                body: message,
-                                headers: { 'Title': 'Alarma de Cliente', 'Priority': 'default', 'Tags': 'bell' }
-                           });
-                           await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
-                           console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
-                        } else {
-                            console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
+                            const message = `🔔 El perfil "${profile.name}" del cliente ${profile.clienteNombre} (${account.type}) vence en ${clientDays} día(s).`;
+                            
+                            try {
+                                await fetch(`https://ntfy.sh/${settings.ntfy_topic}`, {
+                                    method: 'POST',
+                                    body: message,
+                                    headers: { 
+                                        'Title': 'Alarma de Cliente', 
+                                        'Priority': 'default', 
+                                        'Tags': 'bell' 
+                                    }
+                                });
+                                
+                                await pool.query(
+                                    "INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", 
+                                    [notificationId]
+                                );
+                                
+                                console.log(`📲 Notificación de cliente enviada para ${account.id}-${index}`);
+                            } catch (notifyError) {
+                                console.error(`❌ Error enviando notificación: ${notifyError.message}`);
+                            }
                         }
                     }
                 }
             }
         }
     } catch (error) {
-        console.error('❌ Error durante la revisión de alarmas:', error);
+        console.error('❌ Error en sistema de alarmas:', error);
     }
 }
 
-// ✅ RUTAS API MEJORADAS
+// ✅ RUTAS API CORREGIDAS
+
+// Health check
 app.get('/api/health', (req, res) => {
-    const memUsage = process.memoryUsage();
-    const cacheStats = cache.getStats();
-    
-    res.json({ 
-        status: 'OK',
-        timestamp: new Date().toISOString(),
-        version: '2.2.0-IMPROVED',
-        uptime: process.uptime(),
-        memory: {
-            used: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB',
-            total: Math.round(memUsage.heapTotal / 1024 / 1024) + 'MB'
-        },
-        cache: {
-            keys: cacheStats.keys,
-            hits: cacheStats.hits,
-            misses: cacheStats.misses
-        },
-        features: {
-            jwt: true,
-            bcrypt: true,
-            cache: true,
-            compression: true,
-            rate_limiting: true,
-            helmet_security: true
-        }
-    });
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// ✅ LOGIN MEJORADO CON BCRYPT Y JWT
-app.post('/api/login', [
-    body('username').trim().isLength({ min: 1 }).withMessage('Username requerido'),
-    body('password').isLength({ min: 1 }).withMessage('Password requerido')
-], async (req, res) => {
+// ✅ LOGIN MEJORADO
+app.post('/api/login', loginValidators, async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ 
-                success: false,
+                success: false, 
                 message: 'Datos inválidos',
-                details: errors.array()
+                errors: errors.array()
             });
         }
 
         const { username, password } = req.body;
 
-        const userResult = await pool.query(
-            'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
+        const result = await pool.query(
+            'SELECT id, username, password FROM admin_users WHERE username = $1', 
             [username]
         );
 
-        if (userResult.rows.length === 0) {
-            return res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+        if (result.rows.length === 0) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Credenciales inválidas' 
+            });
         }
 
-        const user = userResult.rows[0];
-        const isValidPassword = await bcrypt.compare(password, user.password_hash);
-
+        const user = result.rows[0];
+        let isValidPassword = false;
+        
+        // Verificar password (soporte para migración gradual)
+        if (user.password.startsWith('$2b$')) {
+            isValidPassword = await bcrypt.compare(password, user.password);
+        } else {
+            isValidPassword = password === user.password;
+            
+            // Migrar a bcrypt si es válido
+            if (isValidPassword) {
+                const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+                await pool.query(
+                    'UPDATE admin_users SET password = $1 WHERE id = $2',
+                    [hashedPassword, user.id]
+                );
+                console.log(`✅ Password migrado a bcrypt para: ${username}`);
+            }
+        }
+        
         if (!isValidPassword) {
-            return res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Credenciales inválidas' 
+            });
         }
 
+        // Generar JWT
         const token = jwt.sign(
-            { userId: user.id, username: user.username },
-            JWT_SECRET,
+            { userId: user.id, username: user.username }, 
+            JWT_SECRET, 
             { expiresIn: '24h' }
         );
 
-        console.log(`✅ Login exitoso con JWT: ${username}`);
-        
-        res.json({
-            success: true,
+        console.log(`✅ Login exitoso: ${username} desde ${req.ip}`);
+
+        res.json({ 
+            success: true, 
             message: 'Login exitoso',
             token,
-            user: {
-                id: user.id,
-                username: user.username
-            }
+            user: { id: user.id, username: user.username }
         });
 
     } catch (error) {
         console.error('❌ Error en login:', error);
-        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error interno del servidor' 
+        });
     }
 });
 
-// ✅ STATS CON CACHÉ
-app.get('/api/stats', verifyToken, async (req, res) => {
+// Cuentas - GET
+app.get('/api/accounts', verifyToken, async (req, res) => {
     try {
-        const cacheKey = 'dashboard_stats';
-        const cachedStats = cache.get(cacheKey);
-        
-        if (cachedStats) {
-            console.log('📦 Cache hit: stats');
-            return res.json(cachedStats);
+        const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('❌ Error obteniendo cuentas:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// Cuentas - POST
+app.post('/api/accounts', accountValidators, verifyToken, async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                error: 'Datos inválidos',
+                details: errors.array()
+            });
         }
 
+        const { 
+            id, client_name, client_phone, email, password, 
+            type, country, profiles, fecha_inicio_proveedor 
+        } = req.body;
+        
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        
+        const result = await pool.query(
+            `INSERT INTO accounts (
+                id, client_name, client_phone, email, password, type, country, 
+                profiles, days_remaining, status, fecha_inicio_proveedor, 
+                fecha_vencimiento_proveedor, estado_pago, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()) 
+            RETURNING *`,
+            [
+                id, client_name, client_phone || '', email, password, type, country, 
+                JSON.stringify(profiles || []), diasRestantesProveedor, estadoProveedor, 
+                fechaInicio, fechaVencimientoProveedor, 'activo'
+            ]
+        );
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('❌ Error creando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+// Cuentas - PUT
+app.put('/api/accounts/:id', accountValidators, verifyToken, async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                error: 'Datos inválidos',
+                details: errors.array()
+            });
+        }
+
+        const { id } = req.params;
+        const { 
+            client_name, client_phone, email, password, 
+            type, country, profiles, fecha_inicio_proveedor 
+        } = req.body;
+        
+        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
+        const fechaVencimientoProveedor = new Date(fechaInicio);
+        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
+        
+        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
+        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        const profilesActualizados = procesarPerfiles(profiles);
+        
+        const result = await pool.query(
+            `UPDATE accounts SET 
+                client_name = $1, client_phone = $2, email = $3, password = $4, 
+                type = $5, country = $6, profiles = $7, days_remaining = $8, 
+                status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
+             WHERE id = $12 RETURNING *`,
+            [
+                client_name, client_phone || '', email, password, type, country, 
+                JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, 
+                fechaInicio, fechaVencimientoProveedor, id
+            ]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('❌ Error actualizando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
+});
+
+// Cuentas - DELETE
+app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
+        
+        res.json({ message: 'Cuenta eliminada exitosamente' });
+    } catch (error) {
+        console.error('❌ Error eliminando cuenta:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// Estadísticas
+app.get('/api/stats', verifyToken, async (req, res) => {
+    try {
         const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
         const accountsResult = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
+        
         let activeCount = 0, expiringCount = 0, totalProfiles = 0, soldProfiles = 0;
         const today = new Date();
         
@@ -411,6 +573,7 @@ app.get('/api/stats', verifyToken, async (req, res) => {
             const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles || [];
             totalProfiles += profiles.length;
             soldProfiles += profiles.filter(p => p.estado === 'vendido').length;
+            
             if (row.fecha_vencimiento_proveedor) {
                 const vencimiento = new Date(row.fecha_vencimiento_proveedor);
                 const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
@@ -419,111 +582,95 @@ app.get('/api/stats', verifyToken, async (req, res) => {
             }
         });
         
-        const stats = {
+        res.json({
             total: parseInt(totalResult.rows[0].count),
             active: activeCount,
             profiles: totalProfiles,
             expiring: expiringCount,
             sold_profiles: soldProfiles
-        };
-
-        cache.set(cacheKey, stats);
-        console.log('💾 Cache set: stats');
-        res.json(stats);
+        });
     } catch (error) {
+        console.error('❌ Error obteniendo estadísticas:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
-// Resto de rutas (SIN CAMBIOS para mantener compatibilidad)
-app.get('/api/accounts', verifyToken, async (req, res) => {
+// Configuración de alarmas
+app.get('/api/alarms/settings', verifyToken, async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
-        res.json(result.rows);
+        const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
+        res.json(result.rows[0] || { 
+            provider_threshold_days: 5, 
+            client_threshold_days: 3, 
+            ntfy_topic: '' 
+        });
     } catch (error) {
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error obteniendo configuración de alarmas:', error);
+        res.status(500).json({ error: 'Error obteniendo configuración de alarmas' });
     }
 });
 
-app.post('/api/accounts', verifyToken, async (req, res) => {
+app.put('/api/alarms/settings', verifyToken, async (req, res) => {
     try {
-        const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
-        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
-        const fechaVencimientoProveedor = new Date(fechaInicio);
-        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
-        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
-        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
         const result = await pool.query(
-            `INSERT INTO accounts (id, client_name, client_phone, email, password, type, country, profiles, days_remaining, status, fecha_inicio_proveedor, fecha_vencimiento_proveedor, estado_pago, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()) RETURNING *`,
-            [id, client_name, client_phone || '', email, password, type, country, JSON.stringify(profiles), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, 'activo']
+            `UPDATE alarm_settings SET 
+                provider_threshold_days = $1, 
+                client_threshold_days = $2, 
+                ntfy_topic = $3 
+             WHERE id = 1 RETURNING *`,
+            [provider_threshold_days, client_threshold_days, ntfy_topic]
         );
-        
-        // Invalidar cache
-        cache.del('dashboard_stats');
-        
         res.json(result.rows[0]);
     } catch (error) {
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+        console.error('❌ Error actualizando configuración de alarmas:', error);
+        res.status(500).json({ error: 'Error actualizando configuración de alarmas' });
     }
 });
 
-app.put('/api/accounts/:id', verifyToken, async (req, res) => {
+// Test de alarmas
+app.post('/api/alarms/test', verifyToken, async (req, res) => {
+    console.log('⚡️ Ejecutando test de alarmas...');
     try {
-        const { id } = req.params;
-        const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
-        const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
-        const fechaVencimientoProveedor = new Date(fechaInicio);
-        fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
-        const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
-        const estadoProveedor = actualizarEstado(diasRestantesProveedor);
-        const profilesActualizados = procesarPerfiles(profiles);
-        const result = await pool.query(
-            `UPDATE accounts SET client_name = $1, client_phone = $2, email = $3, password = $4, type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
-             WHERE id = $12 RETURNING *`,
-            [client_name, client_phone || '', email, password, type, country, JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, id]
-        );
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Cuenta no encontrada' });
-        
-        // Invalidar cache
-        cache.del('dashboard_stats');
-        
-        res.json(result.rows[0]);
+        await checkAndSendAlarms();
+        res.json({ 
+            success: true, 
+            message: 'Test de alarmas ejecutado. Revisa las notificaciones.' 
+        });
     } catch (error) {
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+        console.error('❌ Error en test de alarmas:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error al ejecutar test de alarmas.' 
+        });
     }
 });
 
-// ✅ UPLOAD DE VOUCHER MEJORADO CON SHARP
+// Vouchers
 app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, upload.single('voucher'), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
-        if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
         
         const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
-        if (accountResult.rows.length === 0) return res.status(404).json({ error: 'Cuenta no encontrada' });
+        if (accountResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Cuenta no encontrada' });
+        }
         
         const account = accountResult.rows[0];
         const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
         const profileIdx = parseInt(profileIndex);
-        if (profileIdx < 0 || profileIdx >= profiles.length) return res.status(400).json({ error: 'Índice de perfil inválido' });
+        
+        if (profileIdx < 0 || profileIdx >= profiles.length) {
+            return res.status(400).json({ error: 'Índice de perfil inválido' });
+        }
         
         const profile = profiles[profileIdx];
-        
-        // ✅ OPTIMIZAR IMAGEN CON SHARP
-        let voucherBase64;
-        if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
-            const optimizedBuffer = await optimizeImage(req.file.buffer, {
-                width: 800,
-                height: 600,
-                quality: 85
-            });
-            voucherBase64 = optimizedBuffer.toString('base64');
-            console.log('🖼️ Imagen optimizada con Sharp');
-        } else {
-            voucherBase64 = req.file.buffer.toString('base64');
-        }
+        const voucherBase64 = req.file.buffer.toString('base64');
         
         profile.voucherImagen = voucherBase64;
         profile.numeroOperacion = numero_operacion;
@@ -535,11 +682,8 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
             const fechaVencimientoActual = new Date(profile.fechaVencimiento);
             const nuevaFechaVencimiento = new Date(fechaVencimientoActual);
             nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
+            
             profile.fechaVencimiento = nuevaFechaVencimiento.toISOString().split('T')[0];
-            const fechaProximoPago = new Date(nuevaFechaVencimiento);
-            fechaProximoPago.setDate(fechaProximoPago.getDate() - 1);
-            profile.fechaProximoPago = fechaProximoPago.toISOString().split('T')[0];
-            profile.fechaCorte = nuevaFechaVencimiento.toISOString().split('T')[0];
             profile.diasRestantes = calcularDiasRestantesPerfil(profile.fechaVencimiento);
             profile.estadoPago = 'pagado';
             profile.fechaUltimaRenovacion = new Date().toISOString().split('T')[0];
@@ -549,65 +693,14 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', verifyToken, 
         
         await pool.query('UPDATE accounts SET profiles = $1 WHERE id = $2', [JSON.stringify(profiles), accountId]);
         
-        // Invalidar cache
-        cache.del('dashboard_stats');
-        
-        res.json({ success: true, message: 'Voucher procesado con optimización de imagen', profile: profile });
+        res.json({ success: true, message: 'Voucher procesado', profile: profile });
     } catch (error) {
+        console.error('❌ Error procesando voucher:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
-app.delete('/api/accounts/:id', verifyToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Cuenta no encontrada' });
-        
-        // Invalidar cache
-        cache.del('dashboard_stats');
-        
-        res.json({ message: 'Cuenta eliminada exitosamente' });
-    } catch (error) {
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
-// ✅ CONFIGURACIÓN DE ALARMAS (SIN CAMBIOS)
-app.get('/api/alarms/settings', verifyToken, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
-        res.json(result.rows[0] || { provider_threshold_days: 5, client_threshold_days: 3, ntfy_topic: '' });
-    } catch (error) {
-        res.status(500).json({ error: 'Error obteniendo configuración de alarmas' });
-    }
-});
-
-app.put('/api/alarms/settings', verifyToken, async (req, res) => {
-    try {
-        const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
-        const result = await pool.query(
-            'UPDATE alarm_settings SET provider_threshold_days = $1, client_threshold_days = $2, ntfy_topic = $3 WHERE id = 1 RETURNING *',
-            [provider_threshold_days, client_threshold_days, ntfy_topic]
-        );
-        res.json(result.rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: 'Error actualizando configuración de alarmas' });
-    }
-});
-
-app.post('/api/alarms/test', verifyToken, async (req, res) => {
-    console.log('⚡️ Disparando prueba de alarmas manualmente...');
-    try {
-        await checkAndSendAlarms();
-        res.json({ success: true, message: 'Prueba de alarmas iniciada. Revisa tu celular en unos momentos.' });
-    } catch (error) {
-        console.error('❌ Error en la prueba manual de alarmas:', error);
-        res.status(500).json({ success: false, message: 'Error al iniciar la prueba de alarmas.' });
-    }
-});
-
-// ✅ API MICUENTA.ME (SIN CAMBIOS)
+// Micuenta.me checker
 app.post('/api/check-micuenta-me-code', verifyToken, async (req, res) => {
     try {
         const { code, pdv } = req.body;
@@ -621,7 +714,9 @@ app.post('/api/check-micuenta-me-code', verifyToken, async (req, res) => {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Error desconocido del proxy de micuenta.me.' }));
+            const errorData = await response.json().catch(() => ({ 
+                message: 'Error desconocido del proxy de micuenta.me.' 
+            }));
             console.error('Error al consultar micuenta.me:', response.status, errorData.message);
             return res.status(response.status).json(errorData);
         }
@@ -630,95 +725,59 @@ app.post('/api/check-micuenta-me-code', verifyToken, async (req, res) => {
         res.json(data);
 
     } catch (error) {
-        console.error('Error en la ruta /api/check-micuenta-me-code:', error);
-        res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la solicitud externa a micuenta.me.' });
-    }
-});
-
-// ✅ NUEVAS APIS DE PERFORMANCE Y MONITOREO
-app.get('/api/cache/stats', verifyToken, (req, res) => {
-    try {
-        const stats = cache.getStats();
-        res.json({
-            keys: stats.keys,
-            hits: stats.hits,
-            misses: stats.misses,
-            hit_rate: stats.hits > 0 ? ((stats.hits / (stats.hits + stats.misses)) * 100).toFixed(2) + '%' : '0%'
+        console.error('Error en micuenta.me checker:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error interno del servidor al procesar la solicitud externa a micuenta.me.' 
         });
-    } catch (error) {
-        res.status(500).json({ error: 'Error obteniendo estadísticas de cache' });
     }
 });
 
-app.post('/api/cache/clear', verifyToken, (req, res) => {
-    try {
-        const stats = cache.getStats();
-        cache.flushAll();
-        console.log('🧹 Cache limpiado manualmente');
-        res.json({
-            success: true,
-            message: 'Cache limpiado exitosamente',
-            previous_stats: stats
-        });
-    } catch (error) {
-        res.status(500).json({ error: 'Error limpiando cache' });
-    }
-});
-
-// Servir archivos estáticos (SIN CAMBIOS)
+// ✅ RUTAS ESTÁTICAS
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// ✅ INICIAR SERVIDOR MEJORADO
+// ✅ INICIAR SERVIDOR
 async function startServer() {
     try {
         await initDB();
+        
         app.listen(PORT, () => {
-            console.log('🚀 ================================');
-            console.log(`🎯 JIREH Streaming Manager MEJORADO`);
-            console.log(`🌐 Servidor corriendo en puerto ${PORT}`);
-            console.log('🚀 ================================');
-            console.log('✅ MEJORAS IMPLEMENTADAS:');
-            console.log('  🔐 JWT Authentication');
-            console.log('  🔒 bcrypt para passwords');
-            console.log('  🛡️ Helmet security headers');
-            console.log('  ⚡ Rate limiting');
-            console.log('  📦 Sistema de caché NodeCache');
-            console.log('  🗜️ Compresión automática');
-            console.log('  🖼️ Optimización de imágenes Sharp');
-            console.log('  📊 APIs de monitoreo');
-            console.log('🚀 ================================');
+            console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
+            console.log(`🔒 Seguridad JWT habilitada`);
+            console.log(`🛡️ Rate limiting configurado CORRECTAMENTE`);
+            console.log(`🌐 Entorno: ${process.env.NODE_ENV || 'development'}`);
             
-            // Sistema de alarmas (SIN CAMBIOS)
-            setInterval(checkAndSendAlarms, 3600000); 
-            console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
+            // Iniciar sistema de alarmas
+            setInterval(checkAndSendAlarms, 3600000); // Cada hora
+            console.log('⏰ Sistema de alarmas ntfy iniciado');
         });
     } catch (error) {
         console.error('❌ Error iniciando servidor:', error);
+        process.exit(1);
     }
 }
 
 // ✅ MANEJO DE ERRORES MEJORADO
-process.on('unhandledRejection', (err) => {
-    console.error('Unhandled rejection:', err);
-    // ✅ En producción, podrías enviar esto a un servicio de logging
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err);
-    // ✅ En producción, podrías enviar esto a un servicio de logging
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
 });
 
-// ✅ GRACEFUL SHUTDOWN
+// Graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('SIGTERM recibido, cerrando servidor gracefully...');
+    console.log('SIGTERM recibido, cerrando servidor...');
     process.exit(0);
 });
 
 process.on('SIGINT', () => {
-    console.log('SIGINT recibido, cerrando servidor gracefully...');
+    console.log('SIGINT recibido, cerrando servidor...');
     process.exit(0);
 });
 
