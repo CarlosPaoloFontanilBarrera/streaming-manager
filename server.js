@@ -1,4 +1,4 @@
-// server.js - FASE 1: Sistema con JWT + BCRYPT + RATE LIMITING + VALIDACIÓN
+// server.js - FASE 1: Sistema con JWT + BCRYPT + RATE LIMITING + VALIDACIÓN (PROXY FIXED)
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -13,6 +13,9 @@ const Joi = require('joi');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// FASE 1: CONFIGURAR TRUST PROXY PARA RAILWAY
+app.set('trust proxy', 1);
 
 // CONFIGURACIÓN JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'jireh-streaming-secret-key-ultra-segura-2024';
@@ -349,7 +352,8 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        security: 'FASE 1: bcrypt + rate-limiting + validation'
+        security: 'FASE 1: bcrypt + rate-limiting + validation',
+        proxy_configured: true
     });
 });
 
@@ -658,6 +662,7 @@ async function startServer() {
             console.log('   ✅ BCRYPT para contraseñas');
             console.log('   ✅ Rate Limiting (100 req/15min)');
             console.log('   ✅ Validación JOI en todas las rutas');
+            console.log('   ✅ Trust Proxy configurado para Railway');
             console.log('👤 Usuario: paolof');
             console.log('🔑 Password: elpoderosodeizrael777xD!');
             console.log('🌐 URL: https://tu-dominio-railway.app');
