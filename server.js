@@ -1,11 +1,11 @@
-// server.js - Sistema completo con JWT, fechas automáticas, perfiles, vouchers Y ALARMAS NTFY
+// server.js - Sistema completo con JWT, fechas automáticas, perfiles, vouchers Y ALARMAS NTFY + AUTO-CREACIÓN DE TABLAS
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fetch = require('node-fetch');
-const jwt = require('jsonwebtoken'); // AGREGADO JWT
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -135,7 +135,11 @@ async function initDB() {
         if (settings.rows.length === 0) {
             await pool.query('INSERT INTO alarm_settings (provider_threshold_days, client_threshold_days) VALUES (5, 3)');
         } else {
-            const columns = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name='alarm_settings' AND column_name='ntfy_topic'");
+            const columns = await pool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='alarm_settings' AND column_name='ntfy_topic'
+            `);
             if (columns.rows.length === 0) {
                 await pool.query("ALTER TABLE alarm_settings ADD COLUMN ntfy_topic TEXT");
             }
@@ -151,18 +155,8 @@ async function initDB() {
             )
         `);
         
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY, 
-                username TEXT UNIQUE NOT NULL, 
-                password TEXT NOT NULL, 
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        `);
+        console.log('✅ Tablas principales inicializadas correctamente');
         
-        await pool.query(`INSERT INTO admin_users (username, password) VALUES ('paolof', 'elpoderosodeizrael777xD!') ON CONFLICT (username) DO NOTHING`);
-        
-        console.log('✅ Base de datos inicializada correctamente');
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
     }
@@ -241,44 +235,72 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// RUTA DE LOGIN CON JWT
+// RUTA DE LOGIN CON JWT Y AUTO-CREACIÓN DE USUARIO
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         console.log('🔐 Intento de login para:', username);
         
-        // Validar credenciales en la base de datos
-        const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND password = $2', [username, password]);
-        
-        if (result.rows.length > 0) {
-            const user = result.rows[0];
+        // PRIMERO: Asegurar que la tabla admin_users existe correctamente
+        try {
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id SERIAL PRIMARY KEY, 
+                    username TEXT UNIQUE NOT NULL, 
+                    password TEXT NOT NULL, 
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            `);
             
-            // GENERAR TOKEN JWT
-            const token = jwt.sign(
-                { 
-                    id: user.id, 
-                    username: user.username,
-                    exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 días
-                },
-                JWT_SECRET
-            );
-            
-            console.log('✅ Login exitoso, token generado para:', username);
-            
-            // DEVOLVER TOKEN Y DATOS DE USUARIO
-            res.json({ 
-                success: true, 
-                message: 'Login exitoso',
-                token: token,
-                user: {
-                    id: user.id,
-                    username: user.username
-                }
-            });
-        } else {
-            console.log('❌ Credenciales inválidas para:', username);
-            res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+            // Verificar si el usuario existe, si no, crearlo
+            const userCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['paolof']);
+            if (parseInt(userCheck.rows[0].count) === 0) {
+                await pool.query(
+                    'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
+                    ['paolof', 'elpoderosodeizrael777xD!']
+                );
+                console.log('👤 Usuario paolof creado automáticamente');
+            }
+        } catch (tableError) {
+            console.error('❌ Error creando tabla/usuario:', tableError);
         }
+        
+        // SEGUNDO: Realizar el login
+        const result = await pool.query('SELECT id, username, password FROM admin_users WHERE username = $1', [username]);
+        
+        if (result.rows.length === 0) {
+            console.log('❌ Usuario no encontrado:', username);
+            return res.status(401).json({ success: false, message: 'Usuario no encontrado' });
+        }
+        
+        const user = result.rows[0];
+        if (user.password !== password) {
+            console.log('❌ Contraseña incorrecta para:', username);
+            return res.status(401).json({ success: false, message: 'Contraseña incorrecta' });
+        }
+        
+        // TERCERO: Generar token JWT
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username,
+                exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 días
+            },
+            JWT_SECRET
+        );
+        
+        console.log('✅ Login exitoso para:', username);
+        
+        res.json({ 
+            success: true, 
+            message: 'Login exitoso',
+            token: token,
+            user: {
+                id: user.id,
+                username: user.username
+            }
+        });
+        
     } catch (error) {
         console.error('❌ Error en login:', error);
         res.status(500).json({ success: false, message: 'Error interno del servidor' });
@@ -506,18 +528,67 @@ app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'log
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// Iniciar servidor
+// FUNCIÓN DE INICIO CON AUTO-CREACIÓN DE TABLAS Y USUARIO ADMIN
 async function startServer() {
     try {
+        console.log('🔧 Iniciando JIREH Streaming Manager...');
+        
+        // PASO 1: Crear tabla admin_users automáticamente
+        console.log('📝 Creando tabla admin_users...');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id SERIAL PRIMARY KEY, 
+                username TEXT UNIQUE NOT NULL, 
+                password TEXT NOT NULL, 
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        console.log('✅ Tabla admin_users creada/verificada');
+        
+        // PASO 2: Crear usuario admin automáticamente
+        try {
+            const userExists = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['paolof']);
+            if (parseInt(userExists.rows[0].count) === 0) {
+                await pool.query(
+                    'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
+                    ['paolof', 'elpoderosodeizrael777xD!']
+                );
+                console.log('👤 Usuario administrador paolof creado automáticamente');
+            } else {
+                console.log('👤 Usuario administrador paolof ya existe');
+            }
+        } catch (userError) {
+            console.log('⚠️ Error con usuario admin:', userError.message);
+        }
+        
+        // PASO 3: Ejecutar la inicialización normal de otras tablas
         await initDB();
+        
+        // PASO 4: Iniciar el servidor
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
             console.log(`🔐 Sistema JWT activado con clave: ${JWT_SECRET.substring(0, 10)}...`);
+            console.log(`✅ Base de datos PostgreSQL lista en Railway`);
+            console.log(`👤 Usuario admin: paolof`);
+            
+            // Iniciar sistema de alarmas
             setInterval(checkAndSendAlarms, 3600000); 
             console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
         });
+        
     } catch (error) {
-        console.error('❌ Error iniciando servidor:', error);
+        console.error('❌ Error crítico iniciando servidor:', error);
+        
+        // MODO RESPALDO: Intentar iniciar sin verificaciones si falla
+        try {
+            app.listen(PORT, () => {
+                console.log(`🚀 Servidor iniciado en modo básico en puerto ${PORT}`);
+                console.log('⚠️ Algunas funciones pueden no estar disponibles');
+            });
+        } catch (fallbackError) {
+            console.error('❌ Error crítico total:', fallbackError);
+            process.exit(1);
+        }
     }
 }
 
@@ -525,4 +596,5 @@ async function startServer() {
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
+// INICIAR EL SERVIDOR
 startServer();
