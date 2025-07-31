@@ -150,8 +150,18 @@ async function initDB() {
             )
         `);
         
-        console.log('✅ Tablas principales inicializadas correctamente');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id SERIAL PRIMARY KEY, 
+                username TEXT UNIQUE NOT NULL, 
+                password TEXT NOT NULL, 
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
         
+        await pool.query(`INSERT INTO admin_users (username, password) VALUES ('paolof', 'elpoderosodeizrael777xD!') ON CONFLICT (username) DO NOTHING`);
+        
+        console.log('✅ Base de datos inicializada correctamente');
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
     }
@@ -230,7 +240,7 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// RUTA DE LOGIN CON JWT Y AUTO-CREACIÓN
+// RUTA DE LOGIN CON JWT
 app.post('/api/login', async (req, res) => {
     console.log('🔐 === PROCESO DE LOGIN INICIADO ===');
     
@@ -246,28 +256,6 @@ app.post('/api/login', async (req, res) => {
             });
         }
         
-        // Asegurar que la tabla existe
-        console.log('📋 Verificando tabla admin_users...');
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY, 
-                username TEXT UNIQUE NOT NULL, 
-                password TEXT NOT NULL, 
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        `);
-        
-        // Asegurar que el usuario existe
-        const userCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['paolof']);
-        if (parseInt(userCheck.rows[0].count) === 0) {
-            console.log('👤 Creando usuario paolof...');
-            await pool.query(
-                'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
-                ['paolof', 'elpoderosodeizrael777xD!']
-            );
-        }
-        
-        // Realizar login
         console.log('🔍 Buscando usuario en BD...');
         const result = await pool.query('SELECT id, username, password FROM admin_users WHERE username = $1', [username]);
         
@@ -526,72 +514,11 @@ async function startServer() {
     try {
         console.log('🔧 Paso 1: Verificando conexión a PostgreSQL...');
         
-        // Test de conexión básico
         const connectionTest = await pool.query('SELECT NOW() as current_time');
         console.log('✅ Conexión a PostgreSQL exitosa:', connectionTest.rows[0].current_time);
         
-        console.log('📝 Paso 2: Configurando tabla admin_users...');
+        console.log('📝 Paso 2: Configurando tablas...');
         
-        try {
-            // Crear tabla admin_users si no existe
-            await pool.query(`
-                CREATE TABLE IF NOT EXISTS admin_users (
-                    id SERIAL PRIMARY KEY, 
-                    username TEXT UNIQUE, 
-                    password TEXT, 
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            `);
-            console.log('✅ Tabla admin_users verificada/creada');
-            
-            // Verificar y crear usuario admin
-            const userCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['paolof']);
-            const userCount = parseInt(userCheck.rows[0].count);
-            
-            if (userCount === 0) {
-                await pool.query(
-                    'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
-                    ['paolof', 'elpoderosodeizrael777xD!']
-                );
-                console.log('👤 Usuario paolof creado exitosamente');
-            } else {
-                console.log('👤 Usuario paolof ya existe');
-                
-                // Asegurar que tiene contraseña
-                await pool.query(
-                    'UPDATE admin_users SET password = $1 WHERE username = $2 AND (password IS NULL OR password = \'\')',
-                    ['elpoderosodeizrael777xD!', 'paolof']
-                );
-            }
-            
-        } catch (adminError) {
-            console.log('⚠️ Error con admin_users:', adminError.message);
-            console.log('🔄 Intentando solución alternativa...');
-            
-            // Solución alternativa: Drop y recrear
-            try {
-                await pool.query('DROP TABLE IF EXISTS admin_users');
-                await pool.query(`
-                    CREATE TABLE admin_users (
-                        id SERIAL PRIMARY KEY, 
-                        username TEXT UNIQUE NOT NULL, 
-                        password TEXT NOT NULL, 
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                `);
-                await pool.query(
-                    'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
-                    ['paolof', 'elpoderosodeizrael777xD!']
-                );
-                console.log('✅ Tabla admin_users recreada exitosamente');
-            } catch (fallbackError) {
-                console.log('❌ Error en solución alternativa:', fallbackError.message);
-            }
-        }
-        
-        console.log('📊 Paso 3: Inicializando otras tablas...');
-        
-        // Inicializar otras tablas de forma segura
         try {
             await initDB();
             console.log('✅ Todas las tablas inicializadas');
@@ -600,9 +527,8 @@ async function startServer() {
             console.log('🔄 Continuando sin inicialización completa...');
         }
         
-        console.log('🌐 Paso 4: Iniciando servidor web...');
+        console.log('🌐 Paso 3: Iniciando servidor web...');
         
-        // Iniciar servidor
         const server = app.listen(PORT, () => {
             console.log('');
             console.log('🎉 ================================');
@@ -615,7 +541,6 @@ async function startServer() {
             console.log('🎉 ================================');
             console.log('');
             
-            // Iniciar alarmas de forma segura
             try {
                 setInterval(checkAndSendAlarms, 3600000);
                 console.log('⏰ Sistema de alarmas iniciado');
@@ -624,7 +549,6 @@ async function startServer() {
             }
         });
         
-        // Manejar errores del servidor
         server.on('error', (serverError) => {
             console.error('❌ Error del servidor:', serverError);
         });
@@ -633,7 +557,6 @@ async function startServer() {
         console.error('❌ ERROR CRÍTICO:', criticalError);
         console.log('🔄 Intentando inicio básico...');
         
-        // Modo de emergencia: servidor básico sin BD
         try {
             app.listen(PORT, () => {
                 console.log('🚨 SERVIDOR EN MODO EMERGENCIA');
