@@ -332,7 +332,7 @@
             loginButton.disabled = false;
         }
         
-        // Login con API de Railway
+        // Login con API de Railway Y JWT
         async function loginWithAPI(username, password) {
             try {
                 const response = await fetch(`${API_BASE}/login`, {
@@ -346,6 +346,12 @@
                 const result = await response.json();
                 
                 if (response.ok && result.success) {
+                    // GUARDAR EL TOKEN JWT
+                    if (result.token) {
+                        localStorage.setItem('jwtToken', result.token);
+                        console.log('🔑 Token JWT guardado exitosamente');
+                    }
+                    
                     return { success: true, message: result.message };
                 } else {
                     return { success: false, message: result.message || 'Error desconocido' };
