@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - JIREH Streaming Manager</title>
     <style>
+        /* CSS Variables para mejor mantenimiento y consistencia */
         :root {
             --primary-red: #e50914;
             --primary-dark: #dc143c;
@@ -25,6 +26,7 @@
             --blur-bg: blur(20px);
         }
 
+        /* Optimización de fonts - preload crítico */
         @font-face {
             font-family: 'Inter';
             font-style: normal;
@@ -33,6 +35,7 @@
             src: url('https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2') format('woff2');
         }
 
+        /* Reset optimizado - solo lo necesario */
         *,::before,::after{box-sizing:border-box;margin:0;padding:0}
         
         body {
@@ -47,6 +50,7 @@
             overflow: hidden;
         }
 
+        /* Pseudo-elemento optimizado para efectos de fondo */
         body::before {
             content: '';
             position: absolute;
@@ -58,6 +62,7 @@
             will-change: transform;
         }
 
+        /* Animaciones optimizadas con transform y opacity */
         @keyframes pulse {
             0%,100%{opacity:.6;transform:scale3d(1,1,1)}
             50%{opacity:.8;transform:scale3d(1.02,1.02,1)}
@@ -77,6 +82,7 @@
 
         @keyframes spin{to{transform:rotate(360deg)}}
 
+        /* Partículas optimizadas - CSS puro */
         .particle {
             position: absolute;
             width: 3px;
@@ -91,6 +97,7 @@
         .particle:nth-child(2){top:70%;left:85%;animation:float 15s infinite linear 3s}
         .particle:nth-child(3){top:90%;left:20%;animation:float 18s infinite linear 6s}
 
+        /* Container principal optimizado */
         .login-container {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: var(--blur-bg);
@@ -112,6 +119,7 @@
             box-shadow: var(--shadow-xl), 0 15px 35px rgba(229, 9, 20, 0.15);
         }
 
+        /* Logo optimizado */
         .logo {
             font-size: 4em;
             margin-bottom: 20px;
@@ -124,6 +132,7 @@
             display: inline-block;
         }
 
+        /* Tipografía optimizada */
         .title {
             font-size: 2.2em;
             font-weight: 800;
@@ -138,6 +147,7 @@
             font-weight: 500;
         }
 
+        /* Form optimizado */
         .form {
             display: flex;
             flex-direction: column;
@@ -169,6 +179,7 @@
             transform: translateY(-1px);
         }
 
+        /* Password container optimizado */
         .password-container {
             position: relative;
             width: 100%;
@@ -196,6 +207,7 @@
             transform: translateY(-50%) scale(1.1);
         }
 
+        /* Checkbox optimizado */
         .remember {
             display: flex;
             align-items: center;
@@ -214,6 +226,7 @@
             margin: 0;
         }
 
+        /* Button optimizado con efectos */
         .btn {
             background: linear-gradient(135deg, var(--primary-red), var(--primary-dark));
             color: var(--white);
@@ -258,6 +271,7 @@
             transform: none;
         }
 
+        /* Estados de mensaje optimizados */
         .message {
             margin-top: 15px;
             padding: 12px 16px;
@@ -283,6 +297,7 @@
             display: none;
         }
 
+        /* Loading optimizado */
         .loading {
             display: none;
             margin-top: 15px;
@@ -307,6 +322,7 @@
             animation: spin 1s linear infinite;
         }
 
+        /* Indicador de conexión optimizado */
         .connection {
             position: absolute;
             top: 16px;
@@ -325,6 +341,7 @@
             box-shadow: 0 0 8px rgba(220, 53, 69, 0.4);
         }
 
+        /* Info footer */
         .info {
             margin-top: 30px;
             font-size: 0.85em;
@@ -339,6 +356,7 @@
             border: 1px solid rgba(222, 226, 230, 0.4);
         }
 
+        /* Media queries optimizadas */
         @media (max-width: 480px) {
             .login-container {
                 margin: 20px;
@@ -350,16 +368,45 @@
             .subtitle { font-size: 0.9em; }
             .input { 
                 padding: 16px 18px;
-                font-size: 16px;
+                font-size: 16px; /* Previene zoom en iOS */
             }
             .btn { 
                 padding: 16px 18px;
                 font-size: 1em;
             }
         }
+
+        /* Accesibilidad optimizada */
+        @media (prefers-reduced-motion: reduce) {
+            *,*::before,*::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        @media (prefers-contrast: high) {
+            .login-container {
+                border: 2px solid #000;
+                background: rgba(255, 255, 255, 0.98);
+            }
+            .input, .btn {
+                border: 2px solid #333;
+            }
+        }
+
+        /* Focus styles optimizados */
+        .input:focus,
+        .btn:focus,
+        .password-toggle:focus,
+        .remember input:focus {
+            outline: 2px solid var(--primary-red);
+            outline-offset: 2px;
+        }
     </style>
 </head>
 <body>
+    <!-- Partículas optimizadas -->
     <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
@@ -396,20 +443,15 @@
     </div>
 
     <script>
-        // ===============================================
-        // CONFIGURACIÓN COMPLETA JWT
-        // ===============================================
+        // Configuración optimizada con constantes
         const CONFIG = {
             API_BASE: '/api',
-            STORAGE_KEYS: {
-                TOKEN: 'jireh_auth_token',
-                USER: 'jireh_user_data',
-                CREDENTIALS: 'jireh_credentials'
-            },
+            STORAGE_KEY: 'streamingAdminCredentials',
+            LOGIN_KEY: 'streamingAdminLoggedIn',
             HIDE_DELAY: 5000
         };
 
-        // Cache DOM
+        // Cache de elementos DOM
         const $ = {
             connection: document.getElementById('connection'),
             form: document.getElementById('form'),
@@ -422,64 +464,7 @@
             message: document.getElementById('message')
         };
 
-        // ===============================================
-        // GESTIÓN DE JWT COMPLETA
-        // ===============================================
-        const authManager = {
-            setToken(token, user) {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.TOKEN, token);
-                localStorage.setItem(CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
-                console.log('✅ Token JWT guardado correctamente');
-            },
-
-            getToken() {
-                return localStorage.getItem(CONFIG.STORAGE_KEYS.TOKEN);
-            },
-
-            getUser() {
-                try {
-                    const userData = localStorage.getItem(CONFIG.STORAGE_KEYS.USER);
-                    return userData ? JSON.parse(userData) : null;
-                } catch {
-                    return null;
-                }
-            },
-
-            removeAuth() {
-                localStorage.removeItem(CONFIG.STORAGE_KEYS.TOKEN);
-                localStorage.removeItem(CONFIG.STORAGE_KEYS.USER);
-                localStorage.removeItem(CONFIG.STORAGE_KEYS.CREDENTIALS);
-                // Limpiar también el sistema viejo
-                localStorage.removeItem('streamingAdminLoggedIn');
-                localStorage.removeItem('streamingAdminCredentials');
-                console.log('🧹 Autenticación limpiada completamente');
-            },
-
-            isTokenExpired(token) {
-                if (!token) return true;
-                
-                try {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-                    const currentTime = Date.now() / 1000;
-                    const isExpired = payload.exp < currentTime;
-                    console.log('🕒 Token válido hasta:', new Date(payload.exp * 1000).toLocaleString());
-                    return isExpired;
-                } catch (error) {
-                    console.log('❌ Error verificando token:', error);
-                    return true;
-                }
-            },
-
-            isLoggedIn() {
-                const token = this.getToken();
-                const user = this.getUser();
-                const isValid = token && user && !this.isTokenExpired(token);
-                console.log('🔍 Estado de autenticación:', { hasToken: !!token, hasUser: !!user, isValid });
-                return isValid;
-            }
-        };
-
-        // Utilidades
+        // Utilidades optimizadas
         const utils = {
             show: el => el.classList.remove('hidden'),
             hide: el => el.classList.add('hidden'),
@@ -505,30 +490,26 @@
             }
         };
 
-        // API con JWT
+        // API optimizada con manejo de errores
         const api = {
             async request(endpoint, options = {}) {
-                try {
-                    const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
-                        headers: { 'Content-Type': 'application/json' },
-                        ...options
-                    });
-                    
-                    const result = await response.json();
-                    console.log(`📡 API ${endpoint}:`, { status: response.status, result });
-                    
-                    return { success: response.ok, data: result };
-                } catch (error) {
-                    console.error('❌ Error en API:', error);
-                    return { success: false, data: { message: 'Error de conexión con Railway' } };
-                }
+                const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
+                    headers: { 'Content-Type': 'application/json' },
+                    ...options
+                });
+                const result = await response.json();
+                return { success: response.ok, data: result };
             },
             
             async login(username, password) {
-                return this.request('/login', {
-                    method: 'POST',
-                    body: JSON.stringify({ username, password })
-                });
+                try {
+                    return await this.request('/login', {
+                        method: 'POST',
+                        body: JSON.stringify({ username, password })
+                    });
+                } catch (error) {
+                    return { success: false, data: { message: 'Error de conexión con Railway' } };
+                }
             },
             
             async health() {
@@ -541,7 +522,7 @@
             }
         };
 
-        // Storage
+        // Storage optimizado
         const storage = {
             get(key) {
                 try {
@@ -558,91 +539,58 @@
             }
         };
 
-        // ===============================================
-        // FUNCIONES PRINCIPALES
-        // ===============================================
+        // Funciones principales optimizadas
         const auth = {
             checkLogin() {
-                if (authManager.isLoggedIn()) {
-                    console.log('✅ Usuario ya autenticado, redirigiendo al dashboard...');
+                if (storage.get(CONFIG.LOGIN_KEY)) {
                     window.location.href = '/dashboard';
-                    return true;
                 }
-                
-                // Limpiar tokens expirados
-                const token = authManager.getToken();
-                if (token && authManager.isTokenExpired(token)) {
-                    console.log('🧹 Token expirado encontrado, limpiando...');
-                    authManager.removeAuth();
-                }
-                
-                return false;
             },
             
             loadCredentials() {
-                const saved = storage.get(CONFIG.STORAGE_KEYS.CREDENTIALS);
+                const saved = storage.get(CONFIG.STORAGE_KEY);
                 if (saved) {
                     $.username.value = saved.username || '';
                     $.password.value = saved.password || '';
                     $.remember.checked = true;
-                    console.log('📝 Credenciales cargadas desde localStorage');
                 }
             },
             
             saveCredentials(username, password) {
                 if ($.remember.checked) {
-                    storage.set(CONFIG.STORAGE_KEYS.CREDENTIALS, { username, password });
-                    console.log('💾 Credenciales guardadas');
+                    storage.set(CONFIG.STORAGE_KEY, { username, password });
                 } else {
-                    storage.remove(CONFIG.STORAGE_KEYS.CREDENTIALS);
-                    console.log('🗑️ Credenciales no guardadas');
+                    storage.remove(CONFIG.STORAGE_KEY);
                 }
             },
             
             async login(username, password) {
-                console.log('🚀 Iniciando proceso de login para:', username);
                 utils.showLoading();
                 
-                // Verificar conexión
                 const connected = await api.health();
                 utils.updateConnection(connected);
                 
                 if (!connected) {
                     utils.hideLoading();
-                    utils.showMessage('❌ No se puede conectar con Railway. Verifica tu conexión.');
+                    utils.showMessage('No se puede conectar con Railway. Verifica tu conexión.');
                     return;
                 }
                 
-                console.log('✅ Conexión a Railway confirmada');
-                
-                // Realizar login
                 const result = await api.login(username, password);
-                console.log('📬 Respuesta del servidor:', result);
                 
-                if (result.success && result.data.token) {
-                    console.log('🎉 Login exitoso! Token JWT recibido');
-                    
-                    // Guardar autenticación
-                    authManager.setToken(result.data.token, result.data.user);
+                if (result.success) {
                     this.saveCredentials(username, password);
-                    
-                    utils.showMessage('✅ Autenticación exitosa, redirigiendo...', 'success');
-                    
-                    // Redirigir al dashboard
-                    setTimeout(() => {
-                        console.log('🔄 Redirigiendo al dashboard...');
-                        window.location.href = '/dashboard';
-                    }, 1500);
-                    
+                    utils.showMessage('Login exitoso, redirigiendo...', 'success');
+                    storage.set(CONFIG.LOGIN_KEY, true);
+                    setTimeout(() => window.location.href = '/dashboard', 1000);
                 } else {
                     utils.hideLoading();
-                    console.log('❌ Login fallido:', result.data.message);
-                    utils.showMessage(result.data.message || 'Credenciales incorrectas');
+                    utils.showMessage(result.data.message || 'Error desconocido');
                 }
             }
         };
 
-        // Event handlers
+        // Event handlers optimizados
         const handlers = {
             togglePassword() {
                 const isPassword = $.password.type === 'password';
@@ -657,7 +605,7 @@
                 const password = $.password.value.trim();
                 
                 if (!username || !password) {
-                    utils.showMessage('⚠️ Por favor completa todos los campos');
+                    utils.showMessage('Por favor completa todos los campos');
                     return;
                 }
                 
@@ -665,26 +613,19 @@
             },
             
             async testConnection() {
-                console.log('🔧 Testeando conexión manualmente...');
                 const connected = await api.health();
                 utils.updateConnection(connected);
                 utils.showMessage(
-                    connected ? '✅ Conectado a Railway PostgreSQL' : '❌ Sin conexión a Railway',
+                    connected ? '✅ Conectado a Railway' : '❌ Sin conexión a Railway',
                     connected ? 'success' : 'error'
                 );
             }
         };
 
-        // ===============================================
-        // INICIALIZACIÓN
-        // ===============================================
+        // Inicialización optimizada
         const init = () => {
-            console.log('🚀 Iniciando sistema de login con JWT...');
-            
-            // Verificar si ya está autenticado
-            if (auth.checkLogin()) {
-                return; // Ya redirigió, no hacer nada más
-            }
+            // Verificar autenticación
+            auth.checkLogin();
             
             // Cargar credenciales guardadas
             auth.loadCredentials();
@@ -697,7 +638,7 @@
             // Test de conexión automático
             setTimeout(handlers.testConnection, 1000);
             
-            console.log('✅ Sistema de login JWT inicializado correctamente');
+            console.log('🚀 Login optimizado cargado');
         };
 
         // Inicializar cuando el DOM esté listo
