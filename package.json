@@ -17,7 +17,8 @@
     "bcrypt": "^5.1.0",
     "express-validator": "^6.14.2",
     "express-rate-limit": "^6.7.0",
-    "helmet": "^6.1.5"
+    "helmet": "^6.1.5",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
@@ -34,7 +35,8 @@
     "express",
     "railway",
     "vouchers",
-    "fechas-automaticas"
+    "fechas-automaticas",
+    "jwt"
   ],
   "author": "Paolo F",
   "license": "MIT"
