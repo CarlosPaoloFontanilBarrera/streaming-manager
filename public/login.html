@@ -397,7 +397,7 @@
 
     <script>
         // ===============================================
-        // CONFIGURACIÓN PARA JWT (ARREGLADO)
+        // CONFIGURACIÓN COMPLETA JWT
         // ===============================================
         const CONFIG = {
             API_BASE: '/api',
@@ -423,12 +423,13 @@
         };
 
         // ===============================================
-        // GESTIÓN DE JWT (NUEVO)
+        // GESTIÓN DE JWT COMPLETA
         // ===============================================
         const authManager = {
             setToken(token, user) {
                 localStorage.setItem(CONFIG.STORAGE_KEYS.TOKEN, token);
                 localStorage.setItem(CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
+                console.log('✅ Token JWT guardado correctamente');
             },
 
             getToken() {
@@ -448,9 +449,10 @@
                 localStorage.removeItem(CONFIG.STORAGE_KEYS.TOKEN);
                 localStorage.removeItem(CONFIG.STORAGE_KEYS.USER);
                 localStorage.removeItem(CONFIG.STORAGE_KEYS.CREDENTIALS);
-                // Limpiar también el sistema viejo por si acaso
+                // Limpiar también el sistema viejo
                 localStorage.removeItem('streamingAdminLoggedIn');
                 localStorage.removeItem('streamingAdminCredentials');
+                console.log('🧹 Autenticación limpiada completamente');
             },
 
             isTokenExpired(token) {
@@ -459,8 +461,11 @@
                 try {
                     const payload = JSON.parse(atob(token.split('.')[1]));
                     const currentTime = Date.now() / 1000;
-                    return payload.exp < currentTime;
-                } catch {
+                    const isExpired = payload.exp < currentTime;
+                    console.log('🕒 Token válido hasta:', new Date(payload.exp * 1000).toLocaleString());
+                    return isExpired;
+                } catch (error) {
+                    console.log('❌ Error verificando token:', error);
                     return true;
                 }
             },
@@ -468,7 +473,9 @@
             isLoggedIn() {
                 const token = this.getToken();
                 const user = this.getUser();
-                return token && user && !this.isTokenExpired(token);
+                const isValid = token && user && !this.isTokenExpired(token);
+                console.log('🔍 Estado de autenticación:', { hasToken: !!token, hasUser: !!user, isValid });
+                return isValid;
             }
         };
 
@@ -506,9 +513,13 @@
                         headers: { 'Content-Type': 'application/json' },
                         ...options
                     });
+                    
                     const result = await response.json();
+                    console.log(`📡 API ${endpoint}:`, { status: response.status, result });
+                    
                     return { success: response.ok, data: result };
                 } catch (error) {
+                    console.error('❌ Error en API:', error);
                     return { success: false, data: { message: 'Error de conexión con Railway' } };
                 }
             },
@@ -548,16 +559,23 @@
         };
 
         // ===============================================
-        // FUNCIONES PRINCIPALES (ARREGLADAS)
+        // FUNCIONES PRINCIPALES
         // ===============================================
         const auth = {
             checkLogin() {
-                // ARREGLADO: Solo verificar JWT, no el sistema viejo
                 if (authManager.isLoggedIn()) {
-                    console.log('✅ Usuario ya logueado con JWT, redirigiendo...');
+                    console.log('✅ Usuario ya autenticado, redirigiendo al dashboard...');
                     window.location.href = '/dashboard';
                     return true;
                 }
+                
+                // Limpiar tokens expirados
+                const token = authManager.getToken();
+                if (token && authManager.isTokenExpired(token)) {
+                    console.log('🧹 Token expirado encontrado, limpiando...');
+                    authManager.removeAuth();
+                }
+                
                 return false;
             },
             
@@ -567,45 +585,58 @@
                     $.username.value = saved.username || '';
                     $.password.value = saved.password || '';
                     $.remember.checked = true;
+                    console.log('📝 Credenciales cargadas desde localStorage');
                 }
             },
             
             saveCredentials(username, password) {
                 if ($.remember.checked) {
                     storage.set(CONFIG.STORAGE_KEYS.CREDENTIALS, { username, password });
+                    console.log('💾 Credenciales guardadas');
                 } else {
                     storage.remove(CONFIG.STORAGE_KEYS.CREDENTIALS);
+                    console.log('🗑️ Credenciales no guardadas');
                 }
             },
             
             async login(username, password) {
+                console.log('🚀 Iniciando proceso de login para:', username);
                 utils.showLoading();
                 
+                // Verificar conexión
                 const connected = await api.health();
                 utils.updateConnection(connected);
                 
                 if (!connected) {
                     utils.hideLoading();
-                    utils.showMessage('No se puede conectar con Railway. Verifica tu conexión.');
+                    utils.showMessage('❌ No se puede conectar con Railway. Verifica tu conexión.');
                     return;
                 }
                 
+                console.log('✅ Conexión a Railway confirmada');
+                
+                // Realizar login
                 const result = await api.login(username, password);
+                console.log('📬 Respuesta del servidor:', result);
                 
                 if (result.success && result.data.token) {
-                    // ARREGLADO: Guardar JWT correctamente
+                    console.log('🎉 Login exitoso! Token JWT recibido');
+                    
+                    // Guardar autenticación
                     authManager.setToken(result.data.token, result.data.user);
                     this.saveCredentials(username, password);
-                    utils.showMessage('✅ Login exitoso, redirigiendo...', 'success');
                     
-                    console.log('✅ JWT guardado correctamente:', result.data.token);
+                    utils.showMessage('✅ Autenticación exitosa, redirigiendo...', 'success');
                     
-                    // Redirigir después de un breve delay
+                    // Redirigir al dashboard
                     setTimeout(() => {
+                        console.log('🔄 Redirigiendo al dashboard...');
                         window.location.href = '/dashboard';
-                    }, 1000);
+                    }, 1500);
+                    
                 } else {
                     utils.hideLoading();
+                    console.log('❌ Login fallido:', result.data.message);
                     utils.showMessage(result.data.message || 'Credenciales incorrectas');
                 }
             }
@@ -626,7 +657,7 @@
                 const password = $.password.value.trim();
                 
                 if (!username || !password) {
-                    utils.showMessage('Por favor completa todos los campos');
+                    utils.showMessage('⚠️ Por favor completa todos los campos');
                     return;
                 }
                 
@@ -634,29 +665,23 @@
             },
             
             async testConnection() {
+                console.log('🔧 Testeando conexión manualmente...');
                 const connected = await api.health();
                 utils.updateConnection(connected);
                 utils.showMessage(
-                    connected ? '✅ Conectado a Railway' : '❌ Sin conexión a Railway',
+                    connected ? '✅ Conectado a Railway PostgreSQL' : '❌ Sin conexión a Railway',
                     connected ? 'success' : 'error'
                 );
             }
         };
 
         // ===============================================
-        // INICIALIZACIÓN (ARREGLADA)
+        // INICIALIZACIÓN
         // ===============================================
         const init = () => {
-            console.log('🚀 Iniciando login con JWT...');
+            console.log('🚀 Iniciando sistema de login con JWT...');
             
-            // IMPORTANTE: Limpiar cualquier token inválido al cargar
-            const token = authManager.getToken();
-            if (token && authManager.isTokenExpired(token)) {
-                console.log('🧹 Token expirado encontrado, limpiando...');
-                authManager.removeAuth();
-            }
-            
-            // Verificar si ya está logueado
+            // Verificar si ya está autenticado
             if (auth.checkLogin()) {
                 return; // Ya redirigió, no hacer nada más
             }
@@ -672,7 +697,7 @@
             // Test de conexión automático
             setTimeout(handlers.testConnection, 1000);
             
-            console.log('✅ Login JWT inicializado correctamente');
+            console.log('✅ Sistema de login JWT inicializado correctamente');
         };
 
         // Inicializar cuando el DOM esté listo
