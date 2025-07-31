@@ -395,22 +395,165 @@ app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'log
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// Iniciar servidor
+// REEMPLAZAR LA FUNCIÓN startServer() AL FINAL DE TU server.js CON ESTA VERSIÓN CORREGIDA:
+
 async function startServer() {
     try {
+        console.log('🔧 Iniciando JIREH Streaming Manager...');
+        
+        // PASO 1: Arreglar tabla admin_users existente
+        console.log('📝 Verificando y arreglando tabla admin_users...');
+        
+        try {
+            // Primero verificar si la tabla existe
+            const tableExists = await pool.query(`
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'admin_users'
+                );
+            `);
+            
+            if (tableExists.rows[0].exists) {
+                console.log('📋 Tabla admin_users existe, verificando columnas...');
+                
+                // Verificar si tiene la columna password
+                const passwordColumn = await pool.query(`
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='admin_users' AND column_name='password'
+                `);
+                
+                if (passwordColumn.rows.length === 0) {
+                    console.log('➕ Agregando columna password faltante...');
+                    await pool.query("ALTER TABLE admin_users ADD COLUMN password TEXT");
+                    console.log('✅ Columna password agregada');
+                }
+                
+                // Verificar si tiene la columna username
+                const usernameColumn = await pool.query(`
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='admin_users' AND column_name='username'
+                `);
+                
+                if (usernameColumn.rows.length === 0) {
+                    console.log('➕ Agregando columna username faltante...');
+                    await pool.query("ALTER TABLE admin_users ADD COLUMN username TEXT UNIQUE");
+                    console.log('✅ Columna username agregada');
+                }
+                
+            } else {
+                // Crear tabla nueva si no existe
+                console.log('📝 Creando tabla admin_users nueva...');
+                await pool.query(`
+                    CREATE TABLE admin_users (
+                        id SERIAL PRIMARY KEY, 
+                        username TEXT UNIQUE NOT NULL, 
+                        password TEXT NOT NULL, 
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                `);
+                console.log('✅ Tabla admin_users creada');
+            }
+            
+        } catch (tableError) {
+            console.log('⚠️ Error con tabla admin_users:', tableError.message);
+            
+            // Como último recurso, eliminar y recrear la tabla
+            console.log('🔄 Intentando recrear tabla admin_users...');
+            try {
+                await pool.query('DROP TABLE IF EXISTS admin_users CASCADE');
+                await pool.query(`
+                    CREATE TABLE admin_users (
+                        id SERIAL PRIMARY KEY, 
+                        username TEXT UNIQUE NOT NULL, 
+                        password TEXT NOT NULL, 
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                `);
+                console.log('✅ Tabla admin_users recreada exitosamente');
+            } catch (recreateError) {
+                console.log('❌ No se pudo recrear tabla admin_users:', recreateError.message);
+            }
+        }
+        
+        // PASO 2: Crear usuario admin de forma segura
+        try {
+            console.log('👤 Configurando usuario administrador...');
+            
+            // Verificar si el usuario existe
+            const userCheck = await pool.query(`
+                SELECT COUNT(*) as count, id, username, password 
+                FROM admin_users 
+                WHERE username = $1 
+                GROUP BY id, username, password
+            `, ['paolof']);
+            
+            if (userCheck.rows.length === 0) {
+                // Usuario no existe, crearlo
+                await pool.query(
+                    'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
+                    ['paolof', 'elpoderosodeizrael777xD!']
+                );
+                console.log('👤 Usuario administrador paolof creado automáticamente');
+            } else {
+                const user = userCheck.rows[0];
+                if (!user.password) {
+                    // Usuario existe pero sin contraseña, actualizarla
+                    await pool.query(
+                        'UPDATE admin_users SET password = $1 WHERE username = $2',
+                        ['elpoderosodeizrael777xD!', 'paolof']
+                    );
+                    console.log('🔄 Contraseña de paolof actualizada');
+                } else {
+                    console.log('👤 Usuario administrador paolof ya existe y está configurado');
+                }
+            }
+            
+        } catch (userError) {
+            console.log('⚠️ Error configurando usuario admin:', userError.message);
+        }
+        
+        // PASO 3: Verificar usuario final
+        try {
+            const finalCheck = await pool.query('SELECT id, username FROM admin_users WHERE username = $1', ['paolof']);
+            if (finalCheck.rows.length > 0) {
+                console.log('✅ Usuario administrador verificado:', finalCheck.rows[0].username);
+            } else {
+                console.log('⚠️ Usuario administrador no se pudo verificar');
+            }
+        } catch (verifyError) {
+            console.log('⚠️ Error verificando usuario:', verifyError.message);
+        }
+        
+        // PASO 4: Ejecutar la inicialización normal de otras tablas
         await initDB();
+        
+        // PASO 5: Iniciar el servidor
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
+            console.log(`🔐 Sistema JWT activado con clave: ${JWT_SECRET.substring(0, 10)}...`);
+            console.log(`✅ Base de datos PostgreSQL lista en Railway`);
+            console.log(`👤 Usuario admin: paolof / elpoderosodeizrael777xD!`);
+            
+            // Iniciar sistema de alarmas
             setInterval(checkAndSendAlarms, 3600000); 
             console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
         });
+        
     } catch (error) {
-        console.error('❌ Error iniciando servidor:', error);
+        console.error('❌ Error crítico iniciando servidor:', error);
+        
+        // MODO RESPALDO: Intentar iniciar sin verificaciones si falla
+        try {
+            app.listen(PORT, () => {
+                console.log(`🚀 Servidor iniciado en modo básico en puerto ${PORT}`);
+                console.log('⚠️ Algunas funciones pueden no estar disponibles');
+                console.log('🔑 Intenta login con: paolof / elpoderosodeizrael777xD!');
+            });
+        } catch (fallbackError) {
+            console.error('❌ Error crítico total:', fallbackError);
+            process.exit(1);
+        }
     }
 }
-
-// Manejo de errores
-process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
-process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
-
-startServer();
