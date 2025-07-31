@@ -1,6 +1,6 @@
 <script>
         // ===============================================
-        // CONFIGURACIÓN API PARA RAILWAY
+        // CONFIGURACIÓN API PARA RAILWAY CON JWT
         // ===============================================
         const API_BASE = '/api';
         
@@ -16,16 +16,35 @@
         let currentProfileAccountId = null;
         let currentProfileIndex = null;
         
-        // Función para hacer peticiones API
+        // Función para hacer peticiones API CON JWT
         async function apiRequest(endpoint, options = {}) {
             try {
+                // Obtener token JWT del localStorage
+                const token = localStorage.getItem('jwtToken');
+                
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                };
+                
+                // Agregar Authorization header si tenemos token
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
                 const response = await fetch(`${API_BASE}${endpoint}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    },
+                    headers: headers,
                     ...options
                 });
+                
+                // Si recibimos 401 o 403, el token expiró
+                if (response.status === 401 || response.status === 403) {
+                    console.log('🔑 Token expirado, redirigiendo al login...');
+                    localStorage.removeItem('jwtToken');
+                    localStorage.removeItem('streamingAdminLoggedIn');
+                    window.location.href = '/login';
+                    return;
+                }
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Error desconocido del servidor.' }));
@@ -37,6 +56,19 @@
                 console.error('API Error:', error);
                 throw error;
             }
+        }
+        
+        // Función para verificar autenticación mejorada
+        function checkAuth() {
+            const isLoggedIn = localStorage.getItem('streamingAdminLoggedIn');
+            const token = localStorage.getItem('jwtToken');
+            
+            if (isLoggedIn !== 'true' || !token) {
+                console.log('❌ No autenticado, redirigiendo al login...');
+                window.location.href = '/login';
+                return false;
+            }
+            return true;
         }
         
         // ===============================================
