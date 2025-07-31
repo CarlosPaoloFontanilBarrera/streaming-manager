@@ -1,18 +1,41 @@
-// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS
+// server.js - Sistema completo con JWT, fechas automáticas, perfiles, vouchers Y ALARMAS NTFY
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
-const fetch = require('node-fetch'); // Se necesita para enviar notificaciones a ntfy
+const fetch = require('node-fetch');
+const jwt = require('jsonwebtoken'); // AGREGADO JWT
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// CONFIGURACIÓN JWT
+const JWT_SECRET = process.env.JWT_SECRET || 'jireh-streaming-secret-key-ultra-segura-2024';
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// MIDDLEWARE DE AUTENTICACIÓN JWT
+const authenticateJWT = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Token de acceso requerido' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            console.log('❌ Token inválido:', err.message);
+            return res.status(403).json({ error: 'Token inválido o expirado' });
+        }
+        req.user = user;
+        next();
+    });
+};
 
 // Configuración de PostgreSQL
 const pool = new Pool({
@@ -76,7 +99,25 @@ async function initDB() {
     try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS accounts (
-                id TEXT PRIMARY KEY, client_name TEXT NOT NULL, client_phone TEXT DEFAULT '', email TEXT NOT NULL, password TEXT NOT NULL, type TEXT NOT NULL, country TEXT NOT NULL DEFAULT 'PE', profiles JSONB NOT NULL DEFAULT '[]', days_remaining INTEGER NOT NULL DEFAULT 30, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMP DEFAULT NOW(), fecha_venta TIMESTAMP DEFAULT NOW(), fecha_vencimiento TIMESTAMP, fecha_inicio_proveedor TIMESTAMP, fecha_vencimiento_proveedor TIMESTAMP, voucher_imagen TEXT, numero_operacion TEXT, monto_pagado DECIMAL(10,2), estado_pago TEXT DEFAULT 'activo'
+                id TEXT PRIMARY KEY, 
+                client_name TEXT NOT NULL, 
+                client_phone TEXT DEFAULT '', 
+                email TEXT NOT NULL, 
+                password TEXT NOT NULL, 
+                type TEXT NOT NULL, 
+                country TEXT NOT NULL DEFAULT 'PE', 
+                profiles JSONB NOT NULL DEFAULT '[]', 
+                days_remaining INTEGER NOT NULL DEFAULT 30, 
+                status TEXT NOT NULL DEFAULT 'active', 
+                created_at TIMESTAMP DEFAULT NOW(), 
+                fecha_venta TIMESTAMP DEFAULT NOW(), 
+                fecha_vencimiento TIMESTAMP, 
+                fecha_inicio_proveedor TIMESTAMP, 
+                fecha_vencimiento_proveedor TIMESTAMP, 
+                voucher_imagen TEXT, 
+                numero_operacion TEXT, 
+                monto_pagado DECIMAL(10,2), 
+                estado_pago TEXT DEFAULT 'activo'
             )
         `);
         
@@ -88,6 +129,7 @@ async function initDB() {
                 ntfy_topic TEXT
             )
         `);
+        
         const settings = await pool.query('SELECT * FROM alarm_settings');
         if (settings.rows.length === 0) {
             await pool.query('INSERT INTO alarm_settings (provider_threshold_days, client_threshold_days) VALUES (5, 3)');
@@ -100,25 +142,21 @@ async function initDB() {
         
         await pool.query(`
             CREATE TABLE IF NOT EXISTS sent_notifications (
-                id SERIAL PRIMARY KEY, item_id TEXT NOT NULL, item_type TEXT NOT NULL, sent_at TIMESTAMP NOT NULL, UNIQUE(item_id, item_type)
+                id SERIAL PRIMARY KEY, 
+                item_id TEXT NOT NULL, 
+                item_type TEXT NOT NULL, 
+                sent_at TIMESTAMP NOT NULL, 
+                UNIQUE(item_id, item_type)
             )
         `);
         
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW()
-            )
-        `);
+        console.log('✅ Tablas principales inicializadas correctamente');
         
-        await pool.query(`INSERT INTO admin_users (username, password) VALUES ('paolof', 'elpoderosodeizrael777xD!') ON CONFLICT (username) DO NOTHING`);
-        
-        console.log('✅ Base de datos inicializada correctamente');
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
     }
 }
 
-// ########## INICIO DEL CÓDIGO MODIFICADO ##########
 // LÓGICA DE ENVÍO DE ALARMAS POR NTFY
 async function checkAndSendAlarms() {
     console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
@@ -150,7 +188,6 @@ async function checkAndSendAlarms() {
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                     console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
                 } else {
-                    // LÍNEA DE DEPURACIÓN AÑADIDA
                     console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                 }
             }
@@ -173,7 +210,6 @@ async function checkAndSendAlarms() {
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                            console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
                         } else {
-                            // LÍNEA DE DEPURACIÓN AÑADIDA
                             console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                         }
                     }
@@ -184,24 +220,110 @@ async function checkAndSendAlarms() {
         console.error('❌ Error durante la revisión de alarmas:', error);
     }
 }
-// ########## FIN DEL CÓDIGO MODIFICADO ##########
 
-// RUTAS API
-app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
+// ===============================================
+// RUTAS API CON JWT
+// ===============================================
+
+// Ruta de salud (sin autenticación)
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// RUTA DE LOGIN CON JWT Y AUTO-CREACIÓN
 app.post('/api/login', async (req, res) => {
+    console.log('🔐 === PROCESO DE LOGIN INICIADO ===');
+    
     try {
         const { username, password } = req.body;
-        const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND password = $2', [username, password]);
-        if (result.rows.length > 0) {
-            res.json({ success: true, message: 'Login exitoso' });
-        } else {
-            res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+        console.log('👤 Usuario intentando login:', username);
+        
+        if (!username || !password) {
+            console.log('❌ Datos incompletos');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Usuario y contraseña requeridos' 
+            });
         }
+        
+        // Asegurar que la tabla existe
+        console.log('📋 Verificando tabla admin_users...');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id SERIAL PRIMARY KEY, 
+                username TEXT UNIQUE NOT NULL, 
+                password TEXT NOT NULL, 
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        
+        // Asegurar que el usuario existe
+        const userCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['paolof']);
+        if (parseInt(userCheck.rows[0].count) === 0) {
+            console.log('👤 Creando usuario paolof...');
+            await pool.query(
+                'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
+                ['paolof', 'elpoderosodeizrael777xD!']
+            );
+        }
+        
+        // Realizar login
+        console.log('🔍 Buscando usuario en BD...');
+        const result = await pool.query('SELECT id, username, password FROM admin_users WHERE username = $1', [username]);
+        
+        if (result.rows.length === 0) {
+            console.log('❌ Usuario no encontrado:', username);
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Usuario no encontrado' 
+            });
+        }
+        
+        const user = result.rows[0];
+        console.log('✅ Usuario encontrado:', user.username);
+        
+        if (user.password !== password) {
+            console.log('❌ Contraseña incorrecta');
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Contraseña incorrecta' 
+            });
+        }
+        
+        // Generar JWT
+        console.log('🔑 Generando token JWT...');
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username,
+                exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
+            },
+            JWT_SECRET
+        );
+        
+        console.log('✅ LOGIN EXITOSO para:', username);
+        
+        res.json({ 
+            success: true, 
+            message: 'Login exitoso',
+            token: token,
+            user: {
+                id: user.id,
+                username: user.username
+            }
+        });
+        
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        console.error('❌ ERROR EN LOGIN:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error interno del servidor: ' + error.message 
+        });
     }
 });
-app.get('/api/accounts', async (req, res) => {
+
+// RUTAS PROTEGIDAS CON JWT
+app.get('/api/accounts', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
         res.json(result.rows);
@@ -209,7 +331,8 @@ app.get('/api/accounts', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
-app.post('/api/accounts', async (req, res) => {
+
+app.post('/api/accounts', authenticateJWT, async (req, res) => {
     try {
         const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
         const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
@@ -227,7 +350,8 @@ app.post('/api/accounts', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.put('/api/accounts/:id', async (req, res) => {
+
+app.put('/api/accounts/:id', authenticateJWT, async (req, res) => {
     try {
         const { id } = req.params;
         const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
@@ -248,7 +372,8 @@ app.put('/api/accounts/:id', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
+
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
@@ -287,7 +412,8 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.delete('/api/accounts/:id', async (req, res) => {
+
+app.delete('/api/accounts/:id', authenticateJWT, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
@@ -297,7 +423,8 @@ app.delete('/api/accounts/:id', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
-app.get('/api/stats', async (req, res) => {
+
+app.get('/api/stats', authenticateJWT, async (req, res) => {
     try {
         const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
         const accountsResult = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
@@ -326,7 +453,7 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
-app.get('/api/alarms/settings', async (req, res) => {
+app.get('/api/alarms/settings', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
         res.json(result.rows[0] || { provider_threshold_days: 5, client_threshold_days: 3, ntfy_topic: '' });
@@ -335,7 +462,7 @@ app.get('/api/alarms/settings', async (req, res) => {
     }
 });
 
-app.put('/api/alarms/settings', async (req, res) => {
+app.put('/api/alarms/settings', authenticateJWT, async (req, res) => {
     try {
         const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
         const result = await pool.query(
@@ -348,7 +475,7 @@ app.put('/api/alarms/settings', async (req, res) => {
     }
 });
 
-app.post('/api/alarms/test', async (req, res) => {
+app.post('/api/alarms/test', authenticateJWT, async (req, res) => {
     console.log('⚡️ Disparando prueba de alarmas manualmente...');
     try {
         await checkAndSendAlarms();
@@ -359,28 +486,26 @@ app.post('/api/alarms/test', async (req, res) => {
     }
 });
 
-// NUEVA RUTA API PARA CONSULTAR MICUENTA.ME
-app.post('/api/check-micuenta-me-code', async (req, res) => {
+app.post('/api/check-micuenta-me-code', authenticateJWT, async (req, res) => {
     try {
-        const { code, pdv } = req.body; // Recibe code y pdv del frontend de su dashboard
+        const { code, pdv } = req.body;
 
-        const response = await fetch('https://micuenta.me/e/redeem', { // URL del endpoint de micuenta.me
+        const response = await fetch('https://micuenta.me/e/redeem', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ code: code, pdv: pdv }) // Envía code y pdv como JSON
+            body: JSON.stringify({ code: code, pdv: pdv })
         });
 
-        // Reenviar el estado HTTP de micuenta.me si no es 2xx
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Error desconocido del proxy de micuenta.me.' }));
             console.error('Error al consultar micuenta.me:', response.status, errorData.message);
-            return res.status(response.status).json(errorData); // Reenviar el error del servicio externo
+            return res.status(response.status).json(errorData);
         }
 
         const data = await response.json();
-        res.json(data); // Reenviar la respuesta JSON de micuenta.me al frontend de su dashboard
+        res.json(data);
 
     } catch (error) {
         console.error('Error en la ruta /api/check-micuenta-me-code:', error);
@@ -388,172 +513,144 @@ app.post('/api/check-micuenta-me-code', async (req, res) => {
     }
 });
 
-
 // Servir archivos estáticos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// REEMPLAZAR LA FUNCIÓN startServer() AL FINAL DE TU server.js CON ESTA VERSIÓN CORREGIDA:
-
+// FUNCIÓN STARTSERVER MEJORADA CON LOGGING DETALLADO
 async function startServer() {
+    console.log('🚀 === INICIANDO JIREH STREAMING MANAGER ===');
+    
     try {
-        console.log('🔧 Iniciando JIREH Streaming Manager...');
+        console.log('🔧 Paso 1: Verificando conexión a PostgreSQL...');
         
-        // PASO 1: Arreglar tabla admin_users existente
-        console.log('📝 Verificando y arreglando tabla admin_users...');
+        // Test de conexión básico
+        const connectionTest = await pool.query('SELECT NOW() as current_time');
+        console.log('✅ Conexión a PostgreSQL exitosa:', connectionTest.rows[0].current_time);
+        
+        console.log('📝 Paso 2: Configurando tabla admin_users...');
         
         try {
-            // Primero verificar si la tabla existe
-            const tableExists = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'admin_users'
-                );
+            // Crear tabla admin_users si no existe
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id SERIAL PRIMARY KEY, 
+                    username TEXT UNIQUE, 
+                    password TEXT, 
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
             `);
+            console.log('✅ Tabla admin_users verificada/creada');
             
-            if (tableExists.rows[0].exists) {
-                console.log('📋 Tabla admin_users existe, verificando columnas...');
-                
-                // Verificar si tiene la columna password
-                const passwordColumn = await pool.query(`
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name='admin_users' AND column_name='password'
-                `);
-                
-                if (passwordColumn.rows.length === 0) {
-                    console.log('➕ Agregando columna password faltante...');
-                    await pool.query("ALTER TABLE admin_users ADD COLUMN password TEXT");
-                    console.log('✅ Columna password agregada');
-                }
-                
-                // Verificar si tiene la columna username
-                const usernameColumn = await pool.query(`
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name='admin_users' AND column_name='username'
-                `);
-                
-                if (usernameColumn.rows.length === 0) {
-                    console.log('➕ Agregando columna username faltante...');
-                    await pool.query("ALTER TABLE admin_users ADD COLUMN username TEXT UNIQUE");
-                    console.log('✅ Columna username agregada');
-                }
-                
-            } else {
-                // Crear tabla nueva si no existe
-                console.log('📝 Creando tabla admin_users nueva...');
-                await pool.query(`
-                    CREATE TABLE admin_users (
-                        id SERIAL PRIMARY KEY, 
-                        username TEXT UNIQUE NOT NULL, 
-                        password TEXT NOT NULL, 
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                `);
-                console.log('✅ Tabla admin_users creada');
-            }
+            // Verificar y crear usuario admin
+            const userCheck = await pool.query('SELECT COUNT(*) FROM admin_users WHERE username = $1', ['paolof']);
+            const userCount = parseInt(userCheck.rows[0].count);
             
-        } catch (tableError) {
-            console.log('⚠️ Error con tabla admin_users:', tableError.message);
-            
-            // Como último recurso, eliminar y recrear la tabla
-            console.log('🔄 Intentando recrear tabla admin_users...');
-            try {
-                await pool.query('DROP TABLE IF EXISTS admin_users CASCADE');
-                await pool.query(`
-                    CREATE TABLE admin_users (
-                        id SERIAL PRIMARY KEY, 
-                        username TEXT UNIQUE NOT NULL, 
-                        password TEXT NOT NULL, 
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                `);
-                console.log('✅ Tabla admin_users recreada exitosamente');
-            } catch (recreateError) {
-                console.log('❌ No se pudo recrear tabla admin_users:', recreateError.message);
-            }
-        }
-        
-        // PASO 2: Crear usuario admin de forma segura
-        try {
-            console.log('👤 Configurando usuario administrador...');
-            
-            // Verificar si el usuario existe
-            const userCheck = await pool.query(`
-                SELECT COUNT(*) as count, id, username, password 
-                FROM admin_users 
-                WHERE username = $1 
-                GROUP BY id, username, password
-            `, ['paolof']);
-            
-            if (userCheck.rows.length === 0) {
-                // Usuario no existe, crearlo
+            if (userCount === 0) {
                 await pool.query(
                     'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
                     ['paolof', 'elpoderosodeizrael777xD!']
                 );
-                console.log('👤 Usuario administrador paolof creado automáticamente');
+                console.log('👤 Usuario paolof creado exitosamente');
             } else {
-                const user = userCheck.rows[0];
-                if (!user.password) {
-                    // Usuario existe pero sin contraseña, actualizarla
-                    await pool.query(
-                        'UPDATE admin_users SET password = $1 WHERE username = $2',
-                        ['elpoderosodeizrael777xD!', 'paolof']
-                    );
-                    console.log('🔄 Contraseña de paolof actualizada');
-                } else {
-                    console.log('👤 Usuario administrador paolof ya existe y está configurado');
-                }
+                console.log('👤 Usuario paolof ya existe');
+                
+                // Asegurar que tiene contraseña
+                await pool.query(
+                    'UPDATE admin_users SET password = $1 WHERE username = $2 AND (password IS NULL OR password = \'\')',
+                    ['elpoderosodeizrael777xD!', 'paolof']
+                );
             }
             
-        } catch (userError) {
-            console.log('⚠️ Error configurando usuario admin:', userError.message);
+        } catch (adminError) {
+            console.log('⚠️ Error con admin_users:', adminError.message);
+            console.log('🔄 Intentando solución alternativa...');
+            
+            // Solución alternativa: Drop y recrear
+            try {
+                await pool.query('DROP TABLE IF EXISTS admin_users');
+                await pool.query(`
+                    CREATE TABLE admin_users (
+                        id SERIAL PRIMARY KEY, 
+                        username TEXT UNIQUE NOT NULL, 
+                        password TEXT NOT NULL, 
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                `);
+                await pool.query(
+                    'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
+                    ['paolof', 'elpoderosodeizrael777xD!']
+                );
+                console.log('✅ Tabla admin_users recreada exitosamente');
+            } catch (fallbackError) {
+                console.log('❌ Error en solución alternativa:', fallbackError.message);
+            }
         }
         
-        // PASO 3: Verificar usuario final
+        console.log('📊 Paso 3: Inicializando otras tablas...');
+        
+        // Inicializar otras tablas de forma segura
         try {
-            const finalCheck = await pool.query('SELECT id, username FROM admin_users WHERE username = $1', ['paolof']);
-            if (finalCheck.rows.length > 0) {
-                console.log('✅ Usuario administrador verificado:', finalCheck.rows[0].username);
-            } else {
-                console.log('⚠️ Usuario administrador no se pudo verificar');
-            }
-        } catch (verifyError) {
-            console.log('⚠️ Error verificando usuario:', verifyError.message);
+            await initDB();
+            console.log('✅ Todas las tablas inicializadas');
+        } catch (initError) {
+            console.log('⚠️ Error en initDB:', initError.message);
+            console.log('🔄 Continuando sin inicialización completa...');
         }
         
-        // PASO 4: Ejecutar la inicialización normal de otras tablas
-        await initDB();
+        console.log('🌐 Paso 4: Iniciando servidor web...');
         
-        // PASO 5: Iniciar el servidor
-        app.listen(PORT, () => {
-            console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
-            console.log(`🔐 Sistema JWT activado con clave: ${JWT_SECRET.substring(0, 10)}...`);
-            console.log(`✅ Base de datos PostgreSQL lista en Railway`);
-            console.log(`👤 Usuario admin: paolof / elpoderosodeizrael777xD!`);
+        // Iniciar servidor
+        const server = app.listen(PORT, () => {
+            console.log('');
+            console.log('🎉 ================================');
+            console.log('🚀 SERVIDOR INICIADO EXITOSAMENTE');
+            console.log('🎯 Puerto:', PORT);
+            console.log('🔐 JWT activo');
+            console.log('👤 Usuario: paolof');
+            console.log('🔑 Password: elpoderosodeizrael777xD!');
+            console.log('🌐 URL: https://tu-dominio-railway.app');
+            console.log('🎉 ================================');
+            console.log('');
             
-            // Iniciar sistema de alarmas
-            setInterval(checkAndSendAlarms, 3600000); 
-            console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
+            // Iniciar alarmas de forma segura
+            try {
+                setInterval(checkAndSendAlarms, 3600000);
+                console.log('⏰ Sistema de alarmas iniciado');
+            } catch (alarmError) {
+                console.log('⚠️ Error iniciando alarmas:', alarmError.message);
+            }
         });
         
-    } catch (error) {
-        console.error('❌ Error crítico iniciando servidor:', error);
+        // Manejar errores del servidor
+        server.on('error', (serverError) => {
+            console.error('❌ Error del servidor:', serverError);
+        });
         
-        // MODO RESPALDO: Intentar iniciar sin verificaciones si falla
+    } catch (criticalError) {
+        console.error('❌ ERROR CRÍTICO:', criticalError);
+        console.log('🔄 Intentando inicio básico...');
+        
+        // Modo de emergencia: servidor básico sin BD
         try {
             app.listen(PORT, () => {
-                console.log(`🚀 Servidor iniciado en modo básico en puerto ${PORT}`);
-                console.log('⚠️ Algunas funciones pueden no estar disponibles');
-                console.log('🔑 Intenta login con: paolof / elpoderosodeizrael777xD!');
+                console.log('🚨 SERVIDOR EN MODO EMERGENCIA');
+                console.log('🎯 Puerto:', PORT);
+                console.log('⚠️ Base de datos no disponible');
+                console.log('🔑 Intenta: paolof / elpoderosodeizrael777xD!');
             });
-        } catch (fallbackError) {
-            console.error('❌ Error crítico total:', fallbackError);
+        } catch (emergencyError) {
+            console.error('💥 FALLO TOTAL:', emergencyError);
             process.exit(1);
         }
     }
 }
+
+// Manejo de errores
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
+process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
+
+// INICIAR EL SERVIDOR
+startServer();
