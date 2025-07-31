@@ -14,7 +14,10 @@
     "cors": "^2.8.5",
     "multer": "^1.4.5-lts.1",
     "node-fetch": "^2.6.7",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "express-rate-limit": "^7.1.5",
+    "joi": "^17.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
@@ -31,7 +34,10 @@
     "express",
     "railway",
     "vouchers",
-    "fechas-automaticas"
+    "fechas-automaticas",
+    "bcrypt",
+    "rate-limiting",
+    "validation"
   ],
   "author": "Paolo F",
   "license": "MIT"
