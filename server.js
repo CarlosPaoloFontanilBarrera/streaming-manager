@@ -1,18 +1,42 @@
-// server.js - Sistema completo con fechas automáticas, perfiles, vouchers Y ALARMAS NTFY INTEGRADAS
+// server.js - Sistema completo con JWT, fechas automáticas, perfiles, vouchers Y ALARMAS NTFY
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
-const fetch = require('node-fetch'); // Se necesita para enviar notificaciones a ntfy
+const fetch = require('node-fetch');
+const jwt = require('jsonwebtoken'); // AGREGADO JWT
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// CONFIGURACIÓN JWT
+const JWT_SECRET = process.env.JWT_SECRET || 'jireh-streaming-secret-key-ultra-segura-2024';
+const JWT_EXPIRES_IN = '7d';
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// MIDDLEWARE DE AUTENTICACIÓN JWT
+const authenticateJWT = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Token de acceso requerido' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            console.log('❌ Token inválido:', err.message);
+            return res.status(403).json({ error: 'Token inválido o expirado' });
+        }
+        req.user = user;
+        next();
+    });
+};
 
 // Configuración de PostgreSQL
 const pool = new Pool({
@@ -76,7 +100,25 @@ async function initDB() {
     try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS accounts (
-                id TEXT PRIMARY KEY, client_name TEXT NOT NULL, client_phone TEXT DEFAULT '', email TEXT NOT NULL, password TEXT NOT NULL, type TEXT NOT NULL, country TEXT NOT NULL DEFAULT 'PE', profiles JSONB NOT NULL DEFAULT '[]', days_remaining INTEGER NOT NULL DEFAULT 30, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMP DEFAULT NOW(), fecha_venta TIMESTAMP DEFAULT NOW(), fecha_vencimiento TIMESTAMP, fecha_inicio_proveedor TIMESTAMP, fecha_vencimiento_proveedor TIMESTAMP, voucher_imagen TEXT, numero_operacion TEXT, monto_pagado DECIMAL(10,2), estado_pago TEXT DEFAULT 'activo'
+                id TEXT PRIMARY KEY, 
+                client_name TEXT NOT NULL, 
+                client_phone TEXT DEFAULT '', 
+                email TEXT NOT NULL, 
+                password TEXT NOT NULL, 
+                type TEXT NOT NULL, 
+                country TEXT NOT NULL DEFAULT 'PE', 
+                profiles JSONB NOT NULL DEFAULT '[]', 
+                days_remaining INTEGER NOT NULL DEFAULT 30, 
+                status TEXT NOT NULL DEFAULT 'active', 
+                created_at TIMESTAMP DEFAULT NOW(), 
+                fecha_venta TIMESTAMP DEFAULT NOW(), 
+                fecha_vencimiento TIMESTAMP, 
+                fecha_inicio_proveedor TIMESTAMP, 
+                fecha_vencimiento_proveedor TIMESTAMP, 
+                voucher_imagen TEXT, 
+                numero_operacion TEXT, 
+                monto_pagado DECIMAL(10,2), 
+                estado_pago TEXT DEFAULT 'activo'
             )
         `);
         
@@ -88,6 +130,7 @@ async function initDB() {
                 ntfy_topic TEXT
             )
         `);
+        
         const settings = await pool.query('SELECT * FROM alarm_settings');
         if (settings.rows.length === 0) {
             await pool.query('INSERT INTO alarm_settings (provider_threshold_days, client_threshold_days) VALUES (5, 3)');
@@ -100,13 +143,20 @@ async function initDB() {
         
         await pool.query(`
             CREATE TABLE IF NOT EXISTS sent_notifications (
-                id SERIAL PRIMARY KEY, item_id TEXT NOT NULL, item_type TEXT NOT NULL, sent_at TIMESTAMP NOT NULL, UNIQUE(item_id, item_type)
+                id SERIAL PRIMARY KEY, 
+                item_id TEXT NOT NULL, 
+                item_type TEXT NOT NULL, 
+                sent_at TIMESTAMP NOT NULL, 
+                UNIQUE(item_id, item_type)
             )
         `);
         
         await pool.query(`
             CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW()
+                id SERIAL PRIMARY KEY, 
+                username TEXT UNIQUE NOT NULL, 
+                password TEXT NOT NULL, 
+                created_at TIMESTAMP DEFAULT NOW()
             )
         `);
         
@@ -118,7 +168,6 @@ async function initDB() {
     }
 }
 
-// ########## INICIO DEL CÓDIGO MODIFICADO ##########
 // LÓGICA DE ENVÍO DE ALARMAS POR NTFY
 async function checkAndSendAlarms() {
     console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
@@ -150,7 +199,6 @@ async function checkAndSendAlarms() {
                     await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'provider', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                     console.log(`📲 Notificación de proveedor enviada para la cuenta ${account.id}`);
                 } else {
-                    // LÍNEA DE DEPURACIÓN AÑADIDA
                     console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                 }
             }
@@ -173,7 +221,6 @@ async function checkAndSendAlarms() {
                            await pool.query("INSERT INTO sent_notifications (item_id, item_type, sent_at) VALUES ($1, 'client', NOW()) ON CONFLICT (item_id, item_type) DO UPDATE SET sent_at = NOW()", [notificationId]);
                            console.log(`📲 Notificación de cliente enviada para el perfil ${account.id}-${index}`);
                         } else {
-                            // LÍNEA DE DEPURACIÓN AÑADIDA
                             console.log(`[DEBUG] Notificación para ${notificationId} bloqueada. Ya se envió una en las últimas 24 horas.`);
                         }
                     }
@@ -184,32 +231,72 @@ async function checkAndSendAlarms() {
         console.error('❌ Error durante la revisión de alarmas:', error);
     }
 }
-// ########## FIN DEL CÓDIGO MODIFICADO ##########
 
-// RUTAS API
-app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
+// ===============================================
+// RUTAS API CON JWT
+// ===============================================
+
+// Ruta de salud (sin autenticación)
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// RUTA DE LOGIN CON JWT
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
+        console.log('🔐 Intento de login para:', username);
+        
+        // Validar credenciales en la base de datos
         const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND password = $2', [username, password]);
+        
         if (result.rows.length > 0) {
-            res.json({ success: true, message: 'Login exitoso' });
+            const user = result.rows[0];
+            
+            // GENERAR TOKEN JWT
+            const token = jwt.sign(
+                { 
+                    id: user.id, 
+                    username: user.username,
+                    exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 días
+                },
+                JWT_SECRET
+            );
+            
+            console.log('✅ Login exitoso, token generado para:', username);
+            
+            // DEVOLVER TOKEN Y DATOS DE USUARIO
+            res.json({ 
+                success: true, 
+                message: 'Login exitoso',
+                token: token,
+                user: {
+                    id: user.id,
+                    username: user.username
+                }
+            });
         } else {
+            console.log('❌ Credenciales inválidas para:', username);
             res.status(401).json({ success: false, message: 'Credenciales inválidas' });
         }
     } catch (error) {
+        console.error('❌ Error en login:', error);
         res.status(500).json({ success: false, message: 'Error interno del servidor' });
     }
 });
-app.get('/api/accounts', async (req, res) => {
+
+// RUTAS PROTEGIDAS CON JWT
+app.get('/api/accounts', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
         res.json(result.rows);
     } catch (error) {
+        console.error('Error obteniendo cuentas:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
-app.post('/api/accounts', async (req, res) => {
+
+app.post('/api/accounts', authenticateJWT, async (req, res) => {
     try {
         const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
         const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
@@ -217,6 +304,7 @@ app.post('/api/accounts', async (req, res) => {
         fechaVencimientoProveedor.setDate(fechaVencimientoProveedor.getDate() + 30);
         const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
         const estadoProveedor = actualizarEstado(diasRestantesProveedor);
+        
         const result = await pool.query(
             `INSERT INTO accounts (id, client_name, client_phone, email, password, type, country, profiles, days_remaining, status, fecha_inicio_proveedor, fecha_vencimiento_proveedor, estado_pago, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()) RETURNING *`,
@@ -224,10 +312,12 @@ app.post('/api/accounts', async (req, res) => {
         );
         res.json(result.rows[0]);
     } catch (error) {
+        console.error('Error creando cuenta:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.put('/api/accounts/:id', async (req, res) => {
+
+app.put('/api/accounts/:id', authenticateJWT, async (req, res) => {
     try {
         const { id } = req.params;
         const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
@@ -237,39 +327,51 @@ app.put('/api/accounts/:id', async (req, res) => {
         const diasRestantesProveedor = calcularDiasRestantes(fechaVencimientoProveedor);
         const estadoProveedor = actualizarEstado(diasRestantesProveedor);
         const profilesActualizados = procesarPerfiles(profiles);
+        
         const result = await pool.query(
             `UPDATE accounts SET client_name = $1, client_phone = $2, email = $3, password = $4, type = $5, country = $6, profiles = $7, days_remaining = $8, status = $9, fecha_inicio_proveedor = $10, fecha_vencimiento_proveedor = $11
              WHERE id = $12 RETURNING *`,
             [client_name, client_phone || '', email, password, type, country, JSON.stringify(profilesActualizados), diasRestantesProveedor, estadoProveedor, fechaInicio, fechaVencimientoProveedor, id]
         );
+        
         if (result.rows.length === 0) return res.status(404).json({ error: 'Cuenta no encontrada' });
         res.json(result.rows[0]);
     } catch (error) {
+        console.error('Error actualizando cuenta:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single('voucher'), async (req, res) => {
+
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
+        
         if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+        
         const accountResult = await pool.query('SELECT * FROM accounts WHERE id = $1', [accountId]);
         if (accountResult.rows.length === 0) return res.status(404).json({ error: 'Cuenta no encontrada' });
+        
         const account = accountResult.rows[0];
         const profiles = typeof account.profiles === 'string' ? JSON.parse(account.profiles) : account.profiles || [];
         const profileIdx = parseInt(profileIndex);
+        
         if (profileIdx < 0 || profileIdx >= profiles.length) return res.status(400).json({ error: 'Índice de perfil inválido' });
+        
         const profile = profiles[profileIdx];
         const voucherBase64 = req.file.buffer.toString('base64');
+        
         profile.voucherImagen = voucherBase64;
         profile.numeroOperacion = numero_operacion;
         profile.montoPagado = parseFloat(monto_pagado);
         profile.voucherSubido = true;
         profile.fechaVoucher = new Date().toISOString();
+        
         if (profile.estado === 'vendido') {
             const fechaVencimientoActual = new Date(profile.fechaVencimiento);
             const nuevaFechaVencimiento = new Date(fechaVencimientoActual);
             nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 30);
+            
             profile.fechaVencimiento = nuevaFechaVencimiento.toISOString().split('T')[0];
             const fechaProximoPago = new Date(nuevaFechaVencimiento);
             fechaProximoPago.setDate(fechaProximoPago.getDate() - 1);
@@ -281,32 +383,40 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', upload.single
         } else {
             profile.estadoPago = 'confirmado';
         }
+        
         await pool.query('UPDATE accounts SET profiles = $1 WHERE id = $2', [JSON.stringify(profiles), accountId]);
         res.json({ success: true, message: 'Voucher procesado', profile: profile });
     } catch (error) {
+        console.error('Error procesando voucher:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-app.delete('/api/accounts/:id', async (req, res) => {
+
+app.delete('/api/accounts/:id', authenticateJWT, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Cuenta no encontrada' });
         res.json({ message: 'Cuenta eliminada exitosamente' });
     } catch (error) {
+        console.error('Error eliminando cuenta:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
-app.get('/api/stats', async (req, res) => {
+
+app.get('/api/stats', authenticateJWT, async (req, res) => {
     try {
         const totalResult = await pool.query('SELECT COUNT(*) FROM accounts');
         const accountsResult = await pool.query('SELECT fecha_vencimiento_proveedor, profiles FROM accounts');
+        
         let activeCount = 0, expiringCount = 0, totalProfiles = 0, soldProfiles = 0;
         const today = new Date();
+        
         accountsResult.rows.forEach(row => {
             const profiles = typeof row.profiles === 'string' ? JSON.parse(row.profiles) : row.profiles || [];
             totalProfiles += profiles.length;
             soldProfiles += profiles.filter(p => p.estado === 'vendido').length;
+            
             if (row.fecha_vencimiento_proveedor) {
                 const vencimiento = new Date(row.fecha_vencimiento_proveedor);
                 const diffDays = Math.ceil((vencimiento - today) / (1000 * 60 * 60 * 24));
@@ -314,6 +424,7 @@ app.get('/api/stats', async (req, res) => {
                 else if (diffDays > 0) expiringCount++;
             }
         });
+        
         res.json({
             total: parseInt(totalResult.rows[0].count),
             active: activeCount,
@@ -322,20 +433,22 @@ app.get('/api/stats', async (req, res) => {
             sold_profiles: soldProfiles
         });
     } catch (error) {
+        console.error('Error obteniendo estadísticas:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
-app.get('/api/alarms/settings', async (req, res) => {
+app.get('/api/alarms/settings', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
         res.json(result.rows[0] || { provider_threshold_days: 5, client_threshold_days: 3, ntfy_topic: '' });
     } catch (error) {
+        console.error('Error obteniendo configuración de alarmas:', error);
         res.status(500).json({ error: 'Error obteniendo configuración de alarmas' });
     }
 });
 
-app.put('/api/alarms/settings', async (req, res) => {
+app.put('/api/alarms/settings', authenticateJWT, async (req, res) => {
     try {
         const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
         const result = await pool.query(
@@ -344,11 +457,12 @@ app.put('/api/alarms/settings', async (req, res) => {
         );
         res.json(result.rows[0]);
     } catch (error) {
+        console.error('Error actualizando configuración de alarmas:', error);
         res.status(500).json({ error: 'Error actualizando configuración de alarmas' });
     }
 });
 
-app.post('/api/alarms/test', async (req, res) => {
+app.post('/api/alarms/test', authenticateJWT, async (req, res) => {
     console.log('⚡️ Disparando prueba de alarmas manualmente...');
     try {
         await checkAndSendAlarms();
@@ -359,35 +473,32 @@ app.post('/api/alarms/test', async (req, res) => {
     }
 });
 
-// NUEVA RUTA API PARA CONSULTAR MICUENTA.ME
-app.post('/api/check-micuenta-me-code', async (req, res) => {
+app.post('/api/check-micuenta-me-code', authenticateJWT, async (req, res) => {
     try {
-        const { code, pdv } = req.body; // Recibe code y pdv del frontend de su dashboard
+        const { code, pdv } = req.body;
 
-        const response = await fetch('https://micuenta.me/e/redeem', { // URL del endpoint de micuenta.me
+        const response = await fetch('https://micuenta.me/e/redeem', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ code: code, pdv: pdv }) // Envía code y pdv como JSON
+            body: JSON.stringify({ code: code, pdv: pdv })
         });
 
-        // Reenviar el estado HTTP de micuenta.me si no es 2xx
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Error desconocido del proxy de micuenta.me.' }));
             console.error('Error al consultar micuenta.me:', response.status, errorData.message);
-            return res.status(response.status).json(errorData); // Reenviar el error del servicio externo
+            return res.status(response.status).json(errorData);
         }
 
         const data = await response.json();
-        res.json(data); // Reenviar la respuesta JSON de micuenta.me al frontend de su dashboard
+        res.json(data);
 
     } catch (error) {
         console.error('Error en la ruta /api/check-micuenta-me-code:', error);
         res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la solicitud externa a micuenta.me.' });
     }
 });
-
 
 // Servir archivos estáticos
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -401,6 +512,7 @@ async function startServer() {
         await initDB();
         app.listen(PORT, () => {
             console.log(`🚀 JIREH Streaming Manager corriendo en puerto ${PORT}`);
+            console.log(`🔐 Sistema JWT activado con clave: ${JWT_SECRET.substring(0, 10)}...`);
             setInterval(checkAndSendAlarms, 3600000); 
             console.log('⏰ Sistema de revisión de alarmas por ntfy iniciado.');
         });
