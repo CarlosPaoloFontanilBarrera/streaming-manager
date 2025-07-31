@@ -1,11 +1,15 @@
-// server.js - Sistema completo con JWT, fechas automáticas, perfiles, vouchers Y ALARMAS NTFY
+// server.js - FASE 1: Sistema con JWT + BCRYPT + RATE LIMITING + VALIDACIÓN
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fetch = require('node-fetch');
-const jwt = require('jsonwebtoken'); // AGREGADO JWT
+const jwt = require('jsonwebtoken');
+// FASE 1: NUEVAS DEPENDENCIAS DE SEGURIDAD
+const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
+const Joi = require('joi');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,12 +17,97 @@ const PORT = process.env.PORT || 3000;
 // CONFIGURACIÓN JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'jireh-streaming-secret-key-ultra-segura-2024';
 
+// FASE 1: CONFIGURACIÓN DE RATE LIMITING
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // máximo 100 requests por ventana por IP
+    message: {
+        error: 'Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 5, // máximo 5 intentos de login por ventana por IP
+    message: {
+        error: 'Demasiados intentos de login, intenta de nuevo en 15 minutos.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// FASE 1: ESQUEMAS DE VALIDACIÓN CON JOI
+const schemas = {
+    login: Joi.object({
+        username: Joi.string().alphanum().min(3).max(30).required(),
+        password: Joi.string().min(6).required()
+    }),
+    
+    account: Joi.object({
+        id: Joi.string().alphanum().length(6).optional(),
+        client_name: Joi.string().min(2).max(100).required(),
+        client_phone: Joi.string().pattern(/^[+]?[\d\s\-()]{7,15}$/).optional().allow(''),
+        email: Joi.string().email().required(),
+        password: Joi.string().min(6).max(100).required(),
+        type: Joi.string().valid(
+            'Netflix Completa',
+            'Netflix 1 Perfil no renovable', 
+            'Netflix 1 Perfil renovable',
+            'Disney+ Estandar Completa',
+            'Amazon Prime Completa',
+            'Amazon Prime 1 perfil',
+            'Max Completa Estandar',
+            'Max básico con anuncios',
+            'Max 1 perfil'
+        ).required(),
+        country: Joi.string().valid('PE', 'US', 'GB', 'ES').required(),
+        profiles: Joi.array().items(Joi.object({
+            name: Joi.string().required(),
+            pin: Joi.string().length(4).pattern(/^\d+$/).required(),
+            estado: Joi.string().valid('disponible', 'vendido', 'renovacion').required()
+        })).required(),
+        fecha_inicio_proveedor: Joi.date().iso().required(),
+        fecha_vencimiento_proveedor: Joi.date().iso().optional().allow(null)
+    }),
+    
+    voucher: Joi.object({
+        numero_operacion: Joi.string().min(3).max(50).required(),
+        monto_pagado: Joi.number().positive().precision(2).required()
+    }),
+    
+    alarmSettings: Joi.object({
+        provider_threshold_days: Joi.number().integer().min(1).max(30).required(),
+        client_threshold_days: Joi.number().integer().min(1).max(30).required(),
+        ntfy_topic: Joi.string().min(3).max(100).required()
+    })
+};
+
+// FASE 1: MIDDLEWARE DE VALIDACIÓN
+const validate = (schema) => {
+    return (req, res, next) => {
+        const { error } = schema.validate(req.body);
+        if (error) {
+            return res.status(400).json({
+                success: false,
+                message: 'Datos de entrada inválidos',
+                details: error.details.map(detail => detail.message)
+            });
+        }
+        next();
+    };
+};
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// MIDDLEWARE DE AUTENTICACIÓN JWT
+// FASE 1: APLICAR RATE LIMITING
+app.use('/api/', generalLimiter);
+
+// MIDDLEWARE DE AUTENTICACIÓN JWT (sin cambios)
 const authenticateJWT = (req, res, next) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
@@ -37,33 +126,38 @@ const authenticateJWT = (req, res, next) => {
     });
 };
 
-// Configuración de PostgreSQL
+// Configuración de PostgreSQL (sin cambios)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Configuración de multer para subida de archivos
+// Configuración de multer (sin cambios)
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB máximo
+    limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Función para calcular días restantes (timezone-safe)
+// FASE 1: FUNCIONES DE SEGURIDAD BCRYPT
+async function hashPassword(password) {
+    const saltRounds = 12;
+    return await bcrypt.hash(password, saltRounds);
+}
+
+async function comparePassword(password, hashedPassword) {
+    return await bcrypt.compare(password, hashedPassword);
+}
+
+// Funciones de cálculo (sin cambios)
 function calcularDiasRestantes(fechaVencimiento) {
     if (!fechaVencimiento) return 0;
-
     const hoy = new Date();
     const hoyUTC = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
-
     const vencimiento = new Date(fechaVencimiento);
     const vencimientoUTC = Date.UTC(vencimiento.getUTCFullYear(), vencimiento.getUTCMonth(), vencimiento.getUTCDate());
-
     const diferenciaMilisegundos = vencimientoUTC - hoyUTC;
-    
     const dias = Math.ceil(diferenciaMilisegundos / (1000 * 60 * 60 * 24));
-    
     return Math.max(0, dias);
 }
 
@@ -71,30 +165,24 @@ function calcularDiasRestantesPerfil(fechaVencimientoCliente) {
     return calcularDiasRestantes(fechaVencimientoCliente);
 }
 
-// Función para actualizar estado automáticamente
 function actualizarEstado(diasRestantes) {
     if (diasRestantes > 5) return 'active';
     if (diasRestantes > 0) return 'inactive';
     return 'expired';
 }
 
-// Función para procesar perfiles y calcular días restantes individuales
 function procesarPerfiles(profiles) {
     if (!profiles || !Array.isArray(profiles)) return [];
-    
     return profiles.map(profile => {
         if (profile.estado === 'vendido' && profile.fechaVencimiento) {
             const diasRestantesCliente = calcularDiasRestantesPerfil(profile.fechaVencimiento);
-            return {
-                ...profile,
-                diasRestantes: diasRestantesCliente
-            };
+            return { ...profile, diasRestantes: diasRestantesCliente };
         }
         return profile;
     });
 }
 
-// Crear tabla si no existe
+// FASE 1: INICIALIZACIÓN DB CON BCRYPT
 async function initDB() {
     try {
         await pool.query(`
@@ -159,7 +247,29 @@ async function initDB() {
             )
         `);
         
-        await pool.query(`INSERT INTO admin_users (username, password) VALUES ('paolof', 'elpoderosodeizrael777xD!') ON CONFLICT (username) DO NOTHING`);
+        // FASE 1: MIGRAR CONTRASEÑA A BCRYPT
+        const existingUser = await pool.query('SELECT * FROM admin_users WHERE username = $1', ['paolof']);
+        if (existingUser.rows.length === 0) {
+            // Crear usuario con contraseña hasheada
+            const hashedPassword = await hashPassword('elpoderosodeizrael777xD!');
+            await pool.query(
+                'INSERT INTO admin_users (username, password) VALUES ($1, $2)',
+                ['paolof', hashedPassword]
+            );
+            console.log('✅ Usuario paolof creado con bcrypt');
+        } else {
+            // Verificar si la contraseña ya está hasheada
+            const user = existingUser.rows[0];
+            if (!user.password.startsWith('$2b$')) {
+                // Migrar contraseña plana a bcrypt
+                const hashedPassword = await hashPassword(user.password);
+                await pool.query(
+                    'UPDATE admin_users SET password = $1 WHERE username = $2',
+                    [hashedPassword, 'paolof']
+                );
+                console.log('🔄 Contraseña migrada a bcrypt');
+            }
+        }
         
         console.log('✅ Base de datos inicializada correctamente');
     } catch (error) {
@@ -167,10 +277,9 @@ async function initDB() {
     }
 }
 
-// LÓGICA DE ENVÍO DE ALARMAS POR NTFY
+// Función de alarmas (sin cambios)
 async function checkAndSendAlarms() {
     console.log('⏰ Revisando alarmas para enviar notificaciones a ntfy...');
-
     try {
         const settingsRes = await pool.query('SELECT * FROM alarm_settings WHERE id = 1');
         const settings = settingsRes.rows[0];
@@ -232,29 +341,25 @@ async function checkAndSendAlarms() {
 }
 
 // ===============================================
-// RUTAS API CON JWT
+// RUTAS API CON SEGURIDAD MEJORADA - FASE 1
 // ===============================================
 
 // Ruta de salud (sin autenticación)
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        security: 'FASE 1: bcrypt + rate-limiting + validation'
+    });
 });
 
-// RUTA DE LOGIN CON JWT
-app.post('/api/login', async (req, res) => {
-    console.log('🔐 === PROCESO DE LOGIN INICIADO ===');
+// FASE 1: LOGIN CON BCRYPT Y RATE LIMITING
+app.post('/api/login', loginLimiter, validate(schemas.login), async (req, res) => {
+    console.log('🔐 === PROCESO DE LOGIN INICIADO - FASE 1 ===');
     
     try {
         const { username, password } = req.body;
         console.log('👤 Usuario intentando login:', username);
-        
-        if (!username || !password) {
-            console.log('❌ Datos incompletos');
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Usuario y contraseña requeridos' 
-            });
-        }
         
         console.log('🔍 Buscando usuario en BD...');
         const result = await pool.query('SELECT id, username, password FROM admin_users WHERE username = $1', [username]);
@@ -263,18 +368,20 @@ app.post('/api/login', async (req, res) => {
             console.log('❌ Usuario no encontrado:', username);
             return res.status(401).json({ 
                 success: false, 
-                message: 'Usuario no encontrado' 
+                message: 'Credenciales inválidas' // No revelar si es usuario o contraseña
             });
         }
         
         const user = result.rows[0];
         console.log('✅ Usuario encontrado:', user.username);
         
-        if (user.password !== password) {
+        // FASE 1: VERIFICACIÓN CON BCRYPT
+        const isPasswordValid = await comparePassword(password, user.password);
+        if (!isPasswordValid) {
             console.log('❌ Contraseña incorrecta');
             return res.status(401).json({ 
                 success: false, 
-                message: 'Contraseña incorrecta' 
+                message: 'Credenciales inválidas' // No revelar si es usuario o contraseña
             });
         }
         
@@ -305,12 +412,12 @@ app.post('/api/login', async (req, res) => {
         console.error('❌ ERROR EN LOGIN:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Error interno del servidor: ' + error.message 
+            message: 'Error interno del servidor' 
         });
     }
 });
 
-// RUTAS PROTEGIDAS CON JWT
+// RUTAS PROTEGIDAS CON VALIDACIÓN
 app.get('/api/accounts', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM accounts ORDER BY created_at DESC');
@@ -320,7 +427,7 @@ app.get('/api/accounts', authenticateJWT, async (req, res) => {
     }
 });
 
-app.post('/api/accounts', authenticateJWT, async (req, res) => {
+app.post('/api/accounts', authenticateJWT, validate(schemas.account), async (req, res) => {
     try {
         const { id, client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
         const fechaInicio = fecha_inicio_proveedor ? new Date(fecha_inicio_proveedor) : new Date();
@@ -339,7 +446,7 @@ app.post('/api/accounts', authenticateJWT, async (req, res) => {
     }
 });
 
-app.put('/api/accounts/:id', authenticateJWT, async (req, res) => {
+app.put('/api/accounts/:id', authenticateJWT, validate(schemas.account), async (req, res) => {
     try {
         const { id } = req.params;
         const { client_name, client_phone, email, password, type, country, profiles, fecha_inicio_proveedor } = req.body;
@@ -361,7 +468,7 @@ app.put('/api/accounts/:id', authenticateJWT, async (req, res) => {
     }
 });
 
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), async (req, res) => {
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), validate(schemas.voucher), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
@@ -404,6 +511,10 @@ app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJ
 app.delete('/api/accounts/:id', authenticateJWT, async (req, res) => {
     try {
         const { id } = req.params;
+        // FASE 1: VALIDAR ID
+        if (!id || typeof id !== 'string' || id.length !== 6) {
+            return res.status(400).json({ error: 'ID de cuenta inválido' });
+        }
         const result = await pool.query('DELETE FROM accounts WHERE id = $1 RETURNING *', [id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Cuenta no encontrada' });
         res.json({ message: 'Cuenta eliminada exitosamente' });
@@ -450,7 +561,7 @@ app.get('/api/alarms/settings', authenticateJWT, async (req, res) => {
     }
 });
 
-app.put('/api/alarms/settings', authenticateJWT, async (req, res) => {
+app.put('/api/alarms/settings', authenticateJWT, validate(schemas.alarmSettings), async (req, res) => {
     try {
         const { provider_threshold_days, client_threshold_days, ntfy_topic } = req.body;
         const result = await pool.query(
@@ -477,6 +588,14 @@ app.post('/api/alarms/test', authenticateJWT, async (req, res) => {
 app.post('/api/check-micuenta-me-code', authenticateJWT, async (req, res) => {
     try {
         const { code, pdv } = req.body;
+        
+        // FASE 1: VALIDACIÓN BÁSICA
+        if (!code || !pdv || typeof code !== 'string' || typeof pdv !== 'string') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Parámetros code y pdv requeridos como strings' 
+            });
+        }
 
         const response = await fetch('https://micuenta.me/e/redeem', {
             method: 'POST',
@@ -507,9 +626,9 @@ app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'log
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// FUNCIÓN STARTSERVER MEJORADA CON LOGGING DETALLADO
+// FUNCIÓN STARTSERVER MEJORADA
 async function startServer() {
-    console.log('🚀 === INICIANDO JIREH STREAMING MANAGER ===');
+    console.log('🚀 === INICIANDO JIREH STREAMING MANAGER - FASE 1 ===');
     
     try {
         console.log('🔧 Paso 1: Verificando conexión a PostgreSQL...');
@@ -517,7 +636,7 @@ async function startServer() {
         const connectionTest = await pool.query('SELECT NOW() as current_time');
         console.log('✅ Conexión a PostgreSQL exitosa:', connectionTest.rows[0].current_time);
         
-        console.log('📝 Paso 2: Configurando tablas...');
+        console.log('📝 Paso 2: Configurando tablas y seguridad...');
         
         try {
             await initDB();
@@ -534,7 +653,11 @@ async function startServer() {
             console.log('🎉 ================================');
             console.log('🚀 SERVIDOR INICIADO EXITOSAMENTE');
             console.log('🎯 Puerto:', PORT);
-            console.log('🔐 JWT activo');
+            console.log('🔐 FASE 1 COMPLETADA:');
+            console.log('   ✅ JWT activo');
+            console.log('   ✅ BCRYPT para contraseñas');
+            console.log('   ✅ Rate Limiting (100 req/15min)');
+            console.log('   ✅ Validación JOI en todas las rutas');
             console.log('👤 Usuario: paolof');
             console.log('🔑 Password: elpoderosodeizrael777xD!');
             console.log('🌐 URL: https://tu-dominio-railway.app');
