@@ -471,8 +471,7 @@ app.put('/api/accounts/:id', authenticateJWT, validate(schemas.account), async (
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
-
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), async (req, res) => {
+        app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), validate(schemas.voucher), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
