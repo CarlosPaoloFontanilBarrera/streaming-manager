@@ -457,18 +457,16 @@
         }
         
         async function uploadProfileVoucher(accountId, profileIndex, formData) {
-            try {
-                const response = await fetch(`${API_BASE}/accounts/${accountId}/profile/${profileIndex}/voucher`, {
-                    method: 'POST',
-                    body: formData
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return await response.json();
-            } catch (error) {
-                console.error('Error subiendo voucher:', error);
-                throw error;
-            }
-        }
+    try {
+        const token = localStorage.getItem('jwtToken');
+        
+        const response = await fetch(`${API_BASE}/accounts/${accountId}/profile/${profileIndex}/voucher`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
         
         async function handleProfileVoucherSubmit(event) {
             event.preventDefault();
