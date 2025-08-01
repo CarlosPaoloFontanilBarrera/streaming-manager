@@ -472,7 +472,7 @@ app.put('/api/accounts/:id', authenticateJWT, validate(schemas.account), async (
     }
 });
 
-app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), validate(schemas.voucher), async (req, res) => {
+app.post('/api/accounts/:accountId/profile/:profileIndex/voucher', authenticateJWT, upload.single('voucher'), async (req, res) => {
     try {
         const { accountId, profileIndex } = req.params;
         const { numero_operacion, monto_pagado } = req.body;
