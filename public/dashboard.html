@@ -456,15 +456,10 @@
             }
         }
         
-        async function uploadProfileVoucher(accountId, profileIndex, formData) {
+       async function uploadProfileVoucher(accountId, profileIndex, formData) {
     try {
-        const token = localStorage.getItem('jwtToken');
-        
         const response = await fetch(`${API_BASE}/accounts/${accountId}/profile/${profileIndex}/voucher`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
             body: formData
         });
         
